@@ -29,7 +29,7 @@ const navLinks = [
 
 const whatsappMessage =
   'Olá, vim pelo site da F12 Contabilidade e gostaria de solicitar atendimento.';
-const whatsappUrl = `https://wa.me/5592984123021?text=${encodeURIComponent(whatsappMessage)}`;
+const whatsappUrl = `https://wa.me/5592993212585?text=${encodeURIComponent(whatsappMessage)}`;
 
 const benefits = [
   { icon: Handshake, label: 'Atendimento consultivo' },
