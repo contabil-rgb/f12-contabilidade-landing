@@ -122,22 +122,6 @@ export async function listarHistoricoPorCliente(clienteId: string) {
   return data ?? [];
 }
 
-export async function listarHistoricoRecente(limit = 100) {
-  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(500, Math.floor(limit))) : 100;
-
-  const { data, error } = await supabase
-    .from('historico_alteracoes')
-    .select('*')
-    .order('data_alteracao', { ascending: false })
-    .limit(safeLimit);
-
-  if (error) {
-    throw new Error(`Nao foi possivel carregar historico recente: ${error.message}`);
-  }
-
-  return data ?? [];
-}
-
 export async function registrarEventoHistorico({
   clienteId,
   usuarioLogado,

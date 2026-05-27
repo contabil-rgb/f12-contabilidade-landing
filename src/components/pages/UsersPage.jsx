@@ -1,4 +1,3 @@
-import React from 'react';
 import { Edit3, RefreshCcw } from 'lucide-react';
 
 export default function UsersPage({
@@ -44,7 +43,7 @@ export default function UsersPage({
                   <td className="border-b border-slate-100 px-4 py-3">{user.setor || 'Não informado'}</td>
                   <td className="border-b border-slate-100 px-4 py-3">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
                   <td className="border-b border-slate-100 px-4 py-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(user.status === 'Ativo' ? 'success' : 'muted')}`}>
+                    <span className={"inline-flex rounded-full border px-2.5 py-1 text-xs font-black " + chipClass(user.status === "Ativo" ? "success" : "muted")}>
                       {user.status}
                     </span>
                   </td>

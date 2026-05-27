@@ -288,7 +288,3 @@ export async function gerarUrlVisualizacaoAnexo(anexo: AnexoCliente) {
 export async function gerarUrlDownloadAnexo(anexo: AnexoCliente) {
   return gerarUrlAssinada(anexo.caminho_arquivo, 600);
 }
-
-export async function removerAnexoCliente() {
-  throw new Error('Remocao de anexos indisponivel nesta fase.');
-}

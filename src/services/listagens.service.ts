@@ -70,22 +70,6 @@ export async function listarTodasListagens() {
   return data ?? [];
 }
 
-export async function listarListagensPorCategoria(categoria: string) {
-  const { data, error } = await supabase
-    .from('listagens')
-    .select('categoria, valor, ordem')
-    .eq('ativo', true)
-    .eq('categoria', categoria)
-    .order('ordem', { ascending: true })
-    .order('valor', { ascending: true });
-
-  if (error) {
-    throw new Error(`Nao foi possivel carregar listagem '${categoria}': ${error.message}`);
-  }
-
-  return data ?? [];
-}
-
 export async function listarListagensAgrupadas() {
   const rows = await listarTodasListagens();
   const grouped = rows.reduce<Record<string, string[]>>((acc, item) => {

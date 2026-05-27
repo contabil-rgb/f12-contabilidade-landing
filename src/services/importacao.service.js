@@ -2,7 +2,6 @@ import { formatCnpj, normalizeCnpj } from '../lib/formatters.js';
 import { supabase } from '../lib/supabase';
 
 const BATCH_SIZE = 200;
-const DATE_FIELDS = new Set(['data_enviada_reinf', 'data_entrega_ecd', 'data_envio_ecd']);
 const CLIENT_DB_FIELDS = [
   'cnpj',
   'razao_social',
@@ -209,14 +208,4 @@ export async function previsualizarImportacaoExcel(arrayBuffer, fileName = 'impo
     ...result,
     payload,
   };
-}
-
-export function parseDateFieldsForDebug(rows) {
-  return rows.map((row) => {
-    const out = { ...row };
-    DATE_FIELDS.forEach((field) => {
-      out[field] = toIsoDate(row[field]);
-    });
-    return out;
-  });
 }

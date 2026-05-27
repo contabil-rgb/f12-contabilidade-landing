@@ -1747,20 +1747,18 @@ function DetailPage({
 
 function PendenciasPage({
   clients,
-  listagens,
-  onQuickUpdate,
   onView,
   onGoReinf,
   onGoEcd,
   searchContext,
   onClearSearchContext,
-  canQuickEditField,
   supabaseStatus,
   metadata,
   onRefresh,
   loading = false,
 }) {
   const [attachmentFilter, setAttachmentFilter] = useState('all');
+  const [expandedPrioritySections, setExpandedPrioritySections] = useState({});
   const searchClientId = String(searchContext?.clientId ?? '');
   const searchQuery = normalizeText(searchContext?.query ?? '');
   const hasSearchContext = Boolean(searchClientId || searchQuery);
@@ -1775,14 +1773,15 @@ function PendenciasPage({
     return searchable.includes(searchQuery);
   }
 
-  const pendingClients = clients.filter((client) => client._analysis.hasPendencia && matchesSearchContext(client));
   const buckets = [
     {
+      key: 'reinf',
       label: 'Pendencias REINF',
       value: countWhere(clients, (client) => client._analysis.reinfPendente || client._analysis.reciboReinfPendente),
       tone: 'warning',
     },
     {
+      key: 'ecd',
       label: 'Pendencias ECD',
       value: countWhere(
         clients,
@@ -1795,16 +1794,19 @@ function PendenciasPage({
       tone: 'warning',
     },
     {
+      key: 'ecf',
       label: 'Pendencias ECF',
       value: countWhere(clients, (client) => client._analysis.ecfPendente || (isYes(client.ecf) && isBlank(client.anexo_recibo_ecf))),
       tone: 'warning',
     },
     {
+      key: 'comunicacao',
       label: 'Clientes para notificar',
       value: countWhere(clients, (client) => client._analysis.comunicacaoPendente),
       tone: 'info',
     },
     {
+      key: 'critico',
       label: 'Pendências críticas',
       value: countWhere(clients, (client) => client._analysis.situacaoCritica || client._analysis.pendenciaTecnica),
       tone: 'danger',
@@ -1825,31 +1827,303 @@ function PendenciasPage({
     return alerts;
   }
 
-  const attachmentRows = clients.filter((client) => {
-    if (!matchesSearchContext(client)) return false;
-    const pendencias = getPendenciasOperacionais(client);
-    if (!pendencias.length) return false;
-    if (attachmentFilter === 'all') return true;
-    if (attachmentFilter === 'reinf') return pendencias.some((item) => item.key === 'reinf');
-    if (attachmentFilter === 'ecd') return pendencias.some((item) => item.key === 'ecd');
-    if (attachmentFilter === 'ecf') return pendencias.some((item) => item.key === 'ecf');
-    if (attachmentFilter === 'comunicacao') return pendencias.some((item) => item.key === 'comunicacao');
+  function getPendenciaActionItems(client) {
+    return getPendenciasOperacionais(client).map((item) => {
+      let priority = 40;
+      let priorityLabel = 'Média';
+
+      if (item.key === 'reinf') {
+        priority = item.label === 'REINF pendente' ? 95 : 90;
+        priorityLabel = 'Alta';
+        return {
+          ...item,
+          area: 'REINF',
+          route: 'reinf',
+          nextAction: item.label === 'Recibo REINF pendente' ? 'Anexar recibo da REINF.' : 'Revisar envio e prazo da REINF.',
+          priority,
+          priorityLabel,
+        };
+      }
+
+      if (item.key === 'ecd') {
+        priority = item.label === 'Responsavel ECD nao definido' ? 72 : item.label === 'Recibo ECD pendente' ? 82 : 78;
+        priorityLabel = item.label === 'Recibo ECD pendente' ? 'Alta' : 'Média';
+        return {
+          ...item,
+          area: 'ECD',
+          route: 'ecd',
+          nextAction:
+            item.label === 'Responsavel ECD nao definido'
+              ? 'Definir responsável pela ECD.'
+              : item.label === 'Recibo ECD pendente'
+                ? 'Anexar recibo da ECD.'
+                : 'Validar status e envio da ECD.',
+          priority,
+          priorityLabel,
+        };
+      }
+
+      if (item.key === 'ecf') {
+        priority = item.label === 'Recibo ECF pendente' ? 80 : 76;
+        priorityLabel = item.label === 'Recibo ECF pendente' ? 'Alta' : 'Média';
+        return {
+          ...item,
+          area: 'ECF',
+          route: 'ecd',
+          nextAction: item.label === 'Recibo ECF pendente' ? 'Anexar recibo da ECF.' : 'Validar status da ECF.',
+          priority,
+          priorityLabel,
+        };
+      }
+
+      priority = 70;
+      priorityLabel = 'Média';
+      return {
+        ...item,
+        area: 'Comunicacao',
+        route: 'cliente',
+        nextAction: 'Notificar cliente e registrar retorno.',
+        priority,
+        priorityLabel,
+      };
+    });
+  }
+
+  const allActionRows = clients.flatMap((client) =>
+    getPendenciaActionItems(client).map((item, index) => ({
+      client,
+      item,
+      rowId: `${client.id}-${item.key}-${index}`,
+    })),
+  );
+
+  function matchesAttachmentFilter(row, filterKey) {
+    if (filterKey === 'all') return true;
+    if (filterKey === 'critico') return row.client._analysis?.situacaoCritica || row.client._analysis?.pendenciaTecnica;
+    if (filterKey === 'reinf') return row.item.key === 'reinf';
+    if (filterKey === 'ecd') return row.item.key === 'ecd';
+    if (filterKey === 'ecf') return row.item.key === 'ecf';
+    if (filterKey === 'comunicacao') return row.item.key === 'comunicacao';
     return true;
-  });
+  }
+
+  function prioritizeRows(rows) {
+    const byClient = new Map();
+
+    rows.forEach((row) => {
+      const current = byClient.get(row.client.id);
+      const rowPriority = row.item.priority + (row.client._analysis?.situacaoCritica || row.client._analysis?.pendenciaTecnica ? 100 : 0);
+      const currentPriority = current
+        ? current.item.priority + (current.client._analysis?.situacaoCritica || current.client._analysis?.pendenciaTecnica ? 100 : 0)
+        : -1;
+
+      if (!current || rowPriority > currentPriority) {
+        byClient.set(row.client.id, row);
+      }
+    });
+
+    return Array.from(byClient.values()).sort((left, right) => {
+      const leftPriority = left.item.priority + (left.client._analysis?.situacaoCritica || left.client._analysis?.pendenciaTecnica ? 100 : 0);
+      const rightPriority = right.item.priority + (right.client._analysis?.situacaoCritica || right.client._analysis?.pendenciaTecnica ? 100 : 0);
+      if (rightPriority !== leftPriority) return rightPriority - leftPriority;
+      return String(left.client.nome_identificacao || left.client.razao_social || '').localeCompare(
+        String(right.client.nome_identificacao || right.client.razao_social || ''),
+        'pt-BR',
+      );
+    });
+  }
+
+  const actionRows = prioritizeRows(allActionRows.filter(({ client, item }) => {
+    if (!matchesSearchContext(client)) return false;
+    return matchesAttachmentFilter({ client, item }, attachmentFilter);
+  }));
 
   const attachmentBuckets = [
-    { key: 'all', label: 'Todos', value: countWhere(clients, (client) => getPendenciasOperacionais(client).length > 0), tone: 'info' },
-    { key: 'reinf', label: 'REINF', value: countWhere(clients, (client) => getPendenciasOperacionais(client).some((item) => item.key === 'reinf')), tone: 'warning' },
-    { key: 'ecd', label: 'ECD', value: countWhere(clients, (client) => getPendenciasOperacionais(client).some((item) => item.key === 'ecd')), tone: 'warning' },
-    { key: 'ecf', label: 'ECF', value: countWhere(clients, (client) => getPendenciasOperacionais(client).some((item) => item.key === 'ecf')), tone: 'warning' },
-    { key: 'comunicacao', label: 'Comunicacao', value: countWhere(clients, (client) => getPendenciasOperacionais(client).some((item) => item.key === 'comunicacao')), tone: 'info' },
+    {
+      key: 'all',
+      label: 'Todas',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client))).length,
+      tone: 'info',
+    },
+    {
+      key: 'reinf',
+      label: 'REINF',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf'))).length,
+      tone: 'warning',
+    },
+    {
+      key: 'ecd',
+      label: 'ECD',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd'))).length,
+      tone: 'warning',
+    },
+    {
+      key: 'ecf',
+      label: 'ECF',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf'))).length,
+      tone: 'warning',
+    },
+    {
+      key: 'comunicacao',
+      label: 'Comunicação',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length,
+      tone: 'info',
+    },
+    {
+      key: 'critico',
+      label: 'Críticas',
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico'))).length,
+      tone: 'danger',
+    },
   ];
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  function uniqueClientCount(rows, predicate) {
+    return new Set(rows.filter(predicate).map((row) => String(row.client.id))).size;
+  }
+
+  function topClientNames(rows, predicate, limit = 3) {
+    const names = [];
+    const seen = new Set();
+
+    rows.forEach((row) => {
+      if (!predicate(row)) return;
+      const clientId = String(row.client.id);
+      if (seen.has(clientId)) return;
+      seen.add(clientId);
+      names.push(row.client.nome_identificacao || row.client.razao_social || 'Cliente sem nome');
+    });
+
+    return names.slice(0, limit);
+  }
+
+  function getPriorityGroup(row) {
+    if (row.client._analysis?.situacaoCritica || row.client._analysis?.pendenciaTecnica || row.item.priority >= 90) {
+      return 'critical';
+    }
+    if (row.item.priority >= 80) return 'high';
+    return 'medium';
+  }
+
+  const prioritySections = [
+    {
+      key: 'critical',
+      title: 'Críticas e vencidas',
+      description: 'Itens que merecem atenção imediata ou podem impactar o prazo da obrigação.',
+      tone: 'danger',
+    },
+    {
+      key: 'high',
+      title: 'Alta prioridade',
+      description: 'Pendências importantes que já pedem ação do time nas próximas movimentações.',
+      tone: 'warning',
+    },
+    {
+      key: 'medium',
+      title: 'Acompanhamento',
+      description: 'Casos que seguem pendentes, mas sem o mesmo nível de urgência operacional.',
+      tone: 'info',
+    },
+  ].map((section) => ({
+    ...section,
+    rows: actionRows.filter((row) => getPriorityGroup(row) === section.key),
+    previewCount: section.key === 'critical' ? 5 : 4,
+  }));
+
+  const executiveSummary = [
+    {
+      key: 'imediata',
+      title: 'Ação imediata',
+      value: uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'critical'),
+      tone: 'danger',
+      detail: 'Clientes com risco maior ou que já podem comprometer o prazo da obrigação.',
+      highlights: topClientNames(actionRows, (row) => getPriorityGroup(row) === 'critical'),
+    },
+    {
+      key: 'atrasadas',
+      title: 'O que está atrasado',
+      value: uniqueClientCount(actionRows, (row) => {
+        const entregaReinf = normalizeDateInputValue(row.client.data_enviada_reinf);
+        const reinfAtrasada = row.item.key === 'reinf' && entregaReinf && entregaReinf < today && !parseAttachment(row.client.anexo_recibo_reinf).has;
+        return row.client._analysis?.emAtraso || reinfAtrasada;
+      }),
+      tone: 'warning',
+      detail: 'Pendências com atraso operacional ou entrega REINF já vencida.',
+      highlights: topClientNames(actionRows, (row) => {
+        const entregaReinf = normalizeDateInputValue(row.client.data_enviada_reinf);
+        const reinfAtrasada = row.item.key === 'reinf' && entregaReinf && entregaReinf < today && !parseAttachment(row.client.anexo_recibo_reinf).has;
+        return row.client._analysis?.emAtraso || reinfAtrasada;
+      }),
+    },
+    {
+      key: 'comprovantes',
+      title: 'Sem comprovante',
+      value: uniqueClientCount(actionRows, (row) => ['Recibo REINF pendente', 'Recibo ECD pendente', 'Recibo ECF pendente'].includes(row.item.label)),
+      tone: 'warning',
+      detail: 'Clientes aguardando recibo ou comprovante para fechar a obrigação.',
+      highlights: topClientNames(actionRows, (row) => ['Recibo REINF pendente', 'Recibo ECD pendente', 'Recibo ECF pendente'].includes(row.item.label)),
+    },
+    {
+      key: 'notificacao',
+      title: 'Falta notificar',
+      value: uniqueClientCount(actionRows, (row) => row.item.key === 'comunicacao'),
+      tone: 'info',
+      detail: 'Clientes com pendência operacional que ainda precisam de retorno ou cobrança.',
+      highlights: topClientNames(actionRows, (row) => row.item.key === 'comunicacao'),
+    },
+  ];
+
+  function getPendenciaBucketIcon(key) {
+    if (key === 'reinf') return AlertTriangle;
+    if (key === 'ecd') return ClipboardList;
+    if (key === 'ecf') return FolderClock;
+    if (key === 'comunicacao') return BellRing;
+    return ShieldAlert;
+  }
+
+  function getExecutiveSummaryIcon(key) {
+    if (key === 'imediata') return ShieldAlert;
+    if (key === 'atrasadas') return AlertTriangle;
+    if (key === 'comprovantes') return FolderClock;
+    return BellRing;
+  }
+
+  function getPrioritySectionVisual(key) {
+    if (key === 'critical') {
+      return {
+        icon: ShieldAlert,
+        panelClass: 'border-rose-200 bg-rose-50/40',
+        headerClass: 'bg-rose-50/90',
+        dividerClass: 'border-rose-100',
+        textClass: 'text-rose-700',
+      };
+    }
+
+    if (key === 'high') {
+      return {
+        icon: AlertTriangle,
+        panelClass: 'border-amber-200 bg-amber-50/30',
+        headerClass: 'bg-amber-50/90',
+        dividerClass: 'border-amber-100',
+        textClass: 'text-amber-700',
+      };
+    }
+
+    return {
+      icon: CheckCircle2,
+      panelClass: 'border-sky-200 bg-sky-50/30',
+      headerClass: 'bg-sky-50/90',
+      dividerClass: 'border-sky-100',
+      textClass: 'text-sky-700',
+    };
+  }
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Painel de Pendências"
-        description="Acompanhamento rápido de clientes com risco operacional e necessidade de ação."
+        description="Central de prioridades para o coordenador e o time atacarem primeiro o que exige ação."
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
@@ -1872,11 +2146,92 @@ function PendenciasPage({
       />
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {buckets.map((bucket) => (
-          <div key={bucket.label} className={`rounded-lg border p-4 ${chipClass(bucket.tone)}`}>
-            <p className="text-sm font-black">{bucket.label}</p>
-            <p className="mt-2 text-3xl font-black">{formatNumber(bucket.value)}</p>
-          </div>
+          (() => {
+            const Icon = getPendenciaBucketIcon(bucket.key);
+
+            return (
+              <button
+                key={bucket.label}
+                type="button"
+                onClick={() => setAttachmentFilter(bucket.key)}
+                className={`group rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${chipClass(bucket.tone)} ${attachmentFilter === bucket.key ? 'ring-2 ring-brand-blue/20' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black">{bucket.label}</p>
+                    <p className="mt-1 text-xs font-semibold opacity-80">
+                      {bucket.key === 'critico'
+                        ? 'Casos com impacto operacional imediato'
+                        : bucket.key === 'comunicacao'
+                          ? 'Clientes que ainda precisam de retorno'
+                          : 'Pendências que pedem ação nesta frente'}
+                    </p>
+                  </div>
+                  <span className="rounded-lg border border-current/15 bg-white/70 p-2">
+                    <Icon size={16} aria-hidden="true" />
+                  </span>
+                </div>
+                <div className="mt-4 flex items-end justify-between">
+                  <p className="text-3xl font-black">{formatNumber(bucket.value)}</p>
+                  <span className="text-xs font-black opacity-0 transition group-hover:opacity-80">
+                    Filtrar
+                  </span>
+                </div>
+              </button>
+            );
+          })()
         ))}
+      </section>
+
+      <section className="surface-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Resumo do dia</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Um retrato rápido do que pede ação agora, sem precisar percorrer toda a lista.
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+            Atualizado com base no filtro atual
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 xl:grid-cols-4">
+          {executiveSummary.map((item) => {
+            const Icon = getExecutiveSummaryIcon(item.key);
+
+            return (
+              <div key={item.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-slate-900">{item.title}</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950">{formatNumber(item.value)}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(item.tone)}`}>
+                      {item.tone === 'danger' ? 'Urgente' : item.tone === 'info' ? 'Acompanhar' : 'Prioridade'}
+                    </span>
+                    <span className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-500">
+                      <Icon size={16} aria-hidden="true" />
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm font-semibold text-slate-600">{item.detail}</p>
+                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-bold uppercase tracking-normal text-slate-500">Exemplos agora</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {item.highlights.length ? item.highlights.map((name) => (
+                      <span key={`${item.key}-${name}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-600">
+                        {name}
+                      </span>
+                    )) : (
+                      <span className="text-xs font-semibold text-slate-400">Nenhum cliente neste grupo.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {hasSearchContext ? (
@@ -1904,26 +2259,10 @@ function PendenciasPage({
             <div>
               <h2 className="text-lg font-black text-slate-950">Pendências por obrigação</h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                Centralize REINF, ECD, ECF e comunicação pendente em um único painel.
+                Mostramos a pendência mais urgente de cada cliente para facilitar a triagem e a próxima ação.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onGoReinf}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
-              >
-                <ChevronRight size={14} aria-hidden="true" />
-                Ir para REINF
-              </button>
-              <button
-                type="button"
-                onClick={onGoEcd}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
-              >
-                <ChevronRight size={14} aria-hidden="true" />
-                Ir para ECD/ECF
-              </button>
               {attachmentBuckets.map((bucket) => (
                 <button
                   key={bucket.key}
@@ -1941,127 +2280,132 @@ function PendenciasPage({
             </div>
           </div>
         </div>
-        <div className="overflow-auto overflow-soft">
-          <table className="min-w-[1100px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                {['Cliente', 'CNPJ', 'Responsavel', 'Pendencias', 'Acao'].map((header) => (
-                  <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {attachmentRows.length ? attachmentRows.map((client) => (
-                <tr key={`attach-${client.id}`} className="hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600">
-                    {client.cnpj || '-'}
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
-                    {client.responsavel || 'Não informado'}
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {getPendenciasOperacionais(client).map((alert) => (
-                        <span
-                          key={`${client.id}-${alert.key}-${alert.label}`}
-                          className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(alert.tone)}`}
-                        >
-                          {alert.label}
-                        </span>
-                      ))}
+        <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+          <p className="text-xs font-bold uppercase tracking-normal text-slate-500">
+            Exibindo {formatNumber(actionRows.length)} cliente(s) priorizado(s) nesta visão.
+          </p>
+        </div>
+        <div className="space-y-4 p-4">
+          {actionRows.length ? prioritySections.map((section) => (
+            section.rows.length ? (() => {
+              const isExpanded = Boolean(expandedPrioritySections[section.key]);
+              const visibleRows = isExpanded ? section.rows : section.rows.slice(0, section.previewCount);
+              const hiddenCount = Math.max(section.rows.length - visibleRows.length, 0);
+              const visual = getPrioritySectionVisual(section.key);
+              const SectionIcon = visual.icon;
+
+              return (
+                <section key={section.key} className={`overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}>
+                <div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 ${visual.headerClass} ${visual.dividerClass}`}>
+                  <div className="flex items-start gap-3">
+                    <span className={`rounded-xl border border-current/10 bg-white/80 p-2 ${visual.textClass}`}>
+                      <SectionIcon size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-950">{section.title}</h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">{section.description}</p>
                     </div>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
+                  </div>
+                  <span className={`rounded-full border px-3 py-1 text-xs font-black ${chipClass(section.tone)}`}>
+                    {formatNumber(section.rows.length)} cliente(s)
+                  </span>
+                </div>
+                <div className="overflow-auto overflow-soft">
+                  <table className="min-w-[1180px] text-left text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {['Cliente', 'CNPJ', 'Obrigação', 'Pendência', 'Responsável', 'Próxima ação', 'Ação'].map((header) => (
+                          <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleRows.map(({ client, item, rowId }) => (
+                        <tr key={rowId} className="hover:bg-slate-50">
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600">
+                            {client.cnpj || '-'}
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.key === 'comunicacao' ? 'info' : 'warning')}`}>
+                              {item.area}
+                            </span>
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.tone)}`}>
+                              {item.label}
+                            </span>
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+                            {client.responsavel || 'Não informado'}
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">
+                            {item.nextAction}
+                          </td>
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (item.route === 'reinf') {
+                                    onGoReinf();
+                                    return;
+                                  }
+                                  if (item.route === 'ecd') {
+                                    onGoEcd();
+                                    return;
+                                  }
+                                  onView(client.id);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                              >
+                                <ChevronRight size={14} aria-hidden="true" />
+                                {item.route === 'reinf' ? 'Ir para REINF' : item.route === 'ecd' ? 'Ir para ECD/ECF' : 'Abrir cliente'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onView(client.id)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                              >
+                                <Eye size={14} aria-hidden="true" />
+                                Ver cliente
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className={`flex flex-wrap items-center justify-between gap-3 border-t bg-white px-4 py-3 ${visual.dividerClass}`}>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Mostrando {formatNumber(visibleRows.length)} de {formatNumber(section.rows.length)} cliente(s) neste bloco.
+                  </p>
+                  {section.rows.length > section.previewCount ? (
                     <button
                       type="button"
-                      onClick={() => onView(client.id)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                      onClick={() => setExpandedPrioritySections((current) => ({
+                        ...current,
+                        [section.key]: !current[section.key],
+                      }))}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
                     >
-                      <Eye size={14} aria-hidden="true" />
-                      Abrir cliente
+                      {isExpanded ? 'Mostrar menos' : `Ver mais ${formatNumber(hiddenCount)}`}
                     </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm font-semibold text-slate-500">
-                    Nenhuma pendência operacional para o filtro selecionado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="surface-card">
-        <div className="border-b border-slate-200 p-5">
-          <h2 className="text-lg font-black text-slate-950">Acompanhamento rápido</h2>
-        </div>
-        <div className="overflow-auto overflow-soft">
-          <table className="min-w-[1400px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                {['Cliente', 'Alertas', 'Situação', 'Responsável', 'Cliente notificado', 'Próxima ação'].map((header) => (
-                  <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pendingClients.map((client) => (
-                <tr key={client.id} className="hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <button type="button" onClick={() => onView(client.id)} className="text-left">
-                      <span className="block font-black text-slate-950">{client.nome_identificacao}</span>
-                      <span className="text-xs font-semibold text-slate-500">{client.cnpj}</span>
-                    </button>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <AlertsList alerts={client._analysis.alerts} />
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <InlineSelect
-                      value={client.situacao}
-                      options={listagens.situacao}
-                      disabled={!canQuickEditField(client, 'situacao')}
-                      onChange={(value) => onQuickUpdate(client.id, { situacao: value })}
-                    />
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <InlineSelect
-                      value={client.responsavel}
-                      options={listagens.responsavel}
-                      disabled={!canQuickEditField(client, 'responsavel')}
-                      onChange={(value) => onQuickUpdate(client.id, { responsavel: value })}
-                    />
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <InlineSelect
-                      value={client.cliente_notificado}
-                      options={listagens.cliente_notificado}
-                      disabled={!canQuickEditField(client, 'cliente_notificado')}
-                      onChange={(value) => onQuickUpdate(client.id, { cliente_notificado: value })}
-                    />
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <input
-                      defaultValue={client.proxima_acao}
-                      disabled={!canQuickEditField(client, 'proxima_acao')}
-                      onBlur={(event) => onQuickUpdate(client.id, { proxima_acao: event.target.value })}
-                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:bg-slate-100 disabled:text-slate-400"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  ) : null}
+                </div>
+              </section>
+              );
+            })() : null
+          )) : (
+            <div className="px-4 py-8 text-center text-sm font-semibold text-slate-500">
+              Nenhuma pendência operacional para o filtro selecionado.
+            </div>
+          )}
         </div>
       </section>
 
@@ -2085,58 +2429,6 @@ function InlineSelect({ value, options, onChange, disabled = false }) {
         </option>
       ))}
     </select>
-  );
-}
-
-function LegacyReinfPage({ clients, onView }) {
-  const [onlyIssues, setOnlyIssues] = useState(false);
-  const rows = clients.filter((client) =>
-    onlyIssues
-      ? client._analysis.reinfPendente || client._analysis.ataPendente || !client.data_enviada_reinf
-      : true,
-  );
-
-  return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Lucro distribuído" value={countWhere(clients, (client) => isYes(client.distribuicao_lucros))} icon={BriefcaseBusiness} tone="info" />
-        <MetricCard title="REINF pendente" value={countWhere(clients, (client) => client._analysis.reinfPendente)} icon={AlertTriangle} tone="warning" />
-        <MetricCard title="Ata pendente" value={countWhere(clients, (client) => client._analysis.ataPendente)} icon={FolderClock} tone="warning" />
-        <MetricCard title="Valor acumulado informado" value={countWhere(clients, (client) => !isBlank(client.valor_lucro_acumulado))} icon={FileSpreadsheet} tone="success" />
-      </section>
-
-      <section className="surface-card">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-5">
-          <h2 className="text-lg font-black text-slate-950">Controle de REINF</h2>
-          <label className="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-            <input
-              type="checkbox"
-              checked={onlyIssues}
-              onChange={(event) => setOnlyIssues(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
-            />
-            Somente alertas
-          </label>
-        </div>
-        <DataTable
-          rows={rows}
-          columns={[
-            'nome_identificacao',
-            'cnpj',
-            'regime_tributario',
-            'distribuicao_lucros',
-            'lucro',
-            'valor_lucro_acumulado',
-            'precisa_ata',
-            'ata_entregue',
-            'envio_reinf',
-            'data_enviada_reinf',
-          ]}
-          onView={onView}
-          trailing={(client) => <AlertsList alerts={client._analysis.alerts.filter((alert) => ['reinf', 'ata'].includes(alert.key))} />}
-        />
-      </section>
-    </div>
   );
 }
 
@@ -2331,66 +2623,6 @@ function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, on
             return undefined;
           }}
           trailing={(client) => <ReinfObrigacaoStatusCell client={client} />}
-        />
-      </section>
-    </div>
-  );
-}
-
-function LegacyEcdEcfPage({ clients, onView }) {
-  const [mode, setMode] = useState('todos');
-  const [year, setYear] = useState('');
-  const years = uniqueValues(
-    clients.flatMap((client) => [client.ultima_ecd_entregue, client.ultima_ecf_entregue]).map((value) => String(value ?? '').match(/\d{4}/)?.[0]),
-  ).sort((a, b) => b.localeCompare(a));
-
-  const rows = clients.filter((client) => {
-    const modeMatches =
-      mode === 'todos' ||
-      (mode === 'ecd-sim' && isYes(client.ecd)) ||
-      (mode === 'ecd-nao' && normalizeText(client.ecd) === 'nao') ||
-      (mode === 'ecd-pendente' && client._analysis.ecdPendente) ||
-      (mode === 'ecf-pendente' && client._analysis.ecfPendente);
-    const yearMatches = !year || [client.ultima_ecd_entregue, client.ultima_ecf_entregue].some((value) => String(value ?? '').includes(year));
-    return modeMatches && yearMatches;
-  });
-
-  return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Obrigados Ã  ECD" value={countWhere(clients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
-        <MetricCard title="Não obrigados à ECD" value={countWhere(clients, (client) => normalizeText(client.ecd) === 'nao')} icon={CheckCircle2} tone="success" />
-        <MetricCard title="ECD pendente" value={countWhere(clients, (client) => client._analysis.ecdPendente)} icon={AlertTriangle} tone="warning" />
-        <MetricCard title="ECF pendente" value={countWhere(clients, (client) => client._analysis.ecfPendente)} icon={AlertTriangle} tone="warning" />
-      </section>
-
-      <section className="surface-card">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
-          <h2 className="text-lg font-black text-slate-950">Controle de obrigações anuais</h2>
-          <div className="flex flex-wrap gap-2">
-            <InlineSelect
-              value={mode}
-              options={['todos', 'ecd-sim', 'ecd-nao', 'ecd-pendente', 'ecf-pendente']}
-              onChange={setMode}
-            />
-            <InlineSelect value={year} options={years} onChange={setYear} />
-          </div>
-        </div>
-        <DataTable
-          rows={rows}
-          columns={[
-            'nome_identificacao',
-            'cnpj',
-            'regime_tributario',
-            'ecd',
-            'ultima_ecd_entregue',
-            'ecf',
-            'ultima_ecf_entregue',
-            'responsavel',
-            'situacao',
-          ]}
-          onView={onView}
-          trailing={(client) => <AlertsList alerts={client._analysis.alerts.filter((alert) => ['ecd', 'ecf'].includes(alert.key))} />}
         />
       </section>
     </div>
@@ -3955,11 +4187,11 @@ export default function App() {
     const origemEdicao = page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes';
     let previousForHistory = previous;
     if (previous && !canEditClient(currentUserFull, previous)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil nÃ£o pode editar este cliente.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode editar este cliente.' });
       return;
     }
     if (!previous && !can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil nÃ£o pode cadastrar clientes.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode cadastrar clientes.' });
       return;
     }
 
@@ -4201,7 +4433,7 @@ export default function App() {
 
   async function inactivateClient(client) {
     if (!can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil nÃ£o pode inativar clientes.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode inativar clientes.' });
       return;
     }
     if (!confirm(`Inativar ${client.nome_identificacao || client.razao_social}?`)) return;
@@ -4331,7 +4563,7 @@ export default function App() {
 
   async function exportXlsx(rows, filename) {
     if (!can(currentUserFull, PERMISSIONS.REPORTS_EXPORT)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil nÃ£o pode exportar relatÃ³rios.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode exportar relatórios.' });
       return;
     }
     const { exportClientsToXlsx, exportRowsToXlsx } = await import('./lib/excel.js');
@@ -4344,7 +4576,7 @@ export default function App() {
 
   async function exportCsv(rows, filename) {
     if (!can(currentUserFull, PERMISSIONS.REPORTS_EXPORT)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil nÃ£o pode exportar relatÃ³rios.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode exportar relatórios.' });
       return;
     }
     const { exportClientsToCsv, exportRowsToCsv } = await import('./lib/excel.js');
@@ -4360,7 +4592,7 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode restaurar a base.' });
       return;
     }
-    if (!confirm('Restaurar os dados gerados a partir da planilha original? AlteraÃ§Ãµes locais serÃ£o substituÃ­das.')) return;
+    if (!confirm('Restaurar os dados gerados a partir da planilha original? Alterações locais serão substituídas.')) return;
     const sync = await sincronizarClientesSupabase(clientesContabeis.map(withClientDefaults));
     if (!sync.synced) {
       setToast({
@@ -4527,14 +4759,11 @@ export default function App() {
       ? (
         <PendenciasPage
           clients={enrichedClients}
-          listagens={listagens}
-          onQuickUpdate={quickUpdateClient}
           onView={openClient}
           onGoReinf={() => setPage('reinf')}
           onGoEcd={() => setPage('ecd')}
           searchContext={pendenciasSearchContext}
           onClearSearchContext={() => setPendenciasSearchContext(null)}
-          canQuickEditField={(client, fieldKey) => canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
@@ -4605,7 +4834,7 @@ export default function App() {
       : <AccessDeniedPage />,
     historico: can(currentUserFull, PERMISSIONS.HISTORY_VIEW)
       ? (
-        <Suspense fallback={<PageLoadingFallback label="Carregando histÃ³rico..." />}>
+        <Suspense fallback={<PageLoadingFallback label="Carregando histórico..." />}>
           <LazyHistoryPage
             history={security.historico_alteracoes}
             users={security.usuarios.map(sanitizeUser)}

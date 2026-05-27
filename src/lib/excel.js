@@ -256,39 +256,6 @@ export function mergeLists(lists, clients) {
   return merged;
 }
 
-export function mergeImportedClients(currentClients, importedClients) {
-  const byCnpj = new Map();
-  currentClients.forEach((client) => {
-    const key = normalizeCnpj(client.cnpj) || client.id;
-    byCnpj.set(key, client);
-  });
-
-  let created = 0;
-  let updated = 0;
-  importedClients.forEach((client) => {
-    const key = normalizeCnpj(client.cnpj) || client.id;
-    if (byCnpj.has(key)) {
-      updated += 1;
-      byCnpj.set(key, {
-        ...byCnpj.get(key),
-        ...client,
-        id: byCnpj.get(key).id,
-        criado_em: byCnpj.get(key).criado_em || client.criado_em,
-        atualizado_em: todayBr(),
-      });
-    } else {
-      created += 1;
-      byCnpj.set(key, client);
-    }
-  });
-
-  return {
-    clients: Array.from(byCnpj.values()),
-    created,
-    updated,
-  };
-}
-
 export function workbookFromArrayBuffer(buffer, source) {
   const workbook = XLSX.read(buffer, {
     cellDates: true,
