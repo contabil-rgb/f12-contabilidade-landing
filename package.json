@@ -1,17 +1,22 @@
 {
-  "name": "f12-contabilidade-landing",
+  "name": "portal-gestao-contabil-f12",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:sync:clientes": "node scripts/sync-clientes-supabase.mjs",
+    "supabase:sync:clientes:apply": "node scripts/sync-clientes-supabase.mjs --apply"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "lucide-react": "^0.468.0"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
