@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -331,8 +331,6 @@ async function updateUltimoAcessoUsuario(usuarioId) {
   return !error;
 }
 
-async function incrementarTentativasUsuarioPorEmail() { return false; }
-async function limparTentativasUsuarioPorEmail() { return false; }
 
 async function enviarResetSenhaSupabase(email) {
   const redirectTo = `${window.location.origin}${window.location.pathname}?type=recovery`;
@@ -4035,7 +4033,6 @@ export default function App() {
 
     const auth = await loginSupabase(emailNorm, senha);
     if (!auth.ok || !auth.authUser) {
-      incrementarTentativasUsuarioPorEmail(emailNorm).catch(() => {});
       return { ok: false, message: auth.message ?? 'Falha ao autenticar no Supabase.' };
     }
 
@@ -4065,7 +4062,6 @@ export default function App() {
     sincronizarPerfilUsuario(perfil);
     startSession(perfil.id);
     setPage('dashboard');
-    limparTentativasUsuarioPorEmail(emailNorm).catch(() => {});
     updateUltimoAcessoUsuario(perfil.id).catch(() => {});
     return { ok: true };
   }
