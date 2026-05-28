@@ -79,21 +79,21 @@ export function analyzeClient(client) {
   const alerts = [
     emAtraso && {
       key: 'atraso',
-      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competencia em atraso',
+      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competência em atraso',
       tone: 'danger',
     },
-    situacaoCritica && { key: 'critico', label: 'Situacao critica', tone: 'danger' },
+    situacaoCritica && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
     reinfPendente && { key: 'reinf', label: 'REINF pendente', tone: 'warning' },
     reciboReinfPendente && { key: 'recibo_reinf', label: 'Recibo REINF pendente', tone: 'warning' },
     ecdPendente && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     ecdAguardandoEnvio && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
-    ecdResponsavelPendente && { key: 'ecd_responsavel', label: 'Responsavel nao definido', tone: 'warning' },
+    ecdResponsavelPendente && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
     reciboEcdPendente && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
     ecfPendente && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
     reciboEcfPendente && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
-    pendenciaTecnica && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
-    documentosAtrasados && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
-    comunicacaoPendente && { key: 'comunicacao', label: 'Comunicacao pendente', tone: 'info' },
+    pendenciaTecnica && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
+    documentosAtrasados && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
+    comunicacaoPendente && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
   ].filter(Boolean);
 
   let risk = 'ok';
@@ -145,7 +145,7 @@ export function enrichClients(clients) {
 
 export function countBy(rows, key) {
   return rows.reduce((acc, row) => {
-    const label = String(row[key] ?? '').trim() || 'Nao informado';
+    const label = String(row[key] ?? '').trim() || 'Não informado';
     acc[label] = (acc[label] ?? 0) + 1;
     return acc;
   }, {});

@@ -101,7 +101,7 @@ export async function registrarHistoricoAlteracoes(
   const { error } = await supabase.from('historico_alteracoes').insert(rows);
 
   if (error) {
-    throw new Error(`Nao foi possivel registrar historico: ${error.message}`);
+    throw new Error(`Não foi possível registrar histórico: ${error.message}`);
   }
 
   return { ok: true, inserted: rows.length, skipped: CAMPOS_HISTORICO_RELEVANTES.length - rows.length };
@@ -116,7 +116,7 @@ export async function listarHistoricoPorCliente(clienteId: string) {
     .limit(50);
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar historico do cliente: ${error.message}`);
+    throw new Error(`Não foi possível carregar histórico do cliente: ${error.message}`);
   }
 
   return data ?? [];
@@ -149,7 +149,7 @@ export async function registrarEventoHistorico({
 
   const { error } = await supabase.from('historico_alteracoes').insert(row);
   if (error) {
-    throw new Error(`Nao foi possivel registrar evento no historico: ${error.message}`);
+    throw new Error(`Não foi possível registrar evento no histórico: ${error.message}`);
   }
 
   return { ok: true };

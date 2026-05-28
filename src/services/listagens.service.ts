@@ -64,7 +64,7 @@ export async function listarTodasListagens() {
     .order('valor', { ascending: true });
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar listagens do Supabase: ${error.message}`);
+    throw new Error(`Não foi possível carregar listagens do Supabase: ${error.message}`);
   }
 
   return data ?? [];

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 
 export type ObrigacoesClienteRow = {
   cliente_id: string;
+  responsavel_exibicao?: string | null;
   reinf_status_codigo?: string | null;
   reinf_status_label?: string | null;
   reinf_pendente?: boolean | null;
@@ -42,7 +43,7 @@ export async function listarStatusObrigacoesClientes() {
     .select('*');
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar status das obrigacoes: ${error.message}`);
+    throw new Error(`Não foi possível carregar status das obrigações: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeObrigacaoRow(row as Record<string, unknown>));

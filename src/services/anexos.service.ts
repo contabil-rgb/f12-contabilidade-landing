@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { buscarClientePorCnpj } from './clientes.service';
 import type { AnexoCliente, ClienteAnexoRef, TipoAnexo } from '../types/anexo';
 import { normalizarNomeArquivo, timestampParaCaminho } from '../utils/normalizar-nome-arquivo';
 import { validarArquivoAnexo } from '../utils/validar-arquivo';
@@ -6,6 +7,11 @@ import { validarArquivoAnexo } from '../utils/validar-arquivo';
 const BUCKET_DOCUMENTOS_CLIENTES = 'documentos-clientes';
 const FALLBACK_ANEXOS = new Map<string, AnexoCliente[]>();
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function getAnexoTimestamp(value?: string | null) {
+  const time = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
 
 function isUuid(value: unknown) {
   return UUID_REGEX.test(String(value ?? '').trim());
@@ -22,6 +28,17 @@ function getClienteFallbackKey(cliente: ClienteAnexoRef) {
 function getFallbackBucket(clienteKey: string) {
   if (!FALLBACK_ANEXOS.has(clienteKey)) FALLBACK_ANEXOS.set(clienteKey, []);
   return FALLBACK_ANEXOS.get(clienteKey) ?? [];
+}
+
+function clearFallbackBucketByTipo(cliente: ClienteAnexoRef, tipoAnexo: TipoAnexo) {
+  const clienteKey = getClienteFallbackKey(cliente);
+  const bucket = getFallbackBucket(clienteKey);
+  const next = bucket.filter((item) => item.tipo_anexo !== tipoAnexo);
+  if (next.length) {
+    FALLBACK_ANEXOS.set(clienteKey, next);
+  } else {
+    FALLBACK_ANEXOS.delete(clienteKey);
+  }
 }
 
 function toFallbackAnexo(params: {
@@ -71,9 +88,54 @@ function normalizeAnexoRow(row: Record<string, unknown>) {
   } as AnexoCliente;
 }
 
+export function getAnexoDataReferencia(anexo?: AnexoCliente | null) {
+  if (!anexo) return '';
+  return anexo.atualizado_em || anexo.criado_em || '';
+}
+
+export function sortAnexosPorRecencia<T extends AnexoCliente>(anexos: T[]) {
+  return [...(anexos ?? [])].sort((left, right) => {
+    const leftTime = getAnexoTimestamp(getAnexoDataReferencia(left));
+    const rightTime = getAnexoTimestamp(getAnexoDataReferencia(right));
+    if (rightTime !== leftTime) return rightTime - leftTime;
+    return String(left.nome_arquivo ?? '').localeCompare(String(right.nome_arquivo ?? ''), 'pt-BR');
+  });
+}
+
 function resolveClienteId(cliente: ClienteAnexoRef) {
   const id = String(cliente.id ?? '').trim();
   return isUuid(id) ? id : '';
+}
+
+async function resolveClientePersistidoId(cliente: ClienteAnexoRef) {
+  const directId = resolveClienteId(cliente);
+  if (directId) return directId;
+
+  const cnpjDigits = String(cliente.cnpj ?? '').replace(/\D/g, '');
+  if (!cnpjDigits) return '';
+
+  try {
+    const persistedClient = await buscarClientePorCnpj(cnpjDigits);
+    const persistedId = String(persistedClient?.id ?? '').trim();
+    return isUuid(persistedId) ? persistedId : '';
+  } catch {
+    return '';
+  }
+}
+
+function mergeAnexosWithFallback(cliente: ClienteAnexoRef, anexosBanco: AnexoCliente[]) {
+  const fallback = getFallbackBucket(getClienteFallbackKey(cliente));
+  if (!fallback.length) return sortAnexosPorRecencia(anexosBanco);
+
+  const merged = [...fallback];
+  const existingIds = new Set(fallback.map((item) => item.id));
+  anexosBanco.forEach((anexo) => {
+    if (!existingIds.has(anexo.id)) {
+      merged.push(anexo);
+    }
+  });
+
+  return sortAnexosPorRecencia(merged);
 }
 
 async function uploadArquivoStorage(path: string, file: File) {
@@ -109,7 +171,7 @@ async function fallbackUpload(params: {
 }
 
 export async function listarAnexosCliente(cliente: ClienteAnexoRef) {
-  const clienteId = resolveClienteId(cliente);
+  const clienteId = await resolveClientePersistidoId(cliente);
   if (!clienteId) {
     return [...getFallbackBucket(getClienteFallbackKey(cliente))];
   }
@@ -118,13 +180,14 @@ export async function listarAnexosCliente(cliente: ClienteAnexoRef) {
     .from('anexos')
     .select('*')
     .eq('cliente_id', clienteId)
+    .order('atualizado_em', { ascending: false })
     .order('criado_em', { ascending: false });
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar anexos do cliente: ${error.message}`);
+    throw new Error(`Não foi possível carregar anexos do cliente: ${error.message}`);
   }
 
-  return (data ?? []).map((row) => normalizeAnexoRow(row as Record<string, unknown>));
+  return mergeAnexosWithFallback(cliente, (data ?? []).map((row) => normalizeAnexoRow(row as Record<string, unknown>)));
 }
 
 export async function listarUltimosAnexosPorClientes(clienteIds: string[]) {
@@ -135,10 +198,11 @@ export async function listarUltimosAnexosPorClientes(clienteIds: string[]) {
     .from('anexos')
     .select('*')
     .in('cliente_id', ids)
+    .order('atualizado_em', { ascending: false })
     .order('criado_em', { ascending: false });
 
   if (error) {
-    throw new Error(`Nao foi possivel consultar anexos por cliente: ${error.message}`);
+    throw new Error(`Não foi possível consultar anexos por cliente: ${error.message}`);
   }
 
   const grouped: Record<string, Partial<Record<TipoAnexo, AnexoCliente>>> = {};
@@ -160,10 +224,12 @@ export async function listarUltimosAnexosPorClientes(clienteIds: string[]) {
 }
 
 export async function buscarAnexoPorTipo(cliente: ClienteAnexoRef, tipoAnexo: TipoAnexo) {
-  const clienteId = resolveClienteId(cliente);
+  const fallbackAnexo = getFallbackBucket(getClienteFallbackKey(cliente))
+    .find((item) => item.tipo_anexo === tipoAnexo) ?? null;
+
+  const clienteId = await resolveClientePersistidoId(cliente);
   if (!clienteId) {
-    const bucket = getFallbackBucket(getClienteFallbackKey(cliente));
-    return bucket.find((item) => item.tipo_anexo === tipoAnexo) ?? null;
+    return fallbackAnexo;
   }
 
   const { data, error } = await supabase
@@ -171,15 +237,16 @@ export async function buscarAnexoPorTipo(cliente: ClienteAnexoRef, tipoAnexo: Ti
     .select('*')
     .eq('cliente_id', clienteId)
     .eq('tipo_anexo', tipoAnexo)
+    .order('atualizado_em', { ascending: false })
     .order('criado_em', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Nao foi possivel buscar anexo por tipo: ${error.message}`);
+    throw new Error(`Não foi possível buscar anexo por tipo: ${error.message}`);
   }
 
-  return data ? normalizeAnexoRow(data as Record<string, unknown>) : null;
+  return fallbackAnexo ?? (data ? normalizeAnexoRow(data as Record<string, unknown>) : null);
 }
 
 export async function uploadAnexoCliente(params: {
@@ -188,7 +255,7 @@ export async function uploadAnexoCliente(params: {
   file: File;
 }) {
   validarArquivoAnexo(params.file);
-  const clienteId = resolveClienteId(params.cliente);
+  const clienteId = await resolveClientePersistidoId(params.cliente);
   if (!clienteId) {
     return fallbackUpload(params);
   }
@@ -214,9 +281,10 @@ export async function uploadAnexoCliente(params: {
     .single();
 
   if (error) {
-    throw new Error(`Nao foi possivel gravar vinculo do anexo: ${error.message}`);
+    throw new Error(`Não foi possível gravar vínculo do anexo: ${error.message}`);
   }
 
+  clearFallbackBucketByTipo(params.cliente, params.tipoAnexo);
   return normalizeAnexoRow(data as Record<string, unknown>);
 }
 
@@ -227,7 +295,7 @@ export async function substituirAnexoCliente(params: {
   anexoExistente?: AnexoCliente | null;
 }) {
   validarArquivoAnexo(params.file);
-  const clienteId = resolveClienteId(params.cliente);
+  const clienteId = await resolveClientePersistidoId(params.cliente);
   if (!clienteId) {
     return fallbackUpload(params);
   }
@@ -256,9 +324,10 @@ export async function substituirAnexoCliente(params: {
     .single();
 
   if (error) {
-    throw new Error(`Nao foi possivel substituir anexo: ${error.message}`);
+    throw new Error(`Não foi possível substituir anexo: ${error.message}`);
   }
 
+  clearFallbackBucketByTipo(params.cliente, params.tipoAnexo);
   return normalizeAnexoRow(data as Record<string, unknown>);
 }
 
@@ -275,7 +344,7 @@ export async function gerarUrlAssinada(caminhoArquivo: string, expires = 600) {
     .createSignedUrl(caminhoArquivo, expires);
 
   if (error || !data?.signedUrl) {
-    throw new Error(`Nao foi possivel gerar URL assinada: ${error?.message ?? 'erro desconhecido'}`);
+    throw new Error(`Não foi possível gerar URL assinada: ${error?.message ?? 'erro desconhecido'}`);
   }
 
   return data.signedUrl;

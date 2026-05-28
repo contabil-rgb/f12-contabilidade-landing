@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet } from 'lucide-react';
-import { listarAnexosCliente } from '../../services/anexos.service';
+import {
+  getAnexoDataReferencia,
+  listarAnexosCliente,
+  sortAnexosPorRecencia,
+} from '../../services/anexos.service';
 import type { AnexoCliente, ClienteAnexoRef, TipoAnexo } from '../../types/anexo';
 import { TIPO_ANEXO_LABELS, TIPOS_ANEXO_OPTIONS } from '../../types/anexo';
 import { AnexoBadge } from './AnexoBadge';
@@ -21,9 +25,13 @@ export function AnexosClienteSection({
   onSuccess,
   onError,
 }: Props) {
-  const [anexos, setAnexos] = useState<AnexoCliente[]>(anexosIniciais);
+  const [anexos, setAnexos] = useState<AnexoCliente[]>(() => sortAnexosPorRecencia(anexosIniciais));
   const [loading, setLoading] = useState(false);
   const [localWarning, setLocalWarning] = useState('');
+
+  useEffect(() => {
+    setAnexos(sortAnexosPorRecencia(anexosIniciais));
+  }, [anexosIniciais]);
 
   useEffect(() => {
     let active = true;
@@ -32,12 +40,12 @@ export function AnexosClienteSection({
         setLoading(true);
         const data = await listarAnexosCliente(cliente);
         if (active) {
-          setAnexos(data);
+          setAnexos(sortAnexosPorRecencia(data));
           setLocalWarning('');
         }
       } catch (error) {
         if (active) {
-          setLocalWarning(error instanceof Error ? error.message : 'Nao foi possivel carregar anexos.');
+          setLocalWarning(error instanceof Error ? error.message : 'Não foi possível carregar anexos.');
         }
       } finally {
         if (active) setLoading(false);
@@ -58,10 +66,12 @@ export function AnexosClienteSection({
   }, [anexos]);
 
   function handleSuccess(tipoAnexo: TipoAnexo, anexo: AnexoCliente) {
-    setAnexos((current) => [
-      anexo,
-      ...current.filter((item) => item.id !== anexo.id && item.tipo_anexo !== tipoAnexo),
-    ]);
+    setAnexos((current) =>
+      sortAnexosPorRecencia([
+        anexo,
+        ...current.filter((item) => item.id !== anexo.id && item.tipo_anexo !== tipoAnexo),
+      ]),
+    );
     onSuccess?.(tipoAnexo, anexo);
   }
 
@@ -99,7 +109,9 @@ export function AnexosClienteSection({
                 <div>
                   <p className="text-sm font-black text-slate-900">{TIPO_ANEXO_LABELS[tipo]}</p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {anexo?.criado_em ? `Enviado em ${new Date(anexo.criado_em).toLocaleString('pt-BR')}` : 'Nenhum arquivo enviado'}
+                    {getAnexoDataReferencia(anexo)
+                      ? `Enviado em ${new Date(getAnexoDataReferencia(anexo)).toLocaleString('pt-BR')}`
+                      : 'Nenhum arquivo enviado'}
                   </p>
                 </div>
                 <AnexoBadge anexo={anexo} />

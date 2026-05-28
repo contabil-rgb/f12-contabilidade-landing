@@ -153,7 +153,7 @@ export async function sincronizarClientesRows(rows, sourceLabel = 'sincronizacao
         ignorados: ignored,
         erros: 1,
       },
-      errors: ['Nenhum cliente valido para importacao (CNPJ e Razao Social sao obrigatorios).'],
+      errors: ['Nenhum cliente válido para importação (CNPJ e Razão Social são obrigatórios).'],
       rows: [],
     };
   }

@@ -31,6 +31,16 @@ const CLIENTE_FIELDS = new Set([
   'atualizado_em',
 ]);
 
+function normalizeCnpjDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function formatCnpjDigits(value: string) {
+  const digits = normalizeCnpjDigits(value);
+  if (digits.length !== 14) return digits;
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
 function toIsoDate(value: unknown) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -84,7 +94,7 @@ export async function listarClientes() {
     .order('razao_social', { ascending: true });
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar clientes do Supabase: ${error.message}`);
+    throw new Error(`Não foi possível carregar clientes do Supabase: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeRow(row as Record<string, unknown>));
@@ -98,10 +108,35 @@ export async function buscarClientePorId(id: string) {
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Nao foi possivel buscar cliente no Supabase: ${error.message}`);
+    throw new Error(`Não foi possível buscar cliente no Supabase: ${error.message}`);
   }
   if (!data) return null;
   return normalizeRow(data as Record<string, unknown>);
+}
+
+export async function buscarClientePorCnpj(cnpj: string) {
+  const digits = normalizeCnpjDigits(cnpj);
+  if (!digits) return null;
+
+  const candidates = [...new Set([formatCnpjDigits(digits), digits].filter(Boolean))];
+
+  for (const candidate of candidates) {
+    const { data, error } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('cnpj', candidate)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Não foi possível buscar cliente por CNPJ no Supabase: ${error.message}`);
+    }
+
+    if (data) {
+      return normalizeRow(data as Record<string, unknown>);
+    }
+  }
+
+  return null;
 }
 
 export async function criarCliente(cliente: Record<string, unknown>) {
@@ -115,7 +150,7 @@ export async function criarCliente(cliente: Record<string, unknown>) {
     .single();
 
   if (error) {
-    throw new Error(`Nao foi possivel criar cliente no Supabase: ${error.message}`);
+    throw new Error(`Não foi possível criar cliente no Supabase: ${error.message}`);
   }
   return normalizeRow(data as Record<string, unknown>);
 }
@@ -134,7 +169,7 @@ export async function atualizarCliente(id: string, dados: Record<string, unknown
     .single();
 
   if (error) {
-    throw new Error(`Nao foi possivel atualizar cliente no Supabase: ${error.message}`);
+    throw new Error(`Não foi possível atualizar cliente no Supabase: ${error.message}`);
   }
   return normalizeRow(data as Record<string, unknown>);
 }

@@ -31,7 +31,7 @@ export function UploadAnexoButton({
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
-  const hasAnexo = Boolean(anexo?.id);
+  const hasAnexo = Boolean(anexo?.id || anexo?.caminho_arquivo);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -58,7 +58,7 @@ export function UploadAnexoButton({
       const url = await gerarUrlVisualizacaoAnexo(anexo);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Nao foi possivel gerar link de visualizacao.');
+      onError?.(error instanceof Error ? error.message : 'Não foi possível gerar link de visualização.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function UploadAnexoButton({
       const url = await gerarUrlDownloadAnexo(anexo);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Nao foi possivel gerar link de download.');
+      onError?.(error instanceof Error ? error.message : 'Não foi possível gerar link de download.');
     } finally {
       setLoading(false);
     }
