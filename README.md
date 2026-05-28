@@ -40,6 +40,7 @@ No SQL Editor do Supabase, execute nesta ordem:
 5. `C:\Users\F12 CONTABILIDADE 13\Documents\New project\supabase\anexos.sql`
 6. `C:\Users\F12 CONTABILIDADE 13\Documents\New project\supabase\storage.sql`
 7. `C:\Users\F12 CONTABILIDADE 13\Documents\New project\supabase\usuarios-hardening.sql` (recomendado)
+8. `C:\Users\F12 CONTABILIDADE 13\Documents\New project\supabase\obrigacoes-status.sql`
 
 ## 3) Criar usuarios no Supabase Auth e vincular perfis
 
@@ -257,6 +258,48 @@ Use este checklist antes de liberar mudancas no portal.
 2. Edicao de cliente:
    - alterar `situacao` e `responsavel` de um cliente;
    - salvar e confirmar no banco:
+
+## 12) Camada persistente de status e pendencias das obrigacoes
+
+O arquivo `C:\Users\F12 CONTABILIDADE 13\Documents\New project\supabase\obrigacoes-status.sql` cria:
+
+- helpers SQL para leitura de campos `Sim / Nao`
+- a view `public.vw_clientes_obrigacoes_status`
+
+Essa view consolida, por cliente:
+
+- status de REINF
+- status de ECD
+- status de ECF
+- comprovantes pendentes
+- responsavel pendente
+- comunicacao pendente
+- pendencia critica
+
+Objetivo:
+
+- reduzir regra operacional espalhada no frontend
+- dar mais consistencia entre REINF, ECD/ECF e Pendencias
+- preparar o portal para uma futura camada server-side mais forte
+
+Como validar no Supabase:
+
+```sql
+select
+  cliente_id,
+  reinf_status_label,
+  ecd_status_label,
+  ecf_status_label,
+  obrigacoes_status_label,
+  comunicacao_pendente,
+  pendencia_critica,
+  pendencias_obrigacoes_total
+from public.vw_clientes_obrigacoes_status
+order by pendencias_obrigacoes_total desc, cliente_id
+limit 30;
+```
+
+Se a view ainda nao estiver criada, o frontend continua funcionando com fallback para a logica local atual.
 
 ```sql
 select cnpj, situacao, responsavel, atualizado_em

@@ -6,9 +6,14 @@ function numberValue(value) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function preferBoolean(persistedValue, fallbackValue) {
+  return typeof persistedValue === 'boolean' ? persistedValue : fallbackValue;
+}
+
 export function analyzeClient(client) {
   const diasAtraso = numberValue(client.dias_atraso);
   const situacao = normalizeText(client.situacao);
+  const obrigacoes = client?._db_obrigacoes ?? {};
 
   const emAtraso =
     isNo(client.competencia_em_dia) ||
@@ -17,18 +22,39 @@ export function analyzeClient(client) {
     situacao.includes('critico');
 
   const situacaoCritica = situacao.includes('critico');
-  const reinfPendente = isYes(client.distribuicao_lucros) && (!isYes(client.envio_reinf) || isBlank(client.envio_reinf));
-  const reciboReinfPendente = isYes(client.envio_reinf) && isBlank(client.anexo_recibo_reinf);
+  const reinfPendente = preferBoolean(
+    obrigacoes.reinf_pendente,
+    isYes(client.distribuicao_lucros) && (!isYes(client.envio_reinf) || isBlank(client.envio_reinf)),
+  );
+  const reciboReinfPendente = preferBoolean(
+    obrigacoes.recibo_reinf_pendente,
+    isYes(client.envio_reinf) && isBlank(client.anexo_recibo_reinf),
+  );
   const anexoLucrosPendente = false;
   const ataPendente = isYes(client.precisa_ata) && !isYes(client.ata_entregue);
-  const ecdPendente = isYes(client.ecd) && isBlank(client.ultima_ecd_entregue);
-  const ecdAguardandoEnvio = !isBlank(client.data_entrega_ecd) && isBlank(client.data_envio_ecd);
-  const ecdResponsavelPendente =
+  const ecdPendente = preferBoolean(obrigacoes.ecd_pendente, isYes(client.ecd) && isBlank(client.ultima_ecd_entregue));
+  const ecdAguardandoEnvio = preferBoolean(
+    obrigacoes.ecd_aguardando_envio,
+    !isBlank(client.data_entrega_ecd) && isBlank(client.data_envio_ecd),
+  );
+  const ecdResponsavelPendente = preferBoolean(
+    obrigacoes.ecd_responsavel_pendente,
     isYes(client.ecd) &&
-    isBlank(client.responsavel_ecd) &&
-    isBlank(client.responsavel);
-  const reciboEcdPendente = isYes(client.ecd) && isBlank(client.anexo_recibo_ecd);
-  const ecfPendente = isYes(client.ecf) && isBlank(client.ultima_ecf_entregue);
+      isBlank(client.responsavel_ecd) &&
+      isBlank(client.responsavel),
+  );
+  const reciboEcdPendente = preferBoolean(
+    obrigacoes.recibo_ecd_pendente,
+    isYes(client.ecd) && isBlank(client.anexo_recibo_ecd),
+  );
+  const ecfPendente = preferBoolean(
+    obrigacoes.ecf_pendente,
+    isYes(client.ecf) && isBlank(client.ultima_ecf_entregue),
+  );
+  const reciboEcfPendente = preferBoolean(
+    obrigacoes.recibo_ecf_pendente,
+    isYes(client.ecf) && isBlank(client.anexo_recibo_ecf),
+  );
   const pendenciaTecnica = isYes(client.pendencia_tecnica) || normalizeText(client.pendencia_tecnica).includes('pend');
   const documentosAtrasados = isNo(client.enviam_documentos) || normalizeText(client.motivo_atraso).includes('doc');
 
@@ -41,10 +67,14 @@ export function analyzeClient(client) {
     ecdResponsavelPendente ||
     reciboEcdPendente ||
     ecfPendente ||
+    reciboEcfPendente ||
     pendenciaTecnica ||
     documentosAtrasados;
 
-  const comunicacaoPendente = hasPendencia && !isYes(client.cliente_notificado);
+  const comunicacaoPendente = preferBoolean(
+    obrigacoes.comunicacao_pendente,
+    hasPendencia && !isYes(client.cliente_notificado),
+  );
 
   const alerts = [
     emAtraso && {
@@ -60,6 +90,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente && { key: 'ecd_responsavel', label: 'Responsavel nao definido', tone: 'warning' },
     reciboEcdPendente && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
     ecfPendente && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
+    reciboEcfPendente && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
     pendenciaTecnica && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
     documentosAtrasados && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
     comunicacaoPendente && { key: 'comunicacao', label: 'Comunicacao pendente', tone: 'info' },
@@ -76,6 +107,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente ||
     reciboEcdPendente ||
     ecfPendente ||
+    reciboEcfPendente ||
     documentosAtrasados
   ) {
     risk = 'warning';
@@ -95,6 +127,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente,
     reciboEcdPendente,
     ecfPendente,
+    reciboEcfPendente,
     pendenciaTecnica,
     documentosAtrasados,
     comunicacaoPendente,
