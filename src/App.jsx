@@ -4108,14 +4108,19 @@ export default function App() {
       }
       return true;
     } catch (error) {
-      persist(clientesContabeis.map(withClientDefaults), { ...DEFAULT_LISTS, ...listasBase }, {
-        ...metadata,
-        source: 'Fallback local',
-        importedAt: metadata?.importedAt || todayBr(),
-      });
+      const hasCurrentClients = Array.isArray(clients) && clients.length > 0;
+      if (!hasCurrentClients) {
+        persist(clientesContabeis.map(withClientDefaults), { ...DEFAULT_LISTS, ...listasBase }, {
+          ...metadata,
+          source: 'Fallback local',
+          importedAt: metadata?.importedAt || todayBr(),
+        });
+      }
       setSupabaseStatus({
         connected: false,
-        message: 'Erro ao carregar dados (fallback local ativo)',
+        message: hasCurrentClients
+          ? 'Erro ao atualizar dados do Supabase'
+          : 'Erro ao carregar dados (fallback local ativo)',
       });
       if (!silent) {
         setToast({
