@@ -111,6 +111,10 @@ import {
   indexarStatusObrigacoes,
   listarStatusObrigacoesClientes,
 } from './services/obrigacoes.service';
+import {
+  indexarRiscoOperacional,
+  listarRiscoOperacionalClientes,
+} from './services/risco-operacional.service';
 import { supabase } from './lib/supabase';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
@@ -474,10 +478,10 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function statusTone(value, analysis) {
+function statusTone(value, client) {
   const normalized = normalizeText(value);
-  if (analysis?.situacaoCritica || normalized.includes('critico')) return 'danger';
-  if (analysis?.emAtraso || normalized.includes('atras')) return 'warning';
+  if (isSituacaoCritica(client) || normalized.includes('critico')) return 'danger';
+  if (isEmAtraso(client) || normalized.includes('atras')) return 'warning';
   if (normalized.includes('dia') || normalizeText(value) === 'sim') return 'success';
   if (normalized.includes('inativo')) return 'muted';
   return 'neutral';
@@ -633,10 +637,22 @@ function hydrateClientesComObrigacoes(clientesBase, obrigacoesIndex = {}) {
   });
 }
 
+function hydrateClientesComRiscoOperacional(clientesBase, riscoIndex = {}) {
+  return (clientesBase ?? []).map((client) => {
+    const risco = riscoIndex[String(client.id ?? '').trim()];
+    if (!risco) return client;
+    return {
+      ...client,
+      _db_risco_operacional: risco,
+    };
+  });
+}
+
 function clearPersistedObrigacoes(client) {
-  if (!client || !client._db_obrigacoes) return client;
+  if (!client || (!client._db_obrigacoes && !client._db_risco_operacional)) return client;
   const next = { ...client };
   delete next._db_obrigacoes;
+  delete next._db_risco_operacional;
   return next;
 }
 
@@ -684,6 +700,10 @@ function getObrigacoesPersistidas(client) {
   return client?._db_obrigacoes ?? {};
 }
 
+function getRiscoPersistido(client) {
+  return client?._db_risco_operacional ?? {};
+}
+
 function getObrigacaoFlag(client, key, fallback = false) {
   const value = getObrigacoesPersistidas(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
@@ -691,6 +711,37 @@ function getObrigacaoFlag(client, key, fallback = false) {
 
 function getClientAnalysis(client) {
   return client?._analysis ?? analyzeClient(client);
+}
+
+function getRiscoFlag(client, key, fallback = false) {
+  const value = getRiscoPersistido(client)?.[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function getDiasAtrasoValue(client) {
+  const persisted = getRiscoPersistido(client)?.dias_atraso;
+  if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
+  return Number(getClientAnalysis(client)?.diasAtraso || 0) || 0;
+}
+
+function isEmAtraso(client) {
+  return getRiscoFlag(client, 'em_atraso', getClientAnalysis(client).emAtraso);
+}
+
+function isSituacaoCritica(client) {
+  return getRiscoFlag(client, 'situacao_critica', getClientAnalysis(client).situacaoCritica);
+}
+
+function isPendenciaTecnica(client) {
+  return getRiscoFlag(client, 'pendencia_tecnica', getClientAnalysis(client).pendenciaTecnica);
+}
+
+function isDocumentoAtrasado(client) {
+  return getRiscoFlag(client, 'documentos_atrasados', getClientAnalysis(client).documentosAtrasados);
+}
+
+function hasPendenciaOperacional(client) {
+  return getRiscoFlag(client, 'has_pendencia', getClientAnalysis(client).hasPendencia);
 }
 
 function getObrigacaoResponsavel(client) {
@@ -742,8 +793,34 @@ function isComunicacaoPendente(client) {
 }
 
 function isPendenciaCritica(client) {
+  return getObrigacaoFlag(client, 'pendencia_critica', isSituacaoCritica(client) || isPendenciaTecnica(client));
+}
+
+function getClientAlerts(client) {
   const analysis = getClientAnalysis(client);
-  return getObrigacaoFlag(client, 'pendencia_critica', analysis.situacaoCritica || analysis.pendenciaTecnica);
+  const diasAtraso = getDiasAtrasoValue(client);
+  const alerts = [
+    isEmAtraso(client) && {
+      key: 'atraso',
+      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competência em atraso',
+      tone: 'danger',
+    },
+    isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
+    isReinfPendente(client) && { key: 'reinf', label: 'REINF pendente', tone: 'warning' },
+    isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Recibo REINF pendente', tone: 'warning' },
+    isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
+    isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
+    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
+    isReciboEcdPendente(client) && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
+    isEcfPendente(client) && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
+    isReciboEcfPendente(client) && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
+    isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
+    isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
+    isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
+    analysis.ataPendente && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
+  ].filter(Boolean);
+
+  return alerts;
 }
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -899,11 +976,10 @@ function EcdEcfObrigacaoStatusCell({ client }) {
 
 function matchesAlert(client, alertKey) {
   if (!alertKey) return true;
-  const analysis = getClientAnalysis(client);
   const alertMap = {
-    atraso: analysis.emAtraso,
-    critico: analysis.situacaoCritica,
-    tecnica: analysis.pendenciaTecnica,
+    atraso: isEmAtraso(client),
+    critico: isSituacaoCritica(client),
+    tecnica: isPendenciaTecnica(client),
     reinf: isReinfPendente(client),
     recibo_reinf: isReciboReinfPendente(client),
     ecd: isEcdPendente(client),
@@ -911,7 +987,7 @@ function matchesAlert(client, alertKey) {
     ecd_responsavel: isEcdResponsavelPendente(client),
     recibo_ecd: isReciboEcdPendente(client),
     ecf: isEcfPendente(client),
-    documentos: analysis.documentosAtrasados,
+    documentos: isDocumentoAtrasado(client),
     comunicacao: isComunicacaoPendente(client),
   };
   return Boolean(alertMap[alertKey]);
@@ -1031,7 +1107,7 @@ function AppShell({
     if (canSearchPendencias && results.length < 12) {
       for (const client of searchClients) {
         if (!client?.id) continue;
-        if (!getClientAnalysis(client).hasPendencia) continue;
+        if (!hasPendenciaOperacional(client)) continue;
 
         const id = String(client.id);
         const seenKey = `pendencia:${id}`;
@@ -1040,7 +1116,7 @@ function AppShell({
         const nome = String(client.nome_identificacao ?? '');
         const razao = String(client.razao_social ?? '');
         const cnpj = String(client.cnpj ?? '');
-        const alertsText = (getClientAnalysis(client).alerts ?? []).map((item) => item.label).join(' ');
+        const alertsText = getClientAlerts(client).map((item) => item.label).join(' ');
         const stack = normalizeText(`${nome} ${razao} ${cnpj} ${client.situacao ?? ''} ${client.responsavel ?? ''} ${alertsText}`);
         const cnpjDigits = normalizeCnpj(cnpj);
         const byText = queryNorm && stack.includes(queryNorm);
@@ -1409,12 +1485,12 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
 function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
-  const emAtraso = countWhere(clients, (client) => getClientAnalysis(client).emAtraso);
-  const criticos = countWhere(clients, (client) => getClientAnalysis(client).situacaoCritica);
-  const pendencias = countWhere(clients, (client) => getClientAnalysis(client).hasPendencia);
+  const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
+  const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
+  const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client));
   const diasAtrasoMedio = total
     ? (
-      clients.reduce((sum, client) => sum + Number(getClientAnalysis(client)?.diasAtraso || 0), 0) / total
+      clients.reduce((sum, client) => sum + getDiasAtrasoValue(client), 0) / total
     ).toFixed(1)
     : '0.0';
   const percentualEmDia = total ? ((emDia / total) * 100).toFixed(1) : '0.0';
@@ -1443,21 +1519,21 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
     },
     {
       title: 'Situação crítica',
-      value: countWhere(clients, (client) => getClientAnalysis(client).situacaoCritica),
+      value: countWhere(clients, (client) => isSituacaoCritica(client)),
       icon: ShieldAlert,
       tone: 'danger',
       filter: { alerta: 'critico' },
     },
     {
       title: 'Pendência técnica',
-      value: countWhere(clients, (client) => getClientAnalysis(client).pendenciaTecnica),
+      value: countWhere(clients, (client) => isPendenciaTecnica(client)),
       icon: BellRing,
       tone: 'danger',
       filter: { alerta: 'tecnica' },
     },
     {
       title: 'Docs atrasados',
-      value: countWhere(clients, (client) => getClientAnalysis(client).documentosAtrasados),
+      value: countWhere(clients, (client) => isDocumentoAtrasado(client)),
       icon: AlertTriangle,
       tone: 'warning',
       filter: { alerta: 'documentos' },
@@ -1719,7 +1795,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
           <tbody>
             {clients.map((client) => (
               (() => {
-                const analysis = getClientAnalysis(client);
+                const alerts = getClientAlerts(client);
                 return (
                 <tr
                   key={client.id}
@@ -1734,12 +1810,12 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                   </div>
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3 align-top">
-                  <AlertsList alerts={analysis.alerts} />
+                  <AlertsList alerts={alerts} />
                 </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                   <td key={field.key} className="border-b border-slate-100 px-4 py-3 align-top text-slate-700">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(client[field.key], analysis))}`}>
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(client[field.key], client))}`}>
                         {valueOrDash(client[field.key])}
                       </span>
                     ) : (
@@ -1866,7 +1942,7 @@ function DetailPage({
           ) : null}
         </div>
         <div className="mt-5">
-          <AlertsList alerts={getClientAnalysis(client).alerts} />
+          <AlertsList alerts={getClientAlerts(client)} />
         </div>
       </section>
 
@@ -1972,7 +2048,7 @@ function PendenciasPage({
   function matchesSearchContext(client) {
     if (!hasSearchContext) return true;
     if (searchClientId) return String(client.id ?? '') === searchClientId;
-    const alerts = (getClientAnalysis(client).alerts ?? []).map((item) => item.label).join(' ');
+    const alerts = getClientAlerts(client).map((item) => item.label).join(' ');
     const searchable = normalizeText(
       `${client.cnpj} ${client.nome_identificacao} ${client.razao_social} ${client.responsavel} ${client.situacao} ${alerts}`,
     );
@@ -2252,13 +2328,13 @@ function PendenciasPage({
       title: 'O que está atrasado',
       value: uniqueClientCount(actionRows, (row) => {
         const reinfAtrasada = getObrigacoesPersistidas(row.client)?.reinf_status_codigo === 'em_atraso';
-        return getClientAnalysis(row.client).emAtraso || reinfAtrasada;
+        return isEmAtraso(row.client) || reinfAtrasada;
       }),
       tone: 'warning',
       detail: 'Pendências com atraso operacional ou entrega REINF já vencida.',
       highlights: topClientNames(actionRows, (row) => {
         const reinfAtrasada = getObrigacoesPersistidas(row.client)?.reinf_status_codigo === 'em_atraso';
-        return getClientAnalysis(row.client).emAtraso || reinfAtrasada;
+        return isEmAtraso(row.client) || reinfAtrasada;
       }),
     },
     {
@@ -3078,8 +3154,8 @@ function ReportsPage({
   const reports = [
     { title: 'Clientes por responsável', rows: toBreakdown(clients, 'responsavel'), icon: UserCheck },
     { title: 'Clientes por regime tributário', rows: toBreakdown(clients, 'regime_tributario'), icon: Building2 },
-    { title: 'Clientes com atraso', rows: clients.filter((client) => getClientAnalysis(client).emAtraso), icon: FolderClock },
-    { title: 'Clientes com pendências', rows: clients.filter((client) => getClientAnalysis(client).hasPendencia), icon: ShieldAlert },
+    { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
+    { title: 'Clientes com pendências', rows: clients.filter((client) => hasPendenciaOperacional(client)), icon: ShieldAlert },
     { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
     { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
     { title: 'Clientes por dificuldade', rows: toBreakdown(clients, 'dificuldade'), icon: AlertTriangle },
@@ -4106,32 +4182,40 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
-      const [clientesSupabase, listagensSupabase, obrigacoesResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
+        listarRiscoOperacionalClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
       ]);
       const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
       const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesHydrated, obrigacoesIndex);
+      const riscoIndex = riscoResult.ok ? indexarRiscoOperacional(riscoResult.rows) : {};
+      const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
 
       const nextListagens = mergeListagensFromSupabase(
         { ...DEFAULT_LISTS, ...listasBase },
         listagensSupabase,
       );
-      persist(clientesComObrigacoes, nextListagens, {
+      persist(clientesComRisco, nextListagens, {
         ...metadata,
         source: 'Supabase',
         importedAt: metadata?.importedAt || todayBr(),
       });
       setSupabaseStatus({
         connected: true,
-        message: `Conectado ao Supabase (${formatNumber(clientesComObrigacoes.length)} cliente(s))`,
+        message: `Conectado ao Supabase (${formatNumber(clientesComRisco.length)} cliente(s))`,
       });
       if (!obrigacoesResult.ok) {
         console.warn('[obrigacoes] Falha ao carregar view persistente de obrigacoes:', obrigacoesResult.error);
+      }
+      if (!riscoResult.ok) {
+        console.warn('[risco_operacional] Falha ao carregar view persistente de risco operacional:', riscoResult.error);
       }
       if (!silent) {
         setToast({
