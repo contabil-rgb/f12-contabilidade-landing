@@ -1501,7 +1501,7 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
         <MetricCard title="Clientes em dia" value={emDia} icon={CheckCircle2} tone="success" onClick={() => onPreset({ competencia_em_dia: 'Sim' }, 'Clientes em dia')} />
         <MetricCard title="Clientes em atraso" value={emAtraso} icon={FolderClock} tone="warning" onClick={() => onPreset({ alerta: 'atraso' }, 'Clientes em atraso')} />
         <MetricCard title="Pendências ativas" value={pendencias} icon={ShieldAlert} tone="danger" onClick={() => onPreset({ alerta: 'comunicacao' }, 'Pendências ativas')} />
-        <MetricCard title="Média dias atraso" value={diasAtrasoMedio} detail="Média simples da carteira" icon={AlertTriangle} tone={criticos > 0 ? 'warning' : 'neutral'} onClick={() => onPreset({ alerta: 'atraso' }, 'Média atraso')} />
+        <MetricCard title="Média de dias em atraso" value={diasAtrasoMedio} detail="Média simples da carteira" icon={AlertTriangle} tone={criticos > 0 ? 'warning' : 'neutral'} onClick={() => onPreset({ alerta: 'atraso' }, 'Média atraso')} />
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric) => (
@@ -1586,7 +1586,7 @@ function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, on
             value={filters.search}
             onChange={(event) => updateFilter({ search: event.target.value })}
             className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
-            placeholder="Pesquisar CNPJ, razão social ou nome"
+            placeholder="Pesquisar cliente, CNPJ ou razão social"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1801,7 +1801,7 @@ function BaseClientesPage(props) {
     <div className="space-y-5">
       <PageHeader
         title="Base de Clientes"
-        description="Visualização central da carteira contábil com filtros, alertas e ações operacionais."
+        description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
       />
       <SearchAndFilters {...props} />
       <ClientsTable
@@ -2890,7 +2890,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
     <div className="space-y-5">
       <PageHeader
         title="ECD / ECF"
-        description="Controle das obrigacoes anuais, responsaveis e comprovantes da ECD/ECF."
+        description="Controle das obrigações anuais, responsáveis e comprovantes da ECD/ECF."
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
@@ -2939,7 +2939,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <FilterSelect label="Situacao rapida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
+          <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold normal-case outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
@@ -2969,11 +2969,11 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             'anexo_recibo_ecf',
           ]}
           columnLabels={{
-            nome_identificacao: 'Nome / Identificacao',
+            nome_identificacao: 'Nome / Identificação',
             regime_tributario: 'Regime tributário',
-            responsavel_ecd: 'Responsavel',
-            ultima_ecd_entregue: 'Ultima ECD entregue',
-            ultima_ecf_entregue: 'Ultima ECF entregue',
+            responsavel_ecd: 'Responsável',
+            ultima_ecd_entregue: 'Última ECD entregue',
+            ultima_ecf_entregue: 'Última ECF entregue',
             anexo_recibo_ecd: 'Recibo ECD',
             anexo_recibo_ecf: 'Recibo ECF',
           }}
