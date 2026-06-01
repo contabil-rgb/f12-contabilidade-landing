@@ -14,8 +14,8 @@ export const FIELD_DEFINITIONS = [
   { key: 'valor_lucro_acumulado', label: 'Valor Lucro Acumulado', group: 'REINF e Lucros', type: 'currency' },
   { key: 'anexo_recibo_reinf', label: 'Anexo do recibo da REINF', group: 'REINF e Lucros', type: 'attachment' },
   { key: 'anexo_recibo_lucros', label: 'Anexo do recibo de lucros', group: 'REINF e Lucros', type: 'attachment' },
-  { key: 'precisa_ata', label: 'Precisa de Ata?', group: 'REINF e Lucros', type: 'yesno', hidden: true },
-  { key: 'ata_entregue', label: 'Ata entregue?', group: 'REINF e Lucros', type: 'yesno', hidden: true },
+  { key: 'precisa_ata', label: 'Precisa de ata', group: 'REINF e Lucros', type: 'yesno', hidden: true },
+  { key: 'ata_entregue', label: 'Ata entregue', group: 'REINF e Lucros', type: 'yesno', hidden: true },
   { key: 'data_entrega_ata', label: 'Data de entrega da ata', group: 'REINF e Lucros', type: 'date', hidden: true },
 
   { key: 'ecd', label: 'ECD', group: 'ECD / ECF', type: 'yesno', listKey: 'ecd' },
@@ -39,7 +39,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'dias_atraso', label: 'Dias de Atraso', group: 'Status Contábil', type: 'number' },
   { key: 'situacao', label: 'Situação', group: 'Status Contábil', type: 'select', listKey: 'situacao' },
 
-  { key: 'enviam_documentos', label: 'Enviam Documentos', group: 'Documentação', type: 'select', listKey: 'enviam_documentos' },
+  { key: 'enviam_documentos', label: 'Envia documentos', group: 'Documentação', type: 'select', listKey: 'enviam_documentos' },
   { key: 'modo_entrega', label: 'Modo de Entrega', group: 'Documentação', type: 'select', listKey: 'modo_entrega' },
   { key: 'curva_envio', label: 'Curva de Envio', group: 'Documentação', type: 'select', listKey: 'curva_envio' },
   { key: 'ultima_competencia_enviada', label: 'Última competência enviada', group: 'Documentação', type: 'text' },
@@ -48,7 +48,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'revisado_coordenador', label: 'Revisado pelo Coordenador', group: 'Execução e Revisão', type: 'select', listKey: 'revisado_coordenador' },
   { key: 'lancamentos_padrao', label: 'Lançamentos Padrão', group: 'Execução e Revisão', type: 'select', listKey: 'lancamentos_padrao' },
 
-  { key: 'motivo_atraso', label: 'Motivo do Atraso', group: 'Alertas e Pendências', type: 'select', listKey: 'motivo_atraso' },
+  { key: 'motivo_atraso', label: 'Motivo do atraso', group: 'Alertas e Pendências', type: 'select', listKey: 'motivo_atraso' },
   { key: 'pendencia_tecnica', label: 'Pendência Técnica', group: 'Alertas e Pendências', type: 'yesno' },
   { key: 'cliente_notificado', label: 'Cliente Notificado', group: 'Alertas e Pendências', type: 'select', listKey: 'cliente_notificado' },
   { key: 'proxima_acao', label: 'Próxima Ação', group: 'Alertas e Pendências', type: 'textarea' },
@@ -203,7 +203,7 @@ export const DETAIL_SECTIONS = [
   },
   {
     title: 'REINF',
-    fields: ['data_enviada_reinf', 'anexo_recibo_reinf'],
+    fields: ['data_enviada_reinf', 'anexo_recibo_reinf', 'precisa_ata', 'ata_entregue', 'data_entrega_ata'],
   },
   {
     title: 'Documentação',

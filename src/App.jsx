@@ -191,6 +191,7 @@ const ALERT_FILTER_LABELS = {
   recibo_ecd: 'Recibo ECD pendente',
   ecf: 'ECF pendente',
   documentos: 'Documentação atrasada',
+  ata: 'Ata pendente',
   comunicacao: 'Comunicação pendente',
 };
 
@@ -239,15 +240,20 @@ const BASE_CLIENTS_TABLE_COLUMNS = TABLE_COLUMNS.filter((field) =>
 );
 
 const EDIT_MODAL_GROUP_TITLE_OVERRIDES = {
-  'REINF e Lucros': 'REINF',
+  'REINF e Lucros': 'REINF e Ata',
 };
 
 const EDIT_MODAL_GROUP_VISIBLE_FIELDS = {
-  'REINF e Lucros': new Set(['data_enviada_reinf', 'anexo_recibo_reinf']),
+  'REINF e Lucros': new Set(['data_enviada_reinf', 'anexo_recibo_reinf', 'precisa_ata', 'ata_entregue', 'data_entrega_ata']),
 };
 
 const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
   data_enviada_reinf: 'Data de entrega de REINF',
+  precisa_ata: 'Precisa de ata',
+  ata_entregue: 'Ata entregue',
+  data_entrega_ata: 'Data de entrega da ata',
+  enviam_documentos: 'Envia documentos',
+  motivo_atraso: 'Motivo do atraso',
 };
 
 // Modo temporario sem autenticacao (fase de integracao inicial com banco).
@@ -835,6 +841,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   recibo_ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 82, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECD.' },
   ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Media', nextAction: 'Validar status da ECF.' },
   recibo_ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 80, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECF.' },
+  documentos: { key: 'documentos', area: 'Documentacao', route: 'cliente', priority: 68, priorityLabel: 'Media', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
+  ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Media', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
   comunicacao: { key: 'comunicacao', area: 'Comunicacao', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
 };
 
@@ -3653,10 +3661,18 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
     cnpj: client?.cnpj ? formatCnpj(client.cnpj) : '',
   }));
   const [errors, setErrors] = useState([]);
+  const modalFields = FIELD_DEFINITIONS.filter((field) => !['criado_em', 'atualizado_em'].includes(field.key));
 
   function updateField(key, value) {
     setForm((current) => {
       const nextPatch = applyResponsavelEcdFallback(current, { [key]: value });
+      if (key === 'precisa_ata' && !isYes(value)) {
+        nextPatch.ata_entregue = '';
+        nextPatch.data_entrega_ata = '';
+      }
+      if (key === 'ata_entregue' && !isYes(value)) {
+        nextPatch.data_entrega_ata = '';
+      }
       return { ...current, ...nextPatch };
     });
   }
@@ -3664,7 +3680,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
   function submit(event) {
     event.preventDefault();
     const nextErrors = [];
-    EDITABLE_FIELDS.forEach((field) => {
+    modalFields.forEach((field) => {
       const fieldAllowed = canEditFieldForClient(field.key);
       if (field.required && fieldAllowed && isBlank(form[field.key])) {
         nextErrors.push(`${field.label} é obrigatório.`);
@@ -3688,7 +3704,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
     const digits = normalizeCnpj(form.cnpj);
     const { _analysis, ...cleanForm } = form;
     const protectedForm = { ...cleanForm };
-    EDITABLE_FIELDS.forEach((field) => {
+    modalFields.forEach((field) => {
       if (client?.id && !canEditFieldForClient(field.key)) {
         protectedForm[field.key] = client[field.key] ?? '';
       }
@@ -3726,7 +3742,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
           ) : null}
 
           {FIELD_GROUPS.map((group) => {
-            const visibleFields = EDITABLE_FIELDS.filter((field) => {
+            const visibleFields = modalFields.filter((field) => {
               if (field.group !== group) return false;
               const allowedKeys = EDIT_MODAL_GROUP_VISIBLE_FIELDS[group];
               return allowedKeys ? allowedKeys.has(field.key) : true;
@@ -3789,6 +3805,19 @@ function FormField({
 }) {
   const baseClass =
     'mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10';
+  const isAtaEntregueField = field.key === 'ata_entregue';
+  const isDataEntregaAtaField = field.key === 'data_entrega_ata';
+  const ataNotRequired = (isAtaEntregueField || isDataEntregaAtaField) && !isYes(cliente?.precisa_ata);
+  const ataNotDelivered = isDataEntregaAtaField && !isYes(cliente?.ata_entregue);
+  const computedDisabled = disabled || ataNotRequired || ataNotDelivered;
+  const computedDisabledReason =
+    disabled
+      ? disabledReason
+      : ataNotRequired
+        ? 'Marque primeiro que o cliente precisa de ata.'
+        : ataNotDelivered
+          ? 'Informe primeiro se a ata foi entregue.'
+          : undefined;
 
   const label = (
     <span>
@@ -3881,8 +3910,8 @@ function FormField({
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          title={disabled ? disabledReason : undefined}
+          disabled={computedDisabled}
+          title={computedDisabled ? computedDisabledReason : undefined}
           className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
         >
           <option value="">Não informado</option>
@@ -3892,6 +3921,9 @@ function FormField({
             </option>
           ))}
         </select>
+        {computedDisabledReason ? (
+          <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
+        ) : null}
       </label>
     );
   }
@@ -3905,10 +3937,13 @@ function FormField({
         inputMode={field.type === 'currency' || field.type === 'number' ? 'decimal' : undefined}
         placeholder={field.type === 'date' ? 'dd/mm/aaaa' : undefined}
         onChange={(event) => onChange(field.type === 'cnpj' ? formatCnpj(event.target.value) : event.target.value)}
-        disabled={disabled}
-        title={disabled ? disabledReason : undefined}
+        disabled={computedDisabled}
+        title={computedDisabled ? computedDisabledReason : undefined}
         className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
       />
+      {computedDisabledReason ? (
+        <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
+      ) : null}
     </label>
   );
 }
