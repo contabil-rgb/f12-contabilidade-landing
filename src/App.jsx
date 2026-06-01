@@ -800,32 +800,43 @@ function isPendenciaCritica(client) {
   return getObrigacaoFlag(client, 'pendencia_critica', isSituacaoCritica(client) || isPendenciaTecnica(client));
 }
 
-function getClientAlerts(client) {
-  const analysis = getClientAnalysis(client);
+function getClientAlertSignals(client) {
   const diasAtraso = getDiasAtrasoValue(client);
-  const alerts = [
+  return [
     isEmAtraso(client) && {
       key: 'atraso',
-      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competência em atraso',
+      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competencia em atraso',
       tone: 'danger',
     },
-    isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
+    isSituacaoCritica(client) && { key: 'critico', label: 'Situacao critica', tone: 'danger' },
     isReinfPendente(client) && { key: 'reinf', label: 'REINF pendente', tone: 'warning' },
     isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Recibo REINF pendente', tone: 'warning' },
     isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
-    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
+    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsavel nao definido', tone: 'warning' },
     isReciboEcdPendente(client) && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
     isEcfPendente(client) && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
     isReciboEcfPendente(client) && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
-    isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
-    isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
-    isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
+    isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
+    isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
+    isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicacao pendente', tone: 'info' },
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
-
-  return alerts;
 }
+function getClientAlerts(client) {
+  return getClientAlertSignals(client);
+}
+const PENDENCIA_ACTION_BY_SIGNAL = {
+  reinf: { key: 'reinf', area: 'REINF', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da REINF.' },
+  recibo_reinf: { key: 'reinf', area: 'REINF', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar recibo da REINF.' },
+  ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
+  ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
+  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Media', nextAction: 'Definir responsavel pela ECD.' },
+  recibo_ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 82, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECD.' },
+  ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Media', nextAction: 'Validar status da ECF.' },
+  recibo_ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 80, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECF.' },
+  comunicacao: { key: 'comunicacao', area: 'Comunicacao', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
+};
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
   const anexo = fieldValueToAnexo(client[fieldKey], tipoAnexo, client);
@@ -980,21 +991,7 @@ function EcdEcfObrigacaoStatusCell({ client }) {
 
 function matchesAlert(client, alertKey) {
   if (!alertKey) return true;
-  const alertMap = {
-    atraso: isEmAtraso(client),
-    critico: isSituacaoCritica(client),
-    tecnica: isPendenciaTecnica(client),
-    reinf: isReinfPendente(client),
-    recibo_reinf: isReciboReinfPendente(client),
-    ecd: isEcdPendente(client),
-    ecd_envio: isEcdAguardandoEnvio(client),
-    ecd_responsavel: isEcdResponsavelPendente(client),
-    recibo_ecd: isReciboEcdPendente(client),
-    ecf: isEcfPendente(client),
-    documentos: isDocumentoAtrasado(client),
-    comunicacao: isComunicacaoPendente(client),
-  };
-  return Boolean(alertMap[alertKey]);
+  return getClientAlertSignals(client).some((alert) => alert.key === alertKey);
 }
 
 function filterClients(clients, filters) {
@@ -2101,81 +2098,21 @@ function PendenciasPage({
   ];
 
   function getPendenciasOperacionais(client) {
-    const alerts = [];
-    if (isReinfPendente(client)) alerts.push({ key: 'reinf', label: 'REINF pendente', tone: 'warning' });
-    if (isReciboReinfPendente(client)) alerts.push({ key: 'reinf', label: 'Recibo REINF pendente', tone: 'warning' });
-    if (isEcdPendente(client)) alerts.push({ key: 'ecd', label: 'ECD pendente', tone: 'warning' });
-    if (isEcdAguardandoEnvio(client)) alerts.push({ key: 'ecd', label: 'ECD aguardando envio', tone: 'warning' });
-    if (isEcdResponsavelPendente(client)) alerts.push({ key: 'ecd', label: 'Responsável ECD não definido', tone: 'warning' });
-    if (isReciboEcdPendente(client)) alerts.push({ key: 'ecd', label: 'Recibo ECD pendente', tone: 'warning' });
-    if (isEcfPendente(client)) alerts.push({ key: 'ecf', label: 'ECF pendente', tone: 'warning' });
-    if (isReciboEcfPendente(client)) alerts.push({ key: 'ecf', label: 'Recibo ECF pendente', tone: 'warning' });
-    if (isComunicacaoPendente(client)) alerts.push({ key: 'comunicacao', label: 'Cliente não notificado', tone: 'info' });
-    return alerts;
+    return getClientAlertSignals(client)
+      .filter((alert) => alert.key in PENDENCIA_ACTION_BY_SIGNAL)
+      .map((alert) => {
+        const config = PENDENCIA_ACTION_BY_SIGNAL[alert.key];
+        return {
+          ...alert,
+          ...config,
+          signalKey: alert.key,
+          label: alert.key === 'comunicacao' ? 'Cliente nao notificado' : alert.label,
+        };
+      });
   }
-
   function getPendenciaActionItems(client) {
-    return getPendenciasOperacionais(client).map((item) => {
-      let priority = 40;
-      let priorityLabel = 'Média';
-
-      if (item.key === 'reinf') {
-        priority = item.label === 'REINF pendente' ? 95 : 90;
-        priorityLabel = 'Alta';
-        return {
-          ...item,
-          area: 'REINF',
-          route: 'reinf',
-          nextAction: item.label === 'Recibo REINF pendente' ? 'Anexar recibo da REINF.' : 'Revisar envio e prazo da REINF.',
-          priority,
-          priorityLabel,
-        };
-      }
-
-      if (item.key === 'ecd') {
-        priority = item.label === 'Responsável ECD não definido' ? 72 : item.label === 'Recibo ECD pendente' ? 82 : 78;
-        priorityLabel = item.label === 'Recibo ECD pendente' ? 'Alta' : 'Média';
-        return {
-          ...item,
-          area: 'ECD',
-          route: 'ecd',
-          nextAction:
-            item.label === 'Responsável ECD não definido'
-              ? 'Definir responsável pela ECD.'
-              : item.label === 'Recibo ECD pendente'
-                ? 'Anexar recibo da ECD.'
-                : 'Validar status e envio da ECD.',
-          priority,
-          priorityLabel,
-        };
-      }
-
-      if (item.key === 'ecf') {
-        priority = item.label === 'Recibo ECF pendente' ? 80 : 76;
-        priorityLabel = item.label === 'Recibo ECF pendente' ? 'Alta' : 'Média';
-        return {
-          ...item,
-          area: 'ECF',
-          route: 'ecd',
-          nextAction: item.label === 'Recibo ECF pendente' ? 'Anexar recibo da ECF.' : 'Validar status da ECF.',
-          priority,
-          priorityLabel,
-        };
-      }
-
-      priority = 70;
-      priorityLabel = 'Média';
-      return {
-        ...item,
-        area: 'Comunicação',
-        route: 'cliente',
-        nextAction: 'Notificar cliente e registrar retorno.',
-        priority,
-        priorityLabel,
-      };
-    });
+    return getPendenciasOperacionais(client);
   }
-
   const allActionRows = clients.flatMap((client) =>
     getPendenciaActionItems(client).map((item, index) => ({
       client,
@@ -2344,10 +2281,10 @@ function PendenciasPage({
     {
       key: 'comprovantes',
       title: 'Sem comprovante',
-      value: uniqueClientCount(actionRows, (row) => ['Recibo REINF pendente', 'Recibo ECD pendente', 'Recibo ECF pendente'].includes(row.item.label)),
+      value: uniqueClientCount(actionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
       tone: 'warning',
       detail: 'Clientes aguardando recibo ou comprovante para fechar a obrigação.',
-      highlights: topClientNames(actionRows, (row) => ['Recibo REINF pendente', 'Recibo ECD pendente', 'Recibo ECF pendente'].includes(row.item.label)),
+      highlights: topClientNames(actionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
     },
     {
       key: 'notificacao',
@@ -2637,11 +2574,17 @@ function PendenciasPage({
                                 type="button"
                                 onClick={() => {
                                   if (item.route === 'reinf') {
-                                    onGoReinf();
+                                    onGoReinf?.({
+                                      clientId: client.id,
+                                      query: client.nome_identificacao || client.razao_social || client.cnpj || '',
+                                    });
                                     return;
                                   }
                                   if (item.route === 'ecd') {
-                                    onGoEcd();
+                                    onGoEcd?.({
+                                      clientId: client.id,
+                                      query: client.nome_identificacao || client.razao_social || client.cnpj || '',
+                                    });
                                     return;
                                   }
                                   onView(client.id);
@@ -2649,7 +2592,7 @@ function PendenciasPage({
                                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
                               >
                                 <ChevronRight size={14} aria-hidden="true" />
-                                {item.route === 'reinf' ? 'Ir para REINF' : item.route === 'ecd' ? 'Ir para ECD/ECF' : 'Abrir cliente'}
+                                {item.route === 'reinf' ? 'Abrir REINF do cliente' : item.route === 'ecd' ? 'Abrir ECD/ECF do cliente' : 'Abrir cliente'}
                               </button>
                               <button
                                 type="button"
@@ -2740,7 +2683,21 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
-function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, onQuickUpdate, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, onRefresh, loading = false }) {
+function ReinfPage({
+  clients,
+  onView,
+  canManageAttachments,
+  canEditReinfDate,
+  onQuickUpdate,
+  onAnexoSuccess,
+  onAnexoError,
+  supabaseStatus,
+  metadata,
+  onRefresh,
+  loading = false,
+  searchContext,
+  onClearSearchContext,
+}) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -2752,6 +2709,8 @@ function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, on
   };
   const [quick, setQuick] = useState('todos');
   const [filters, setFilters] = useState(emptyFilters);
+  const [focusedClientId, setFocusedClientId] = useState('');
+  const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
   const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
   const quickFilters = [
@@ -2763,7 +2722,18 @@ function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, on
   ];
   const quickPredicate = quickFilters.find((item) => item.key === quick)?.predicate ?? (() => true);
 
+  useEffect(() => {
+    const nextClientId = String(searchContext?.clientId ?? '');
+    if (!nextClientId) return;
+    setQuick('todos');
+    setFilters(emptyFilters);
+    setFocusedClientId(nextClientId);
+    setFocusedClientLabel(searchContext?.query || 'cliente selecionado');
+    onClearSearchContext?.();
+  }, [searchContext?.clientId, searchContext?.query]);
+
   const rows = clients.filter((client) => {
+    if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
     const reinfStatus = getObrigacoesPersistidas(client)?.reinf_status_codigo;
     const dataEntregaReinf = normalizeDateInputValue(getReinfDataEntregaValue(client));
@@ -2811,6 +2781,28 @@ function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, on
         <MetricCard title="REINF pendente" value={countWhere(clients, (client) => isReinfPendente(client))} icon={AlertTriangle} tone="warning" />
         <MetricCard title="Recibo pendente" value={countWhere(clients, (client) => isReciboReinfPendente(client))} icon={Paperclip} tone="warning" />
       </section>
+
+      {focusedClientId ? (
+        <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-700">
+              REINF aberto a partir de Pendencias:
+              {' '}
+              <span className="font-black text-slate-900">{focusedClientLabel || 'cliente selecionado'}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFocusedClientId('');
+                setFocusedClientLabel('');
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+            >
+              Ver todos novamente
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -2919,7 +2911,7 @@ function ReinfPage({ clients, onView, canManageAttachments, canEditReinfDate, on
   );
 }
 
-function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, onRefresh, loading = false }) {
+function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, onRefresh, loading = false, searchContext, onClearSearchContext }) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -2930,6 +2922,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
   };
   const [mode, setMode] = useState('todos');
   const [filters, setFilters] = useState(emptyFilters);
+  const [focusedClientId, setFocusedClientId] = useState('');
+  const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
   const modeOptions = [
     { value: 'todos', label: 'Todos' },
@@ -2941,7 +2935,18 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
   ];
   const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
 
+  useEffect(() => {
+    const nextClientId = String(searchContext?.clientId ?? '');
+    if (!nextClientId) return;
+    setMode('todos');
+    setFilters(emptyFilters);
+    setFocusedClientId(nextClientId);
+    setFocusedClientLabel(searchContext?.query || 'cliente selecionado');
+    onClearSearchContext?.();
+  }, [searchContext?.clientId, searchContext?.query]);
+
   const rows = clients.filter((client) => {
+    if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
     const reciboEcfPendente = isReciboEcfPendente(client);
     const responsavelAtual = getObrigacaoResponsavel(client);
@@ -4003,6 +4008,8 @@ export default function App() {
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
   const [page, setPage] = useState('dashboard');
   const [pendenciasSearchContext, setPendenciasSearchContext] = useState(null);
+  const [reinfSearchContext, setReinfSearchContext] = useState(null);
+  const [ecdSearchContext, setEcdSearchContext] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [quickFilterLabel, setQuickFilterLabel] = useState('');
   const [sort, setSort] = useState({ key: 'nome_identificacao', direction: 'asc' });
@@ -5053,8 +5060,20 @@ export default function App() {
         <PendenciasPage
           clients={enrichedClients}
           onView={openClient}
-          onGoReinf={() => setPage('reinf')}
-          onGoEcd={() => setPage('ecd')}
+          onGoReinf={(payload) => {
+            setReinfSearchContext(payload ? {
+              clientId: payload?.clientId ?? '',
+              query: payload?.query ?? '',
+            } : null);
+            setPage('reinf');
+          }}
+          onGoEcd={(payload) => {
+            setEcdSearchContext(payload ? {
+              clientId: payload?.clientId ?? '',
+              query: payload?.query ?? '',
+            } : null);
+            setPage('ecd');
+          }}
           searchContext={pendenciasSearchContext}
           onClearSearchContext={() => setPendenciasSearchContext(null)}
           supabaseStatus={supabaseStatus}
@@ -5077,6 +5096,8 @@ export default function App() {
         metadata={metadata}
         onRefresh={refreshSupabaseData}
         loading={supabaseRefreshing}
+        searchContext={reinfSearchContext}
+        onClearSearchContext={() => setReinfSearchContext(null)}
       />
     ),
     ecd: (
@@ -5090,6 +5111,8 @@ export default function App() {
         metadata={metadata}
         onRefresh={refreshSupabaseData}
         loading={supabaseRefreshing}
+        searchContext={ecdSearchContext}
+        onClearSearchContext={() => setEcdSearchContext(null)}
       />
     ),
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)
