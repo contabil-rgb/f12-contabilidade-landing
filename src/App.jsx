@@ -740,6 +740,10 @@ function isDocumentoAtrasado(client) {
   return getRiscoFlag(client, 'documentos_atrasados', getClientAnalysis(client).documentosAtrasados);
 }
 
+function isAtaPendente(client) {
+  return getRiscoFlag(client, 'ata_pendente', getClientAnalysis(client).ataPendente);
+}
+
 function hasPendenciaOperacional(client) {
   return getRiscoFlag(client, 'has_pendencia', getClientAnalysis(client).hasPendencia);
 }
@@ -817,7 +821,7 @@ function getClientAlerts(client) {
     isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
     isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
     isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
-    analysis.ataPendente && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
+    isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 
   return alerts;
@@ -4258,6 +4262,14 @@ export default function App() {
     }
   }
 
+  async function resyncSupabaseAfterMutation(context = 'atualizacao') {
+    const ok = await carregarDadosSupabase({ silent: true });
+    if (!ok) {
+      console.warn(`[supabase] Falha ao reidratar dados apos ${context}.`);
+    }
+    return ok;
+  }
+
   function startSession(userId) {
     const nextSession = {
       usuario_id: userId,
@@ -4453,6 +4465,7 @@ export default function App() {
     const previous = index >= 0 ? nextClients[index] : null;
     const origemEdicao = page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes';
     let previousForHistory = previous;
+    let syncedWithSupabase = false;
     if (previous && !canEditClient(currentUserFull, previous)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode editar este cliente.' });
       return;
@@ -4486,6 +4499,7 @@ export default function App() {
           const saved = await atualizarClienteSupabase(previous.id, mergedClient);
           mergedClient = withClientDefaults({ ...mergedClient, ...saved });
           setSupabaseStatus({ connected: true, message: 'Alteracao salva no Supabase' });
+          syncedWithSupabase = true;
           await registrarHistoricoPersistente({
             clienteId: previous.id,
             valoresAntigos: previousForHistory ?? previous,
@@ -4515,6 +4529,7 @@ export default function App() {
         const saved = await criarClienteSupabase(createdClient);
         createdClient = withClientDefaults({ ...createdClient, ...saved });
         setSupabaseStatus({ connected: true, message: 'Cliente criado no Supabase' });
+        syncedWithSupabase = true;
       } catch (error) {
         setSupabaseStatus({ connected: false, message: 'Falha ao criar no Supabase (registro local)' });
         createdClient = {
@@ -4534,6 +4549,9 @@ export default function App() {
       title: 'Cliente salvo',
       message: `${client.nome_identificacao || client.razao_social}.`,
     });
+    if (syncedWithSupabase) {
+      void resyncSupabaseAfterMutation(previous ? 'salvar cliente' : 'criar cliente');
+    }
   }
 
   async function quickUpdateClient(id, patch) {
@@ -4542,6 +4560,7 @@ export default function App() {
     if (!previous || !canViewClient(currentUserFull, previous)) return;
     patch = applyResponsavelEcdFallback(previous, patch);
     let previousForHistory = previous;
+    let syncedWithSupabase = false;
     const deniedField = Object.keys(patch).find((fieldKey) => !canEditClientField(currentUserFull, fieldKey));
     if (deniedField) {
       setToast({ title: 'Acesso negado', message: deniedReasonForField(currentUserFull, deniedField) });
@@ -4559,6 +4578,7 @@ export default function App() {
         const saved = await atualizarClienteSupabase(id, nextClient);
         nextClient = withClientDefaults({ ...nextClient, ...saved });
         setSupabaseStatus({ connected: true, message: 'Atualizacao rapida salva no Supabase' });
+        syncedWithSupabase = true;
         await registrarHistoricoPersistente({
           clienteId: id,
           valoresAntigos: previousForHistory ?? previous,
@@ -4586,6 +4606,9 @@ export default function App() {
       tipoAcao: 'atualizacao_rapida',
     }));
     persist(nextClients);
+    if (syncedWithSupabase) {
+      void resyncSupabaseAfterMutation('atualizacao rapida');
+    }
   }
 
   async function handleAnexoSuccess(clientId, tipoAnexo, anexo) {

@@ -1,5 +1,8 @@
 -- Portal de Gestao Contabil - Camada persistente de risco operacional resumido
--- Esta etapa depende de public.vw_clientes_obrigacoes_status ja criada em obrigacoes-status.sql.
+-- Esta etapa depende de public.vw_clientes_obrigacoes_status ja criada em
+-- obrigacoes-status.sql.
+-- Para bancos antigos, execute antes o arquivo
+-- public/clientes-campos-operacionais.sql.
 -- Pode ser executado mais de uma vez com seguranca.
 --
 -- Contrato da view:
@@ -13,6 +16,7 @@
 -- - has_pendencia
 -- - risco_codigo
 -- - risco_label
+-- - ata_pendente
 
 create or replace function public.is_text_no(value text)
 returns boolean
@@ -35,6 +39,10 @@ with base as (
     c.pendencia_tecnica,
     c.competencia_em_dia,
     c.dias_atraso,
+    c.precisa_ata,
+    c.ata_entregue,
+    c.enviam_documentos,
+    c.motivo_atraso,
     o.reinf_pendente,
     o.recibo_reinf_pendente,
     o.ecd_pendente,
@@ -69,7 +77,13 @@ flags as (
       public.is_text_yes(b.pendencia_tecnica) or
       lower(coalesce(b.pendencia_tecnica, '')) like '%pend%'
     ) as pendencia_tecnica_bool,
-    false as documentos_atrasados
+    (
+      public.is_text_no(b.enviam_documentos) or
+      lower(coalesce(b.motivo_atraso, '')) like '%doc%'
+    ) as documentos_atrasados,
+    (
+      public.is_text_yes(b.precisa_ata) and not public.is_text_yes(b.ata_entregue)
+    ) as ata_pendente
   from base b
 )
 select
@@ -87,14 +101,16 @@ select
     f.em_atraso or
     coalesce(f.possui_pendencia_obrigacao, false) or
     f.pendencia_tecnica_bool or
-    f.documentos_atrasados
+    f.documentos_atrasados or
+    f.ata_pendente
   ) as has_pendencia,
   case
     when f.situacao_critica or f.pendencia_tecnica_bool or coalesce(f.pendencia_critica, false) then 'danger'
     when (
       f.em_atraso or
       coalesce(f.possui_pendencia_obrigacao, false) or
-      f.documentos_atrasados
+      f.documentos_atrasados or
+      f.ata_pendente
     ) then 'warning'
     else 'ok'
   end as risco_codigo,
@@ -103,13 +119,15 @@ select
     when (
       f.em_atraso or
       coalesce(f.possui_pendencia_obrigacao, false) or
-      f.documentos_atrasados
+      f.documentos_atrasados or
+      f.ata_pendente
     ) then 'Atenção'
     else 'Em dia'
   end as risco_label,
   coalesce(f.comunicacao_pendente, false) as comunicacao_pendente,
   coalesce(f.pendencia_critica, false) as pendencia_critica,
-  coalesce(f.pendencias_obrigacoes_total, 0) as pendencias_obrigacoes_total
+  coalesce(f.pendencias_obrigacoes_total, 0) as pendencias_obrigacoes_total,
+  f.ata_pendente
 from flags f;
 
 grant select on public.vw_clientes_risco_operacional to authenticated;

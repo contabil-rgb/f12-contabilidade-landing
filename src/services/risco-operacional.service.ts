@@ -11,6 +11,7 @@ export type RiscoOperacionalClienteRow = {
   situacao_critica?: boolean | null;
   pendencia_tecnica?: boolean | null;
   documentos_atrasados?: boolean | null;
+  ata_pendente?: boolean | null;
   has_pendencia?: boolean | null;
   risco_codigo?: string | null;
   risco_label?: string | null;

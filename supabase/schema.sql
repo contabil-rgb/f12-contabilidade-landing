@@ -22,6 +22,9 @@ create table if not exists public.clientes (
   envio_reinf text,
   data_enviada_reinf date,
   valor_lucro_acumulado numeric(15,2),
+  precisa_ata text,
+  ata_entregue text,
+  data_entrega_ata date,
   ecd text,
   ultima_ecd_entregue text,
   data_entrega_ecd date,
@@ -29,6 +32,8 @@ create table if not exists public.clientes (
   responsavel_ecd text,
   ecf text,
   ultima_ecf_entregue text,
+  enviam_documentos text,
+  motivo_atraso text,
   pendencia_tecnica text,
   cliente_notificado text,
   proxima_acao text,
@@ -62,4 +67,3 @@ create index if not exists idx_clientes_ecf on public.clientes(ecf);
 create index if not exists idx_clientes_status on public.clientes(status);
 
 create index if not exists idx_listagens_categoria on public.listagens(categoria);
-

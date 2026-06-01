@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-const DATE_FIELDS = new Set(['data_enviada_reinf', 'data_entrega_ecd', 'data_envio_ecd']);
+const DATE_FIELDS = new Set(['data_enviada_reinf', 'data_entrega_ecd', 'data_envio_ecd', 'data_entrega_ata']);
 const CLIENTE_FIELDS = new Set([
   'cnpj',
   'razao_social',
@@ -17,6 +17,9 @@ const CLIENTE_FIELDS = new Set([
   'envio_reinf',
   'data_enviada_reinf',
   'valor_lucro_acumulado',
+  'precisa_ata',
+  'ata_entregue',
+  'data_entrega_ata',
   'ecd',
   'ultima_ecd_entregue',
   'data_entrega_ecd',
@@ -24,6 +27,8 @@ const CLIENTE_FIELDS = new Set([
   'responsavel_ecd',
   'ecf',
   'ultima_ecf_entregue',
+  'enviam_documentos',
+  'motivo_atraso',
   'pendencia_tecnica',
   'cliente_notificado',
   'proxima_acao',
