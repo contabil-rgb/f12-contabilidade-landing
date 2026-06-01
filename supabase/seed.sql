@@ -21,5 +21,10 @@ values
   ('situacao', 'Em dia', 1),
   ('situacao', 'Atencao', 2),
   ('situacao', 'Atrasado', 3),
-  ('situacao', 'Critico', 4)
+  ('situacao', 'Critico', 4),
+
+  ('status_retorno_cliente', 'Aguardando retorno', 1),
+  ('status_retorno_cliente', 'Retorno recebido', 2),
+  ('status_retorno_cliente', 'Sem retorno', 3),
+  ('status_retorno_cliente', 'Concluido', 4)
 on conflict (categoria, valor) do nothing;

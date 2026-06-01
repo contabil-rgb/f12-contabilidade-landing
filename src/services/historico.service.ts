@@ -26,7 +26,11 @@ export const CAMPOS_HISTORICO_RELEVANTES = [
   'motivo_atraso',
   'pendencia_tecnica',
   'cliente_notificado',
+  'data_notificacao_cliente',
+  'status_retorno_cliente',
+  'data_retorno_cliente',
   'proxima_acao',
+  'prazo_proxima_acao',
   'status',
 ];
 

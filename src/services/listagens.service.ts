@@ -34,6 +34,8 @@ const CATEGORY_ALIASES: Record<string, string> = {
   motivoatraso: 'motivo_atraso',
   cliente_notificado: 'cliente_notificado',
   clientenotificado: 'cliente_notificado',
+  status_retorno_cliente: 'status_retorno_cliente',
+  statusretornocliente: 'status_retorno_cliente',
   dificuldade: 'dificuldade',
   ecd: 'ecd',
   ecf: 'ecf',

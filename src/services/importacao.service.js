@@ -32,7 +32,11 @@ const CLIENT_DB_FIELDS = [
   'motivo_atraso',
   'pendencia_tecnica',
   'cliente_notificado',
+  'data_notificacao_cliente',
+  'status_retorno_cliente',
+  'data_retorno_cliente',
   'proxima_acao',
+  'prazo_proxima_acao',
   'status',
   'atualizado_em',
 ];
@@ -108,7 +112,11 @@ function normalizeClienteRow(input) {
     motivo_atraso: normalizeString(input.motivo_atraso),
     pendencia_tecnica: normalizeString(input.pendencia_tecnica),
     cliente_notificado: normalizeString(input.cliente_notificado),
+    data_notificacao_cliente: toIsoDate(input.data_notificacao_cliente),
+    status_retorno_cliente: normalizeString(input.status_retorno_cliente),
+    data_retorno_cliente: toIsoDate(input.data_retorno_cliente),
     proxima_acao: normalizeString(input.proxima_acao),
+    prazo_proxima_acao: toIsoDate(input.prazo_proxima_acao),
     status: normalizeString(input.status) || 'Ativo',
     atualizado_em: new Date().toISOString(),
   };

@@ -51,7 +51,11 @@ export const FIELD_DEFINITIONS = [
   { key: 'motivo_atraso', label: 'Motivo do atraso', group: 'Alertas e Pendências', type: 'select', listKey: 'motivo_atraso' },
   { key: 'pendencia_tecnica', label: 'Pendência Técnica', group: 'Alertas e Pendências', type: 'yesno' },
   { key: 'cliente_notificado', label: 'Cliente Notificado', group: 'Alertas e Pendências', type: 'select', listKey: 'cliente_notificado' },
+  { key: 'data_notificacao_cliente', label: 'Data da notificação', group: 'Alertas e Pendências', type: 'date' },
+  { key: 'status_retorno_cliente', label: 'Status do retorno', group: 'Alertas e Pendências', type: 'select', listKey: 'status_retorno_cliente' },
+  { key: 'data_retorno_cliente', label: 'Data do retorno', group: 'Alertas e Pendências', type: 'date' },
   { key: 'proxima_acao', label: 'Próxima Ação', group: 'Alertas e Pendências', type: 'textarea' },
+  { key: 'prazo_proxima_acao', label: 'Prazo da próxima ação', group: 'Alertas e Pendências', type: 'date' },
 
   { key: 'criado_em', label: 'Criado em', group: 'Auditoria', type: 'date' },
   { key: 'atualizado_em', label: 'Atualizado em', group: 'Auditoria', type: 'date' },
@@ -123,7 +127,11 @@ export const EXCEL_HEADER_MAP = {
   'Motivo de Atraso': 'motivo_atraso',
   'Pendência Técnica': 'pendencia_tecnica',
   'Cliente Notificado': 'cliente_notificado',
+  'Data da Notificação': 'data_notificacao_cliente',
+  'Status do Retorno': 'status_retorno_cliente',
+  'Data do Retorno': 'data_retorno_cliente',
   'Próxima Ação': 'proxima_acao',
+  'Prazo da Próxima Ação': 'prazo_proxima_acao',
 };
 
 export const LIST_HEADER_MAP = {
@@ -145,6 +153,7 @@ export const LIST_HEADER_MAP = {
   'Motivo do Atraso': 'motivo_atraso',
   'Risco de Multa': 'risco_multa',
   'Cliente Notificado': 'cliente_notificado',
+  'Status do Retorno': 'status_retorno_cliente',
   Dificuldade: 'dificuldade',
   ECD: 'ecd',
 };
@@ -165,6 +174,7 @@ export const DEFAULT_LISTS = {
   motivo_atraso: ['Docs Atrasados', 'Falta de financeiro rodando', 'Cliente Novo', 'Desorganização Interna F12'],
   risco_multa: ['Alto', 'Médio', 'Baixo'],
   cliente_notificado: ['Sim', 'Não'],
+  status_retorno_cliente: ['Aguardando retorno', 'Retorno recebido', 'Sem retorno', 'Concluído'],
   dificuldade: ['Baixa', 'Média', 'Alta', 'Altíssima'],
   ecd: ['Sim', 'Não'],
 };
@@ -215,7 +225,7 @@ export const DETAIL_SECTIONS = [
   },
   {
     title: 'Alertas e Pendências',
-    fields: ['motivo_atraso', 'pendencia_tecnica', 'cliente_notificado', 'proxima_acao'],
+    fields: ['motivo_atraso', 'pendencia_tecnica', 'cliente_notificado', 'data_notificacao_cliente', 'status_retorno_cliente', 'data_retorno_cliente', 'proxima_acao', 'prazo_proxima_acao'],
   },
 ];
 
