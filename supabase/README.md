@@ -9,6 +9,7 @@ Arquivos SQL ativos:
 - `supabase/obrigacoes-status.sql` -> view persistente de status e pendencias de REINF / ECD / ECF
 - `supabase/clientes-campos-operacionais.sql` -> colunas operacionais adicionais usadas pelo risco resumido
 - `supabase/clientes-campos-acompanhamento.sql` -> datas e status operacionais de notificacao, retorno e prazo
+- `supabase/acompanhamento-operacional.sql` -> view persistente de acompanhamento operacional do cliente
 - `supabase/risco-operacional.sql` -> view persistente de risco operacional resumido
 
 Ordem recomendada no SQL Editor:
@@ -20,4 +21,5 @@ Ordem recomendada no SQL Editor:
 5. `obrigacoes-status.sql`
 6. `clientes-campos-operacionais.sql`
 7. `clientes-campos-acompanhamento.sql`
-8. `risco-operacional.sql`
+8. `acompanhamento-operacional.sql`
+9. `risco-operacional.sql`

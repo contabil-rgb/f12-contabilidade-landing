@@ -115,6 +115,10 @@ import {
   indexarRiscoOperacional,
   listarRiscoOperacionalClientes,
 } from './services/risco-operacional.service';
+import {
+  indexarAcompanhamentoOperacional,
+  listarAcompanhamentoOperacionalClientes,
+} from './services/acompanhamento-operacional.service';
 import { supabase } from './lib/supabase';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
@@ -657,11 +661,23 @@ function hydrateClientesComRiscoOperacional(clientesBase, riscoIndex = {}) {
   });
 }
 
+function hydrateClientesComAcompanhamentoOperacional(clientesBase, acompanhamentoIndex = {}) {
+  return (clientesBase ?? []).map((client) => {
+    const acompanhamento = acompanhamentoIndex[String(client.id ?? '').trim()];
+    if (!acompanhamento) return client;
+    return {
+      ...client,
+      _db_acompanhamento_operacional: acompanhamento,
+    };
+  });
+}
+
 function clearPersistedObrigacoes(client) {
-  if (!client || (!client._db_obrigacoes && !client._db_risco_operacional)) return client;
+  if (!client || (!client._db_obrigacoes && !client._db_risco_operacional && !client._db_acompanhamento_operacional)) return client;
   const next = { ...client };
   delete next._db_obrigacoes;
   delete next._db_risco_operacional;
+  delete next._db_acompanhamento_operacional;
   return next;
 }
 
@@ -713,6 +729,10 @@ function getRiscoPersistido(client) {
   return client?._db_risco_operacional ?? {};
 }
 
+function getAcompanhamentoPersistido(client) {
+  return client?._db_acompanhamento_operacional ?? {};
+}
+
 function getObrigacaoFlag(client, key, fallback = false) {
   const value = getObrigacoesPersistidas(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
@@ -725,6 +745,22 @@ function getClientAnalysis(client) {
 function getRiscoFlag(client, key, fallback = false) {
   const value = getRiscoPersistido(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function getAcompanhamentoFlag(client, key, fallback = false) {
+  const value = getAcompanhamentoPersistido(client)?.[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function getAcompanhamentoNumber(client, key) {
+  const value = getAcompanhamentoPersistido(client)?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getAcompanhamentoText(client, key, fallback = '') {
+  const value = getAcompanhamentoPersistido(client)?.[key];
+  if (typeof value === 'string') return value;
+  return fallback;
 }
 
 function getDiasAtrasoValue(client) {
@@ -758,34 +794,72 @@ function hasPendenciaOperacional(client) {
 }
 
 function getDataNotificacaoClienteValue(client) {
-  return normalizeDateInputValue(client?.data_notificacao_cliente || '');
+  return normalizeDateInputValue(
+    getAcompanhamentoText(client, 'data_notificacao_cliente', client?.data_notificacao_cliente || ''),
+  );
 }
 
 function getDataRetornoClienteValue(client) {
-  return normalizeDateInputValue(client?.data_retorno_cliente || '');
+  return normalizeDateInputValue(
+    getAcompanhamentoText(client, 'data_retorno_cliente', client?.data_retorno_cliente || ''),
+  );
 }
 
 function getPrazoProximaAcaoValue(client) {
-  return normalizeDateInputValue(client?.prazo_proxima_acao || '');
+  return normalizeDateInputValue(
+    getAcompanhamentoText(client, 'prazo_proxima_acao', client?.prazo_proxima_acao || ''),
+  );
 }
 
 function getStatusRetornoClienteValue(client) {
-  return normalizeText(client?.status_retorno_cliente || '');
+  return normalizeText(
+    getAcompanhamentoText(client, 'status_retorno_cliente', client?.status_retorno_cliente || ''),
+  );
 }
 
 function hasRetornoConcluido(client) {
+  if (getAcompanhamentoFlag(client, 'retorno_recebido', false)) return true;
   const status = getStatusRetornoClienteValue(client);
   return status === normalizeText('Retorno recebido') || status === normalizeText('Concluido');
 }
 
 function isAguardandoRetorno(client) {
-  if (!isYes(client?.cliente_notificado)) return false;
-  if (hasRetornoConcluido(client)) return false;
-  const status = getStatusRetornoClienteValue(client);
-  return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
+  const fallback = (() => {
+    if (!isYes(client?.cliente_notificado)) return false;
+    if (hasRetornoConcluido(client)) return false;
+    const status = getStatusRetornoClienteValue(client);
+    return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
+  })();
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'aguardando_retorno')) {
+    return getAcompanhamentoFlag(client, 'aguardando_retorno', fallback);
+  }
+  return fallback;
+}
+
+function isSemRetorno(client) {
+  const fallback = isYes(client?.cliente_notificado)
+    && !hasRetornoConcluido(client)
+    && getStatusRetornoClienteValue(client) === normalizeText('Sem retorno');
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'sem_retorno')) {
+    return getAcompanhamentoFlag(client, 'sem_retorno', fallback);
+  }
+  return fallback;
+}
+
+function isClienteNotificado(client) {
+  const fallback = isYes(client?.cliente_notificado);
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'cliente_notificado_bool')) {
+    return getAcompanhamentoFlag(client, 'cliente_notificado_bool', fallback);
+  }
+  return fallback;
 }
 
 function getPrazoDiffDias(client) {
+  const persisted = getAcompanhamentoNumber(client, 'dias_para_prazo');
+  if (persisted !== null) return persisted;
   const prazo = getPrazoProximaAcaoValue(client);
   if (!prazo) return null;
   const today = new Date();
@@ -795,18 +869,77 @@ function getPrazoDiffDias(client) {
   return Math.round((dueDate.getTime() - startToday.getTime()) / 86400000);
 }
 
+function getDiasSemRetorno(client) {
+  const persisted = getAcompanhamentoNumber(client, 'dias_sem_retorno');
+  if (persisted !== null) return persisted;
+  const data = getDataNotificacaoClienteValue(client);
+  if (!data || !isAguardandoRetorno(client)) return null;
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const notificadoEm = new Date(`${data}T00:00:00`);
+  if (Number.isNaN(notificadoEm.getTime())) return null;
+  return Math.round((startToday.getTime() - notificadoEm.getTime()) / 86400000);
+}
+
 function isPrazoProximaAcaoVencido(client) {
-  const diff = getPrazoDiffDias(client);
-  return diff !== null && diff < 0;
+  const fallback = (() => {
+    const diff = getPrazoDiffDias(client);
+    return diff !== null && diff < 0;
+  })();
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_vencido')) {
+    return getAcompanhamentoFlag(client, 'prazo_proxima_acao_vencido', fallback);
+  }
+  return fallback;
 }
 
 function isPrazoProximaAcaoProximo(client) {
-  const diff = getPrazoDiffDias(client);
-  return diff !== null && diff >= 0 && diff <= 3;
+  const fallback = (() => {
+    const diff = getPrazoDiffDias(client);
+    return diff !== null && diff >= 0 && diff <= 3;
+  })();
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_proximo')) {
+    return getAcompanhamentoFlag(client, 'prazo_proxima_acao_proximo', fallback);
+  }
+  return fallback;
 }
 
 function hasAcompanhamentoPendente(client) {
-  return isComunicacaoPendente(client) || isAguardandoRetorno(client) || isPrazoProximaAcaoVencido(client) || isPrazoProximaAcaoProximo(client);
+  const fallback =
+    isComunicacaoPendente(client)
+    || isAguardandoRetorno(client)
+    || isPrazoProximaAcaoVencido(client)
+    || isPrazoProximaAcaoProximo(client);
+  const persisted = getAcompanhamentoPersistido(client);
+  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
+    return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback) || isComunicacaoPendente(client);
+  }
+  return fallback;
+}
+
+function getStatusAcompanhamentoLabel(client) {
+  const fallback = (() => {
+    if (isPrazoProximaAcaoVencido(client)) return 'Prazo vencido';
+    if (isSemRetorno(client)) return 'Sem retorno';
+    if (isAguardandoRetorno(client)) return 'Aguardando retorno';
+    if (hasRetornoConcluido(client)) return 'Retorno recebido';
+    if (isClienteNotificado(client)) return 'Notificado';
+    return 'Sem notificacao';
+  })();
+  return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
+}
+
+function getStatusAcompanhamentoCodigo(client) {
+  const fallback = (() => {
+    if (isPrazoProximaAcaoVencido(client)) return 'prazo_vencido';
+    if (isSemRetorno(client)) return 'sem_retorno';
+    if (isAguardandoRetorno(client)) return 'aguardando_retorno';
+    if (hasRetornoConcluido(client)) return 'retorno_recebido';
+    if (isClienteNotificado(client)) return 'notificado';
+    return 'sem_notificacao';
+  })();
+  return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
 }
 
 function getObrigacaoResponsavel(client) {
@@ -888,7 +1021,7 @@ function getClientAlertSignals(client) {
       label: dataNotificacao
         ? `Aguardando retorno desde ${formatDateDisplay(dataNotificacao)}`
         : 'Aguardando retorno do cliente',
-      tone: getStatusRetornoClienteValue(client) === normalizeText('Sem retorno') ? 'danger' : 'warning',
+      tone: isSemRetorno(client) ? 'danger' : 'warning',
     },
     isPrazoProximaAcaoVencido(client) && {
       key: 'prazo',
@@ -4344,7 +4477,7 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
@@ -4353,31 +4486,39 @@ export default function App() {
         listarRiscoOperacionalClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
+        listarAcompanhamentoOperacionalClientes()
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
       ]);
       const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
       const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesHydrated, obrigacoesIndex);
       const riscoIndex = riscoResult.ok ? indexarRiscoOperacional(riscoResult.rows) : {};
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
+      const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
+      const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
 
       const nextListagens = mergeListagensFromSupabase(
         { ...DEFAULT_LISTS, ...listasBase },
         listagensSupabase,
       );
-      persist(clientesComRisco, nextListagens, {
+      persist(clientesComAcompanhamento, nextListagens, {
         ...metadata,
         source: 'Supabase',
         importedAt: metadata?.importedAt || todayBr(),
       });
       setSupabaseStatus({
         connected: true,
-        message: `Conectado ao Supabase (${formatNumber(clientesComRisco.length)} cliente(s))`,
+        message: `Conectado ao Supabase (${formatNumber(clientesComAcompanhamento.length)} cliente(s))`,
       });
       if (!obrigacoesResult.ok) {
         console.warn('[obrigacoes] Falha ao carregar view persistente de obrigacoes:', obrigacoesResult.error);
       }
       if (!riscoResult.ok) {
         console.warn('[risco_operacional] Falha ao carregar view persistente de risco operacional:', riscoResult.error);
+      }
+      if (!acompanhamentoResult.ok) {
+        console.warn('[acompanhamento_operacional] Falha ao carregar view persistente de acompanhamento operacional:', acompanhamentoResult.error);
       }
       if (!silent) {
         setToast({
