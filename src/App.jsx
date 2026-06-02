@@ -50,6 +50,7 @@ import {
 import { analyzeClient, enrichClients, toBreakdown } from './lib/statusRules.js';
 import {
   formatCnpj,
+  formatCnpjInput,
   formatCurrency,
   formatNumber,
   getFieldLabel,
@@ -378,9 +379,9 @@ function withClientDefaults(client) {
 
 function loadInitialState() {
   return {
-    clientes: clientesContabeis.map(withClientDefaults),
+    clientes: [],
     listagens: { ...DEFAULT_LISTS, ...listasBase },
-    savedAt: importMetadata.importedAt,
+    savedAt: '',
   };
 }
 
@@ -4307,9 +4308,16 @@ function FormField({
       <input
         value={value}
         type={field.type === 'number' ? 'number' : 'text'}
-        inputMode={field.type === 'currency' || field.type === 'number' ? 'decimal' : undefined}
+        inputMode={
+          field.type === 'cnpj'
+            ? 'numeric'
+            : field.type === 'currency' || field.type === 'number'
+              ? 'decimal'
+              : undefined
+        }
+        maxLength={field.type === 'cnpj' ? 18 : undefined}
         placeholder={field.type === 'date' ? 'dd/mm/aaaa' : undefined}
-        onChange={(event) => onChange(field.type === 'cnpj' ? formatCnpj(event.target.value) : event.target.value)}
+        onChange={(event) => onChange(field.type === 'cnpj' ? formatCnpjInput(event.target.value) : event.target.value)}
         disabled={computedDisabled}
         title={computedDisabled ? computedDisabledReason : undefined}
         className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
@@ -4672,17 +4680,17 @@ export default function App() {
     } catch (error) {
       const hasCurrentClients = Array.isArray(clients) && clients.length > 0;
       if (!hasCurrentClients) {
-        persist(clientesContabeis.map(withClientDefaults), { ...DEFAULT_LISTS, ...listasBase }, {
+        persist([], { ...DEFAULT_LISTS, ...listasBase }, {
           ...metadata,
-          source: 'Fallback local',
-          importedAt: metadata?.importedAt || todayBr(),
+          source: 'Supabase indisponivel',
+          importedAt: metadata?.importedAt || '',
         });
       }
       setSupabaseStatus({
         connected: false,
         message: hasCurrentClients
           ? 'Erro ao atualizar dados do Supabase'
-          : 'Erro ao carregar dados (fallback local ativo)',
+          : 'Erro ao carregar dados do Supabase',
       });
       if (!silent) {
         setToast({
@@ -4958,11 +4966,12 @@ export default function App() {
             origem: origemEdicao,
           });
         } catch (error) {
-          setSupabaseStatus({ connected: false, message: 'Falha ao salvar no Supabase (alteracao local)' });
+          setSupabaseStatus({ connected: false, message: 'Falha ao salvar no Supabase' });
           setToast({
             title: 'Falha ao salvar no Supabase',
-            message: `${error.message}. A alteracao foi mantida localmente.`,
+            message: `${error.message}. Nenhuma alteracao local paralela foi aplicada.`,
           });
+          return;
         }
       }
       nextClients[index] = clearPersistedObrigacoes(mergedClient);
@@ -4981,15 +4990,12 @@ export default function App() {
         setSupabaseStatus({ connected: true, message: 'Cliente criado no Supabase' });
         syncedWithSupabase = true;
       } catch (error) {
-        setSupabaseStatus({ connected: false, message: 'Falha ao criar no Supabase (registro local)' });
-        createdClient = {
-          ...createdClient,
-          id: createdClient.id || stableIdFromCnpj(createdClient.cnpj || `local-${Date.now()}`),
-        };
+        setSupabaseStatus({ connected: false, message: 'Falha ao criar no Supabase' });
         setToast({
           title: 'Falha ao criar no Supabase',
-          message: `${error.message}. O cliente foi criado apenas localmente.`,
+          message: `${error.message}. O cliente nao foi criado localmente para evitar divergencia.`,
         });
+        return;
       }
       nextClients.unshift(clearPersistedObrigacoes(createdClient));
     }
@@ -5037,11 +5043,12 @@ export default function App() {
           origem: page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes',
         });
       } catch (error) {
-        setSupabaseStatus({ connected: false, message: 'Falha na atualizacao do Supabase (mudanca local)' });
+        setSupabaseStatus({ connected: false, message: 'Falha na atualizacao do Supabase' });
         setToast({
           title: 'Falha ao salvar no Supabase',
-          message: `${error.message}. A alteracao foi mantida localmente.`,
+          message: `${error.message}. Nenhuma alteracao local paralela foi aplicada.`,
         });
+        return;
       }
     }
 
@@ -5196,11 +5203,12 @@ export default function App() {
           origem: 'Base de Clientes',
         });
       } catch (error) {
-        setSupabaseStatus({ connected: false, message: 'Falha ao inativar no Supabase (ajuste local)' });
+        setSupabaseStatus({ connected: false, message: 'Falha ao inativar no Supabase' });
         setToast({
           title: 'Falha ao inativar no Supabase',
-          message: `${error.message}. O ajuste foi aplicado localmente.`,
+          message: `${error.message}. O cliente foi mantido como esta para evitar divergencia.`,
         });
+        return;
       }
     }
     const nextClient = { ...client, situacao: 'Inativo', status: 'Inativo', atualizado_em: todayBr() };
