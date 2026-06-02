@@ -3477,6 +3477,38 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
   );
 }
 
+function StaticBreakdownPanel({ title, rows, total, icon: Icon = BarChart3 }) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+
+  return (
+    <section className="surface-card p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-black text-slate-950">{title}</h2>
+        <Icon className="text-brand-blue" size={19} aria-hidden="true" />
+      </div>
+      <div className="mt-4 space-y-3">
+        {rows.slice(0, 9).map((row) => (
+          <div key={row.label} className="rounded-lg p-2">
+            <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+              <span className="font-bold text-slate-700">{row.label}</span>
+              <span className="font-black text-slate-950">{row.value}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-brand-blue"
+                style={{ width: `${Math.max((row.value / max) * 100, 4)}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs font-semibold text-slate-400">
+              {total ? `${((row.value / total) * 100).toFixed(1)}% da base` : '0% da base'}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ReportsPage({
   clients,
   filteredClients,
@@ -3494,14 +3526,42 @@ function ReportsPage({
   const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
   const clientesPrazoVencido = clients.filter((client) => isPrazoProximaAcaoVencido(client));
   const clientesPrazoProximo = clients.filter((client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
+  const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
+  const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
+  const clientesSemNotificacao = clients.filter((client) => !isClienteNotificado(client));
+  const acompanhamentoStatusRows = [
+    { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
+    { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
+    { label: 'Sem retorno', value: clientesSemRetorno.length },
+    { label: 'Sem notificacao', value: clientesSemNotificacao.length },
+    { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
+  ].filter((row) => row.value > 0);
+  const acompanhamentoPrazoRows = [
+    { label: 'Prazo vencido', value: clientesPrazoVencido.length },
+    { label: 'Prazo proximo', value: clientesPrazoProximo.length },
+    {
+      label: 'Media dias sem retorno',
+      value: clientesAguardandoRetorno.length
+        ? Number(
+          (
+            clientesAguardandoRetorno.reduce((sum, client) => sum + Math.max(getDiasSemRetorno(client) ?? 0, 0), 0)
+            / clientesAguardandoRetorno.length
+          ).toFixed(1),
+        )
+        : 0,
+    },
+  ].filter((row) => row.value > 0);
   const reports = [
     { title: 'Clientes por responsável', rows: toBreakdown(clients, 'responsavel'), icon: UserCheck },
     { title: 'Clientes por regime tributário', rows: toBreakdown(clients, 'regime_tributario'), icon: Building2 },
     { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
+    { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail },
+    { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle },
     { title: 'Prazo da próxima ação vencido', rows: clientesPrazoVencido, icon: BellRing },
     { title: 'Prazo da próxima ação próximo', rows: clientesPrazoProximo, icon: ClipboardList },
+    { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff },
     { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
     { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
     { title: 'Clientes por dificuldade', rows: toBreakdown(clients, 'dificuldade'), icon: AlertTriangle },
@@ -3610,6 +3670,21 @@ function ReportsPage({
             </article>
           );
         })}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <StaticBreakdownPanel
+          title="Status do acompanhamento"
+          rows={acompanhamentoStatusRows}
+          total={clients.length}
+          icon={Mail}
+        />
+        <StaticBreakdownPanel
+          title="Prazos e retorno"
+          rows={acompanhamentoPrazoRows}
+          total={clients.length}
+          icon={ClipboardList}
+        />
       </section>
 
       <section className="surface-card p-5">
