@@ -68,7 +68,6 @@ import {
   ACCESS_PROFILE_KEYS,
   ACCESS_PROFILES,
   HISTORY_FIELDS,
-  INITIAL_USERS,
   PERMISSIONS,
   USER_STATUS,
 } from './data/security.js';
@@ -119,6 +118,13 @@ import {
   indexarAcompanhamentoOperacional,
   listarAcompanhamentoOperacionalClientes,
 } from './services/acompanhamento-operacional.service';
+import {
+  atualizarUltimoAcessoUsuarioPortal,
+  atualizarUsuarioPortal,
+  buscarPerfilPorAuthUserId,
+  limparTrocaSenhaObrigatoriaUsuario,
+  listarUsuariosPortal,
+} from './services/usuarios.service';
 import { supabase } from './lib/supabase';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
@@ -307,49 +313,17 @@ async function getAuthUserSupabase() {
   return data?.user ?? null;
 }
 
-function normalizePerfilAcessoValue(value) {
-  const raw = String(value ?? '').trim();
-  const normalized = normalizeText(raw);
-  if (
-    raw === ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN ||
-    normalized === 'coordenador / administrador' ||
-    normalized === 'coordenador administrador'
-  ) {
-    return ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN;
-  }
-  if (
-    raw === ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL ||
-    normalized === 'setor contabil / operacional' ||
-    normalized === 'setor contabil operacional'
-  ) {
-    return ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL;
-  }
-  return ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL;
-}
-
 async function getPerfilByAuthUserId(authUserId) {
-  const { data, error } = await supabase
-    .from('usuarios')
-    .select('*')
-    .eq('auth_user_id', authUserId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message || 'Falha ao consultar public.usuarios.');
-  }
-  if (!data) return null;
-  return {
-    ...data,
-    perfil_acesso: normalizePerfilAcessoValue(data.perfil_acesso),
-  };
+  return buscarPerfilPorAuthUserId(authUserId);
 }
 
 async function updateUltimoAcessoUsuario(usuarioId) {
-  const { error } = await supabase
-    .from('usuarios')
-    .update({ ultimo_acesso: new Date().toISOString(), atualizado_em: new Date().toISOString() })
-    .eq('id', usuarioId);
-  return !error;
+  try {
+    await atualizarUltimoAcessoUsuarioPortal(usuarioId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 
@@ -428,12 +402,7 @@ function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
 function loadSecurityState() {
   return {
     ...createEmptySecurityState(),
-    usuarios: INITIAL_USERS.map((user) => ({
-      ...user,
-      id: user.id || stableIdFromCnpj(user.email),
-      criado_em: user.criado_em || todayBr(),
-      atualizado_em: user.atualizado_em || todayBr(),
-    })),
+    usuarios: [],
   };
 }
 
@@ -3993,13 +3962,13 @@ function UserModal({ user, users, onClose, onSave }) {
 
         <div className="space-y-4 p-5">
           <div className="grid gap-3 sm:grid-cols-2">
-            <AuthTextField label="Nome completo" value={form.nome} onChange={(value) => setForm((current) => ({ ...current, nome: value }))} disabled />
+            <AuthTextField label="Nome completo" value={form.nome} onChange={(value) => setForm((current) => ({ ...current, nome: value }))} />
             <AuthTextField label="E-mail profissional" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} disabled />
-            <AuthTextField label="Cargo / funcao" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} disabled />
-            <AuthTextField label="Setor" value={form.setor} onChange={(value) => setForm((current) => ({ ...current, setor: value }))} disabled />
+            <AuthTextField label="Cargo / funcao" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} />
+            <AuthTextField label="Setor" value={form.setor} onChange={(value) => setForm((current) => ({ ...current, setor: value }))} />
             <label className="text-xs font-black uppercase tracking-normal text-slate-500">
               Perfil de acesso
-              <select value={form.perfil_acesso} disabled onChange={(event) => setForm((current) => ({ ...current, perfil_acesso: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
+              <select value={form.perfil_acesso} onChange={(event) => setForm((current) => ({ ...current, perfil_acesso: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10">
                 {ACCESS_PROFILE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -4020,7 +3989,7 @@ function UserModal({ user, users, onClose, onSave }) {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
-            A gestão de senha ocorre pelo fluxo seguro do Supabase Auth (primeiro acesso e recuperação).
+            O e-mail institucional e a senha continuam protegidos pelo Supabase Auth. Aqui gerimos nome, cargo, setor, perfil e status do acesso.
           </div>
 
           <ErrorList errors={errors} />
@@ -4530,7 +4499,7 @@ export default function App() {
         setAuthView('login');
         setToast({
           title: 'Falha ao validar sessão',
-          message: error.message || 'Não foi possível validar a sessão atual no Supabase.',
+          message: error.message || 'Nao foi possivel validar a sessao atual no Supabase.',
         });
       } finally {
         if (active) setAuthReady(true);
@@ -4600,6 +4569,8 @@ export default function App() {
         auth_user_id: perfil.auth_user_id ?? base.auth_user_id ?? null,
         nome: perfil.nome ?? base.nome ?? '',
         email: perfil.email ?? base.email ?? '',
+        cargo: perfil.cargo ?? base.cargo ?? '',
+        setor: perfil.setor ?? base.setor ?? '',
         perfil_acesso: perfil.perfil_acesso ?? base.perfil_acesso ?? '',
         status: perfil.status ?? base.status ?? 'Ativo',
         ultimo_acesso: perfil.ultimo_acesso ?? base.ultimo_acesso ?? '',
@@ -4617,6 +4588,14 @@ export default function App() {
     });
   }
 
+  function sincronizarUsuariosSupabase(usuariosSupabase) {
+    if (!Array.isArray(usuariosSupabase) || !usuariosSupabase.length) return;
+    persistSecurity((current) => ({
+      ...current,
+      usuarios: usuariosSupabase,
+    }));
+  }
+
   async function recuperarPerfilSessaoSupabase() {
     const authUser = await getAuthUserSupabase();
     if (!authUser) return null;
@@ -4632,7 +4611,7 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
@@ -4642,6 +4621,9 @@ export default function App() {
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarAcompanhamentoOperacionalClientes()
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
+        listarUsuariosPortal()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
       ]);
@@ -4662,6 +4644,11 @@ export default function App() {
         source: 'Supabase',
         importedAt: metadata?.importedAt || todayBr(),
       });
+      if (usuariosResult.ok) {
+        sincronizarUsuariosSupabase(usuariosResult.rows);
+      } else {
+        console.warn('[usuarios] Falha ao carregar usuarios do Supabase:', usuariosResult.error);
+      }
       setSupabaseStatus({
         connected: true,
         message: `Conectado ao Supabase (${formatNumber(clientesComAcompanhamento.length)} cliente(s))`,
@@ -4826,6 +4813,13 @@ export default function App() {
         };
       }
       await atualizarSenhaUsuarioLogado(senha);
+      if (recoverySession?.user?.id) {
+        const perfil = await buscarPerfilPorAuthUserId(recoverySession.user.id);
+        if (perfil?.id) {
+          const atualizado = await limparTrocaSenhaObrigatoriaUsuario(perfil.id);
+          sincronizarPerfilUsuario(atualizado);
+        }
+      }
       return { ok: true };
     } catch (error) {
       return { ok: false, errors: [error.message || 'Não foi possível redefinir a senha no Supabase.'] };
@@ -4840,6 +4834,8 @@ export default function App() {
     if (errorsSupabase.length) return { ok: false, errors: errorsSupabase };
     try {
       await atualizarSenhaUsuarioLogado(novaSenha);
+      const atualizado = await limparTrocaSenhaObrigatoriaUsuario(currentUserFull.id);
+      sincronizarPerfilUsuario(atualizado);
       setToast({ title: 'Senha alterada', message: 'Acesso liberado ao portal.' });
       return { ok: true };
     } catch (error) {
@@ -5359,38 +5355,67 @@ export default function App() {
   async function saveUser(userValues) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) return;
     if (!security.usuarios.some((user) => user.id === userValues.id)) {
-      setToast({ title: 'Ação bloqueada', message: 'Usuário não encontrado na base local.' });
+      setToast({ title: 'Acao bloqueada', message: 'Usuario nao encontrado na base local.' });
       return;
     }
-    const updated = {
-      ...userValues,
-      atualizado_em: new Date().toISOString(),
-    };
-    persistSecurity((current) => ({
-      ...current,
-      usuarios: (current.usuarios ?? []).map((user) => (user.id === updated.id ? updated : user)),
-    }));
-    setEditingUser(null);
-    setToast({ title: 'Usuário salvo', message: updated.email });
+    if (!isUuid(userValues.id)) {
+      setToast({ title: 'Sincronizacao pendente', message: 'Atualize os dados do Supabase antes de editar usuarios.' });
+      return;
+    }
+    if (userValues.id === currentUserFull?.id && userValues.status !== 'Ativo') {
+      setToast({ title: 'Acao bloqueada', message: 'Voce nao pode inativar seu proprio usuario.' });
+      return;
+    }
+    if (userValues.id === currentUserFull?.id && userValues.perfil_acesso !== currentUserFull?.perfil_acesso) {
+      setToast({ title: 'Acao bloqueada', message: 'Altere o perfil do seu proprio usuario apenas por um fluxo administrado.' });
+      return;
+    }
+    try {
+      const updated = await atualizarUsuarioPortal(userValues.id, {
+        nome: userValues.nome,
+        cargo: userValues.cargo,
+        setor: userValues.setor,
+        perfil_acesso: userValues.perfil_acesso,
+        status: userValues.status,
+      });
+      persistSecurity((current) => ({
+        ...current,
+        usuarios: (current.usuarios ?? []).map((user) => (user.id === updated.id ? updated : user)),
+      }));
+      setEditingUser(null);
+      setToast({ title: 'Usuario salvo', message: updated.email });
+    } catch (error) {
+      setToast({
+        title: 'Falha ao salvar usuario',
+        message: error.message || 'Nao foi possivel persistir o usuario no Supabase.',
+      });
+    }
   }
 
   async function toggleUserStatus(user) {
     if (user.id === currentUserFull?.id) {
-      setToast({ title: 'Ação bloqueada', message: 'Você não pode inativar seu próprio usuário.' });
+      setToast({ title: 'Acao bloqueada', message: 'Voce nao pode inativar seu proprio usuario.' });
+      return;
+    }
+    if (!isUuid(user.id)) {
+      setToast({ title: 'Sincronizacao pendente', message: 'Atualize os dados do Supabase antes de alterar usuarios.' });
       return;
     }
 
     const nextStatus = user.status === 'Ativo' ? 'Inativo' : 'Ativo';
-    const updated = {
-      ...user,
-      status: nextStatus,
-      atualizado_em: new Date().toISOString(),
-    };
-    persistSecurity((current) => ({
-      ...current,
-      usuarios: (current.usuarios ?? []).map((item) => (item.id === updated.id ? updated : item)),
-    }));
-    setToast({ title: `Usuário ${nextStatus.toLowerCase()}`, message: user.email });
+    try {
+      const updated = await atualizarUsuarioPortal(user.id, { status: nextStatus });
+      persistSecurity((current) => ({
+        ...current,
+        usuarios: (current.usuarios ?? []).map((item) => (item.id === updated.id ? updated : item)),
+      }));
+      setToast({ title: 'Usuario ' + nextStatus.toLowerCase(), message: user.email });
+    } catch (error) {
+      setToast({
+        title: 'Falha ao atualizar status',
+        message: error.message || 'Nao foi possivel atualizar o usuario no Supabase.',
+      });
+    }
   }
 
   if (!authReady) {

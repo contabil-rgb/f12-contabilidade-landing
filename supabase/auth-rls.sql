@@ -10,9 +10,14 @@ create table if not exists public.usuarios (
   auth_user_id uuid unique,
   nome text not null,
   email text not null unique,
+  cargo text,
+  setor text,
   perfil_acesso text not null,
   status text not null default 'Ativo',
   ultimo_acesso timestamptz,
+  precisa_trocar_senha boolean not null default false,
+  tentativas_invalidas integer not null default 0,
+  bloqueado_ate timestamptz,
   criado_em timestamptz default now(),
   atualizado_em timestamptz default now()
 );
@@ -22,10 +27,10 @@ create index if not exists idx_usuarios_auth_user_id on public.usuarios(auth_use
 create index if not exists idx_usuarios_status on public.usuarios(status);
 create index if not exists idx_usuarios_perfil_acesso on public.usuarios(perfil_acesso);
 
-insert into public.usuarios (nome, email, perfil_acesso, status)
+insert into public.usuarios (nome, email, cargo, setor, perfil_acesso, status, precisa_trocar_senha)
 values
-  ('Coordenador', 'leticiacampos@f12contabilidade.com.br', 'Coordenador / Administrador', 'Ativo'),
-  ('Setor Contabil', 'contabil@f12contabilidade.com.br', 'Setor Contabil / Operacional', 'Ativo')
+  ('Coordenador', 'leticiacampos@f12contabilidade.com.br', 'Coordenador', 'Contabilidade', 'coordenador_administrador', 'Ativo', false),
+  ('Setor Contabil', 'contabil@f12contabilidade.com.br', 'Operacional', 'Setor Contabil', 'setor_contabil_operacional', 'Ativo', false)
 on conflict (email) do nothing;
 
 -- 2) Trigger generico para atualizar campo atualizado_em

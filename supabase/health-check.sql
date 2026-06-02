@@ -17,7 +17,7 @@ select
   (select count(*) from public.anexos) as total_anexos;
 
 -- 3) Usuarios complementares e vinculo auth
-select nome, email, perfil_acesso, status, auth_user_id
+select nome, email, cargo, setor, perfil_acesso, status, precisa_trocar_senha, auth_user_id
 from public.usuarios
 order by nome;
 
@@ -47,4 +47,3 @@ where schemaname = 'storage'
   and tablename = 'objects'
   and policyname like 'storage_docs_clientes_%'
 order by policyname;
-

@@ -5,6 +5,7 @@ Arquivos SQL ativos:
 - `supabase/schema.sql` -> estrutura base (`clientes`, `listagens`)
 - `supabase/seed.sql` -> listagens iniciais
 - `supabase/auth-rls.sql` -> `usuarios` + Auth/RLS basico
+- `supabase/usuarios-campos-gestao.sql` -> campos complementares da Gestao de Usuarios
 - `supabase/historico.sql` -> tabela `historico_alteracoes` + RLS basico do historico
 - `supabase/obrigacoes-status.sql` -> view persistente de status e pendencias de REINF / ECD / ECF
 - `supabase/clientes-campos-operacionais.sql` -> colunas operacionais adicionais usadas pelo risco resumido
@@ -17,9 +18,10 @@ Ordem recomendada no SQL Editor:
 1. `schema.sql`
 2. `seed.sql`
 3. `auth-rls.sql`
-4. `historico.sql`
-5. `obrigacoes-status.sql`
-6. `clientes-campos-operacionais.sql`
-7. `clientes-campos-acompanhamento.sql`
-8. `acompanhamento-operacional.sql`
-9. `risco-operacional.sql`
+4. `usuarios-campos-gestao.sql`
+5. `historico.sql`
+6. `obrigacoes-status.sql`
+7. `clientes-campos-operacionais.sql`
+8. `clientes-campos-acompanhamento.sql`
+9. `acompanhamento-operacional.sql`
+10. `risco-operacional.sql`
