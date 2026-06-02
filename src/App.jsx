@@ -1904,6 +1904,11 @@ function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, on
     onManualFilter?.();
   }
 
+  const alertOptions = Object.entries(ALERT_FILTER_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
+
   return (
     <section className="surface-card p-5">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -1952,6 +1957,21 @@ function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, on
       ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          Alertas e acompanhamento
+          <select
+            value={filters.alerta}
+            onChange={(event) => updateFilter({ alerta: event.target.value })}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+          >
+            <option value="">Todos</option>
+            {alertOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {FILTER_FIELDS.map((fieldKey) => {
           const field = FIELD_DEFINITIONS.find((item) => item.key === fieldKey);
           const options = uniqueValues([...(getOptions(listagens, field) ?? []), filters[fieldKey]]);
@@ -2124,12 +2144,72 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
 }
 
 function BaseClientesPage(props) {
+  const acompanhamentoMetrics = [
+    {
+      key: 'acompanhamento',
+      title: 'Acompanhamento pendente',
+      value: countWhere(props.clients, (client) => hasAcompanhamentoPendente(client)),
+      detail: 'Clientes com retorno ou prazo para acompanhar',
+      icon: Mail,
+      tone: 'info',
+      alerta: 'comunicacao',
+    },
+    {
+      key: 'retorno',
+      title: 'Aguardando retorno',
+      value: countWhere(props.clients, (client) => isAguardandoRetorno(client)),
+      detail: 'Clientes notificados sem retorno concluido',
+      icon: Mail,
+      tone: 'warning',
+      alerta: 'retorno',
+    },
+    {
+      key: 'prazo',
+      title: 'Prazo vencido',
+      value: countWhere(props.clients, (client) => isPrazoProximaAcaoVencido(client)),
+      detail: 'Proxima acao que ja passou do prazo',
+      icon: BellRing,
+      tone: 'danger',
+      alerta: 'prazo',
+    },
+    {
+      key: 'prazo_proximo',
+      title: 'Prazo proximo',
+      value: countWhere(
+        props.clients,
+        (client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client),
+      ),
+      detail: 'Acoes que vencem nos proximos 3 dias',
+      icon: ClipboardList,
+      tone: 'warning',
+      alerta: 'prazo_proximo',
+    },
+  ];
+
+  function applyAlertFilter(alerta) {
+    props.setFilters((current) => ({ ...current, alerta }));
+    props.onManualFilter?.();
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Base de Clientes"
         description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
       />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {acompanhamentoMetrics.map((metric) => (
+          <MetricCard
+            key={metric.key}
+            title={metric.title}
+            value={metric.value}
+            detail={metric.detail}
+            icon={metric.icon}
+            tone={metric.tone}
+            onClick={() => applyAlertFilter(metric.alerta)}
+          />
+        ))}
+      </section>
       <SearchAndFilters {...props} />
       <ClientsTable
         clients={props.clients}
