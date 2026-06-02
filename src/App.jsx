@@ -193,6 +193,9 @@ const ALERT_FILTER_LABELS = {
   documentos: 'Documentação atrasada',
   ata: 'Ata pendente',
   comunicacao: 'Comunicação pendente',
+  retorno: 'Aguardando retorno',
+  prazo: 'Prazo da proxima acao vencido',
+  prazo_proximo: 'Prazo da proxima acao proximo',
 };
 
 const CLIENT_FIELD_DEFAULTS = {
@@ -754,6 +757,58 @@ function hasPendenciaOperacional(client) {
   return getRiscoFlag(client, 'has_pendencia', getClientAnalysis(client).hasPendencia);
 }
 
+function getDataNotificacaoClienteValue(client) {
+  return normalizeDateInputValue(client?.data_notificacao_cliente || '');
+}
+
+function getDataRetornoClienteValue(client) {
+  return normalizeDateInputValue(client?.data_retorno_cliente || '');
+}
+
+function getPrazoProximaAcaoValue(client) {
+  return normalizeDateInputValue(client?.prazo_proxima_acao || '');
+}
+
+function getStatusRetornoClienteValue(client) {
+  return normalizeText(client?.status_retorno_cliente || '');
+}
+
+function hasRetornoConcluido(client) {
+  const status = getStatusRetornoClienteValue(client);
+  return status === normalizeText('Retorno recebido') || status === normalizeText('Concluido');
+}
+
+function isAguardandoRetorno(client) {
+  if (!isYes(client?.cliente_notificado)) return false;
+  if (hasRetornoConcluido(client)) return false;
+  const status = getStatusRetornoClienteValue(client);
+  return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
+}
+
+function getPrazoDiffDias(client) {
+  const prazo = getPrazoProximaAcaoValue(client);
+  if (!prazo) return null;
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dueDate = new Date(`${prazo}T00:00:00`);
+  if (Number.isNaN(dueDate.getTime())) return null;
+  return Math.round((dueDate.getTime() - startToday.getTime()) / 86400000);
+}
+
+function isPrazoProximaAcaoVencido(client) {
+  const diff = getPrazoDiffDias(client);
+  return diff !== null && diff < 0;
+}
+
+function isPrazoProximaAcaoProximo(client) {
+  const diff = getPrazoDiffDias(client);
+  return diff !== null && diff >= 0 && diff <= 3;
+}
+
+function hasAcompanhamentoPendente(client) {
+  return isComunicacaoPendente(client) || isAguardandoRetorno(client) || isPrazoProximaAcaoVencido(client) || isPrazoProximaAcaoProximo(client);
+}
+
 function getObrigacaoResponsavel(client) {
   return getObrigacoesPersistidas(client)?.responsavel_exibicao || client?.responsavel_ecd || client?.responsavel || '';
 }
@@ -808,6 +863,8 @@ function isPendenciaCritica(client) {
 
 function getClientAlertSignals(client) {
   const diasAtraso = getDiasAtrasoValue(client);
+  const dataNotificacao = getDataNotificacaoClienteValue(client);
+  const prazoProximaAcao = getPrazoProximaAcaoValue(client);
   return [
     isEmAtraso(client) && {
       key: 'atraso',
@@ -826,6 +883,23 @@ function getClientAlertSignals(client) {
     isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
     isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
     isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicacao pendente', tone: 'info' },
+    isAguardandoRetorno(client) && {
+      key: 'retorno',
+      label: dataNotificacao
+        ? `Aguardando retorno desde ${formatDateDisplay(dataNotificacao)}`
+        : 'Aguardando retorno do cliente',
+      tone: getStatusRetornoClienteValue(client) === normalizeText('Sem retorno') ? 'danger' : 'warning',
+    },
+    isPrazoProximaAcaoVencido(client) && {
+      key: 'prazo',
+      label: prazoProximaAcao ? `Prazo vencido em ${formatDateDisplay(prazoProximaAcao)}` : 'Prazo da proxima acao vencido',
+      tone: 'danger',
+    },
+    !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client) && {
+      key: 'prazo_proximo',
+      label: prazoProximaAcao ? `Prazo em ${formatDateDisplay(prazoProximaAcao)}` : 'Prazo da proxima acao proximo',
+      tone: 'warning',
+    },
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
@@ -844,6 +918,9 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   documentos: { key: 'documentos', area: 'Documentacao', route: 'cliente', priority: 68, priorityLabel: 'Media', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
   ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Media', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
   comunicacao: { key: 'comunicacao', area: 'Comunicacao', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
+  retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
+  prazo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 88, priorityLabel: 'Alta', nextAction: 'Atuar na proxima acao hoje ou renegociar o prazo com o cliente.' },
+  prazo_proximo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 72, priorityLabel: 'Media', nextAction: 'Antecipar a tratativa antes do prazo vencer.' },
 };
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -2093,8 +2170,8 @@ function PendenciasPage({
     },
     {
       key: 'comunicacao',
-      label: 'Clientes para notificar',
-      value: countWhere(clients, (client) => isComunicacaoPendente(client)),
+      label: 'Acompanhamento do cliente',
+      value: countWhere(clients, (client) => hasAcompanhamentoPendente(client)),
       tone: 'info',
     },
     {
@@ -2135,7 +2212,7 @@ function PendenciasPage({
     if (filterKey === 'reinf') return row.item.key === 'reinf';
     if (filterKey === 'ecd') return row.item.key === 'ecd';
     if (filterKey === 'ecf') return row.item.key === 'ecf';
-    if (filterKey === 'comunicacao') return row.item.key === 'comunicacao';
+    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey);
     return true;
   }
 
@@ -2199,7 +2276,7 @@ function PendenciasPage({
     },
     {
       key: 'comunicacao',
-      label: 'Comunicação',
+      label: 'Acompanhamento',
       value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length,
       tone: 'info',
     },
@@ -2296,11 +2373,11 @@ function PendenciasPage({
     },
     {
       key: 'notificacao',
-      title: 'Falta notificar',
-      value: uniqueClientCount(actionRows, (row) => row.item.key === 'comunicacao'),
+      title: 'Acompanhamento',
+      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
       tone: 'info',
-      detail: 'Clientes com pendência operacional que ainda precisam de retorno ou cobrança.',
-      highlights: topClientNames(actionRows, (row) => row.item.key === 'comunicacao'),
+      detail: 'Clientes que ainda precisam de notificacao, retorno registrado ou acao antes do prazo vencer.',
+      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
     },
   ];
 
@@ -2393,7 +2470,7 @@ function PendenciasPage({
                       {bucket.key === 'critico'
                         ? 'Casos com impacto operacional imediato'
                         : bucket.key === 'comunicacao'
-                          ? 'Clientes que ainda precisam de retorno'
+                          ? 'Clientes com notificacao, retorno ou prazo para acompanhar'
                           : 'Pendências que pedem ação nesta frente'}
                     </p>
                   </div>
