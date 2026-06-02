@@ -1573,7 +1573,11 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
   const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
-  const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client));
+  const acompanhamentoPendente = countWhere(clients, (client) => hasAcompanhamentoPendente(client));
+  const retornoPendente = countWhere(clients, (client) => isAguardandoRetorno(client));
+  const prazoVencido = countWhere(clients, (client) => isPrazoProximaAcaoVencido(client));
+  const prazoProximo = countWhere(clients, (client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
+  const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
   const diasAtrasoMedio = total
     ? (
       clients.reduce((sum, client) => sum + getDiasAtrasoValue(client), 0) / total
@@ -1623,6 +1627,34 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       icon: AlertTriangle,
       tone: 'warning',
       filter: { alerta: 'documentos' },
+    },
+    {
+      title: 'Aguardando retorno',
+      value: retornoPendente,
+      icon: Mail,
+      tone: 'warning',
+      filter: { alerta: 'retorno' },
+    },
+    {
+      title: 'Prazo vencido',
+      value: prazoVencido,
+      icon: BellRing,
+      tone: 'danger',
+      filter: { alerta: 'prazo' },
+    },
+    {
+      title: 'Prazo próximo',
+      value: prazoProximo,
+      icon: ClipboardList,
+      tone: 'info',
+      filter: { alerta: 'prazo_proximo' },
+    },
+    {
+      title: 'Acompanhamento pendente',
+      value: acompanhamentoPendente,
+      icon: Mail,
+      tone: 'info',
+      filter: { alerta: 'comunicacao' },
     },
   ];
 
@@ -3245,11 +3277,18 @@ function ReportsPage({
   onRefresh,
   loading = false,
 }) {
+  const clientesComPendencias = clients.filter((client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
+  const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
+  const clientesPrazoVencido = clients.filter((client) => isPrazoProximaAcaoVencido(client));
+  const clientesPrazoProximo = clients.filter((client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
   const reports = [
     { title: 'Clientes por responsável', rows: toBreakdown(clients, 'responsavel'), icon: UserCheck },
     { title: 'Clientes por regime tributário', rows: toBreakdown(clients, 'regime_tributario'), icon: Building2 },
     { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
-    { title: 'Clientes com pendências', rows: clients.filter((client) => hasPendenciaOperacional(client)), icon: ShieldAlert },
+    { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
+    { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail },
+    { title: 'Prazo da próxima ação vencido', rows: clientesPrazoVencido, icon: BellRing },
+    { title: 'Prazo da próxima ação próximo', rows: clientesPrazoProximo, icon: ClipboardList },
     { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
     { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
     { title: 'Clientes por dificuldade', rows: toBreakdown(clients, 'dificuldade'), icon: AlertTriangle },
@@ -5345,4 +5384,5 @@ export default function App() {
     </>
   );
 }
+
 
