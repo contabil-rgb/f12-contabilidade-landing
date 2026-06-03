@@ -4431,22 +4431,50 @@ function ReportsPage({
   loading = false,
 }) {
   const clientesComPendencias = clients.filter((client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
+  const clientesComFollowup = clients.filter((client) => hasFollowupsRegistrados(client));
+  const clientesFollowupEmAberto = clients.filter(
+    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getStatusAcompanhamentoCodigo(client) === 'em_aberto',
+  );
   const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
   const clientesPrazoVencido = clients.filter((client) => isPrazoProximaAcaoVencido(client));
   const clientesPrazoProximo = clients.filter((client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
   const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
   const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
   const clientesSemNotificacao = clients.filter((client) => !isClienteNotificado(client));
+  const clientesFollowupSemResponsavel = clients.filter(
+    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && !getFollowupResponsavelUsuarioId(client),
+  );
+  const clientesFollowupComResponsavel = clients.filter(
+    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getFollowupResponsavelUsuarioId(client),
+  );
+  const followupsPorResponsavelRows = toBreakdownByResolver(
+    clients,
+    (client) => getFollowupResponsavelNome(client),
+    {
+      filter: (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client),
+    },
+  );
+  const followupResumoRows = [
+    { label: 'Clientes com follow-up', value: clientesComFollowup.length },
+    { label: 'Follow-up em aberto', value: clientesFollowupEmAberto.length },
+    { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
+    { label: 'Sem responsável', value: clientesFollowupSemResponsavel.length },
+    { label: 'Com responsável', value: clientesFollowupComResponsavel.length },
+  ].filter((row) => row.value > 0);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
+    { label: 'Com follow-up', value: clientesComFollowup.length },
+    { label: 'Follow-up em aberto', value: clientesFollowupEmAberto.length },
     { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
     { label: 'Sem retorno', value: clientesSemRetorno.length },
     { label: 'Sem notificacao', value: clientesSemNotificacao.length },
+    { label: 'Sem responsável', value: clientesFollowupSemResponsavel.length },
     { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
     { label: 'Prazo vencido', value: clientesPrazoVencido.length },
     { label: 'Prazo proximo', value: clientesPrazoProximo.length },
+    { label: 'Com responsável', value: clientesFollowupComResponsavel.length },
     {
       label: 'Media dias sem retorno',
       value: clientesAguardandoRetorno.length
@@ -4578,6 +4606,21 @@ function ReportsPage({
             </article>
           );
         })}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <StaticBreakdownPanel
+          title="Resumo de follow-ups"
+          rows={followupResumoRows}
+          total={Math.max(clientesComFollowup.length, 1)}
+          icon={ClipboardList}
+        />
+        <StaticBreakdownPanel
+          title="Follow-ups por responsável"
+          rows={followupsPorResponsavelRows}
+          total={Math.max(clientesComFollowup.length, 1)}
+          icon={UserCheck}
+        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
