@@ -1831,7 +1831,21 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
   );
 }
 
-function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false }) {
+function toBreakdownByResolver(clients, resolver, { filter } = {}) {
+  const counts = new Map();
+
+  (clients ?? []).forEach((client) => {
+    if (filter && !filter(client)) return;
+    const label = String(resolver(client) || '').trim() || 'Nao informado';
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
+}
+
+function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false, currentUserId = '' }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
@@ -1847,6 +1861,46 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
     ).toFixed(1)
     : '0.0';
   const percentualEmDia = total ? ((emDia / total) * 100).toFixed(1) : '0.0';
+  const clientesComFollowup = countWhere(clients, (client) => hasFollowupsRegistrados(client));
+  const followupsEmAberto = countWhere(
+    clients,
+    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getStatusAcompanhamentoCodigo(client) === 'em_aberto',
+  );
+  const meusFollowups = countWhere(
+    clients,
+    (client) => String(getFollowupResponsavelUsuarioId(client)) === String(currentUserId) && hasAcompanhamentoPendente(client),
+  );
+  const followupsSemResponsavel = countWhere(
+    clients,
+    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && !getFollowupResponsavelUsuarioId(client),
+  );
+  const filaFollowups = clients
+    .filter((client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client))
+    .map((client) => ({
+      client,
+      prioridade: isPrazoProximaAcaoVencido(client)
+        ? 4
+        : isSemRetorno(client)
+          ? 3
+          : isAguardandoRetorno(client)
+            ? 2
+            : isPrazoProximaAcaoProximo(client)
+              ? 1
+              : 0,
+    }))
+    .sort((left, right) => {
+      if (right.prioridade !== left.prioridade) return right.prioridade - left.prioridade;
+      const leftDiff = getPrazoDiffDias(left.client);
+      const rightDiff = getPrazoDiffDias(right.client);
+      if (leftDiff !== null && rightDiff !== null && leftDiff !== rightDiff) return leftDiff - rightDiff;
+      if (leftDiff !== null && rightDiff === null) return -1;
+      if (leftDiff === null && rightDiff !== null) return 1;
+      return String(left.client.nome_identificacao || left.client.razao_social || '').localeCompare(
+        String(right.client.nome_identificacao || right.client.razao_social || ''),
+        'pt-BR',
+      );
+    })
+    .slice(0, 6);
   const metrics = [
     { title: 'Total de clientes', value: total, icon: Users, tone: 'info', filter: {} },
     {
@@ -1920,6 +1974,43 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       filter: { alerta: 'comunicacao' },
     },
   ];
+  const followupMetrics = [
+    {
+      title: 'Clientes com follow-up',
+      value: clientesComFollowup,
+      detail: 'Clientes que já têm timeline operacional registrada',
+      icon: ClipboardList,
+      tone: 'info',
+    },
+    {
+      title: 'Follow-ups em aberto',
+      value: followupsEmAberto,
+      detail: 'Casos abertos sem atraso, mas ainda pedindo ação',
+      icon: Mail,
+      tone: 'warning',
+    },
+    {
+      title: 'Meus follow-ups',
+      value: meusFollowups,
+      detail: 'Clientes com próxima ação atribuída a você',
+      icon: UserCheck,
+      tone: 'info',
+    },
+    {
+      title: 'Sem responsável',
+      value: followupsSemResponsavel,
+      detail: 'Follow-ups pendentes que ainda não têm dono',
+      icon: AlertTriangle,
+      tone: 'danger',
+    },
+  ];
+  const followupsPorResponsavel = toBreakdownByResolver(
+    clients,
+    (client) => getFollowupResponsavelNome(client),
+    {
+      filter: (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client),
+    },
+  );
 
   return (
     <div className="space-y-6">
@@ -1968,6 +2059,76 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
             onClick={() => onPreset(metric.filter, metric.title)}
           />
         ))}
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {followupMetrics.map((metric) => (
+          <MetricCard
+            key={metric.title}
+            {...metric}
+          />
+        ))}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1.3fr,0.9fr]">
+        <section className="surface-card p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black text-slate-950">Fila operacional de follow-ups</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Clientes que merecem atenção primeiro, já considerando prazo, retorno e próxima ação.
+              </p>
+            </div>
+            <Mail className="text-brand-blue" size={18} aria-hidden="true" />
+          </div>
+          <div className="mt-4 space-y-3">
+            {filaFollowups.length ? filaFollowups.map(({ client }) => (
+              <button
+                key={client.id}
+                type="button"
+                onClick={() => onPreset({ alerta: 'comunicacao', search: client.nome_identificacao || client.razao_social || '' }, `Follow-up: ${client.nome_identificacao || client.razao_social || 'Cliente'}`)}
+                className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-brand-blue/40 hover:bg-sky-50/30"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj || '-'}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">{getProximaAcaoOperacional(client) || 'Sem próxima ação registrada'}</p>
+                  </div>
+                  <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(
+                    isPrazoProximaAcaoVencido(client)
+                      ? 'danger'
+                      : isAguardandoRetorno(client)
+                        ? 'warning'
+                        : 'info',
+                  )}`}>
+                    {getStatusAcompanhamentoLabel(client)}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                    Resp. {getResponsavelOperacional(client) || 'Nao informado'}
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                    Prazo {getPrazoProximaAcaoValue(client) ? formatDateDisplay(getPrazoProximaAcaoValue(client)) : 'Nao informado'}
+                  </span>
+                </div>
+              </button>
+            )) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                Nenhum follow-up prioritário no momento.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <BreakdownPanel
+          title="Follow-ups por responsável"
+          rows={followupsPorResponsavel}
+          total={Math.max(clientesComFollowup, 1)}
+          field="responsavel"
+          onSelect={onPreset}
+        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-3">
@@ -6319,6 +6480,7 @@ export default function App() {
           metadata={metadata}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing}
+          currentUserId={currentUserFull?.id ?? ''}
         />
       )
       : <AccessDeniedPage />,
