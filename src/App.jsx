@@ -1996,6 +1996,142 @@ function AlertsList({ alerts }) {
   );
 }
 
+function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }) {
+  return (
+    <article className="surface-card p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-slate-500">{title}</p>
+          <div className="mt-3">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(tone)}`}>
+              {label}
+            </span>
+          </div>
+          {detail ? <p className="mt-3 text-sm font-semibold text-slate-600">{detail}</p> : null}
+        </div>
+        <span className={`flex h-11 w-11 items-center justify-center rounded-lg border ${chipClass(tone)}`}>
+          <Icon size={21} aria-hidden="true" />
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function getObrigacoesPendentesCount(client) {
+  const persisted = getObrigacoesPersistidas(client)?.pendencias_obrigacoes_total;
+  if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
+  return [
+    isReinfPendente(client),
+    isReciboReinfPendente(client),
+    isEcdPendente(client),
+    isEcdAguardandoEnvio(client),
+    isEcdResponsavelPendente(client),
+    isReciboEcdPendente(client),
+    isEcfPendente(client),
+    isReciboEcfPendente(client),
+    isComunicacaoPendente(client),
+  ].filter(Boolean).length;
+}
+
+function getDetailAcompanhamentoSummary(client) {
+  const code = getStatusAcompanhamentoCodigo(client);
+  const label = getStatusAcompanhamentoLabel(client);
+  const dataNotificacao = getDataNotificacaoClienteValue(client);
+  const dataRetorno = getDataRetornoClienteValue(client);
+  const prazo = getPrazoProximaAcaoValue(client);
+  const diasSemRetorno = getDiasSemRetorno(client);
+  const toneMap = {
+    prazo_vencido: 'danger',
+    sem_retorno: 'danger',
+    aguardando_retorno: 'warning',
+    retorno_recebido: 'success',
+    notificado: 'info',
+    sem_notificacao: 'neutral',
+  };
+
+  let detail = 'Sem notificacao registrada.';
+  if (isPrazoProximaAcaoVencido(client) && prazo) {
+    detail = `Prazo definido para ${formatDateDisplay(prazo)}.`;
+  } else if (isPrazoProximaAcaoProximo(client) && prazo) {
+    detail = `Prazo proximo em ${formatDateDisplay(prazo)}.`;
+  } else if (isAguardandoRetorno(client) && dataNotificacao) {
+    detail = diasSemRetorno !== null
+      ? `${diasSemRetorno} dia(s) sem retorno desde ${formatDateDisplay(dataNotificacao)}.`
+      : `Aguardando retorno desde ${formatDateDisplay(dataNotificacao)}.`;
+  } else if (hasRetornoConcluido(client) && dataRetorno) {
+    detail = `Retorno registrado em ${formatDateDisplay(dataRetorno)}.`;
+  } else if (isClienteNotificado(client) && dataNotificacao) {
+    detail = `Cliente notificado em ${formatDateDisplay(dataNotificacao)}.`;
+  }
+
+  return {
+    label,
+    detail,
+    tone: toneMap[code] || 'neutral',
+  };
+}
+
+function getDetailRiscoSummary(client) {
+  const persisted = getRiscoPersistido(client);
+  const fallbackCode = isPendenciaCritica(client) || isSituacaoCritica(client) || isPendenciaTecnica(client)
+    ? 'danger'
+    : hasPendenciaOperacional(client)
+      ? 'warning'
+      : 'ok';
+  const code = normalizeText(persisted?.risco_codigo || fallbackCode);
+  const label = persisted?.risco_label || (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia');
+  const toneMap = {
+    danger: 'danger',
+    warning: 'warning',
+    ok: 'success',
+  };
+  const detalhes = [];
+  const diasAtraso = getDiasAtrasoValue(client);
+  if (diasAtraso > 0) detalhes.push(`${diasAtraso} dia(s) de atraso`);
+  if (isPendenciaTecnica(client)) detalhes.push('Pendencia tecnica');
+  if (isDocumentoAtrasado(client)) detalhes.push('Documentacao atrasada');
+  if (isAtaPendente(client)) detalhes.push('Ata pendente');
+  if (!detalhes.length) detalhes.push('Sem sinais operacionais criticos no momento');
+  return {
+    label,
+    detail: detalhes.join(' | '),
+    tone: toneMap[code] || 'neutral',
+  };
+}
+
+function getDetailObrigacoesSummary(client) {
+  const persisted = getObrigacoesPersistidas(client);
+  const count = getObrigacoesPendentesCount(client);
+  const fallbackCode = count > 0 ? 'obrigacao_pendente' : 'em_dia';
+  const code = normalizeText(persisted?.obrigacoes_status_codigo || fallbackCode);
+  const label = persisted?.obrigacoes_status_label || (count > 0 ? 'Obrigacoes pendentes' : 'Em dia');
+  const toneMap = {
+    obrigacao_pendente: 'warning',
+    aguardando_envio: 'warning',
+    responsavel_pendente: 'warning',
+    comprovante_pendente: 'warning',
+    em_dia: 'success',
+  };
+  const responsavel = getObrigacaoResponsavel(client);
+  const detail = `${count} pendencia(s) em obrigacoes${responsavel ? ` | Resp. ${responsavel}` : ''}`;
+  return {
+    label,
+    detail,
+    tone: toneMap[code] || 'neutral',
+  };
+}
+
+function getDetailProximaAcaoSummary(client) {
+  const proximaAcao = getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '');
+  const prazo = getPrazoProximaAcaoValue(client);
+  const detail = prazo ? `Prazo: ${formatDateDisplay(prazo)}` : 'Sem prazo registrado';
+  return {
+    label: proximaAcao || 'Nenhuma proxima acao registrada',
+    detail,
+    tone: isPrazoProximaAcaoVencido(client) ? 'danger' : isPrazoProximaAcaoProximo(client) ? 'warning' : 'info',
+  };
+}
+
 function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, canEditRow, canInactivateRow, renderClientCell }) {
   function sortColumn(key) {
     setSort((current) => ({
@@ -2218,6 +2354,11 @@ function DetailPage({
     );
   }
 
+  const acompanhamentoSummary = getDetailAcompanhamentoSummary(client);
+  const riscoSummary = getDetailRiscoSummary(client);
+  const obrigacoesSummary = getDetailObrigacoesSummary(client);
+  const proximaAcaoSummary = getDetailProximaAcaoSummary(client);
+
   return (
     <div className="space-y-5">
       <section className="surface-card p-5">
@@ -2245,6 +2386,37 @@ function DetailPage({
         <div className="mt-5">
           <AlertsList alerts={getClientAlerts(client)} />
         </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <DetailStatusCard
+          title="Acompanhamento"
+          label={acompanhamentoSummary.label}
+          detail={acompanhamentoSummary.detail}
+          icon={Mail}
+          tone={acompanhamentoSummary.tone}
+        />
+        <DetailStatusCard
+          title="Risco operacional"
+          label={riscoSummary.label}
+          detail={riscoSummary.detail}
+          icon={ShieldAlert}
+          tone={riscoSummary.tone}
+        />
+        <DetailStatusCard
+          title="Obrigacoes"
+          label={obrigacoesSummary.label}
+          detail={obrigacoesSummary.detail}
+          icon={BookOpenCheck}
+          tone={obrigacoesSummary.tone}
+        />
+        <DetailStatusCard
+          title="Proxima acao"
+          label={proximaAcaoSummary.label}
+          detail={proximaAcaoSummary.detail}
+          icon={FolderClock}
+          tone={proximaAcaoSummary.tone}
+        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
