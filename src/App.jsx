@@ -35,7 +35,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { clientesContabeis, importMetadata, listasBase } from './data/baseContabilidade.js';
+import { importMetadata } from './data/baseContabilidade.metadata.js';
 import {
   DEFAULT_LISTS,
   DETAIL_SECTIONS,
@@ -375,10 +375,15 @@ function withClientDefaults(client) {
   return { ...CLIENT_FIELD_DEFAULTS, ...client };
 }
 
+async function loadClientesContabeisSnapshot() {
+  const module = await import('./data/baseContabilidade.js');
+  return module.clientesContabeis ?? [];
+}
+
 function loadInitialState() {
   return {
     clientes: [],
-    listagens: { ...DEFAULT_LISTS, ...listasBase },
+    listagens: { ...DEFAULT_LISTS },
     savedAt: '',
   };
 }
@@ -393,6 +398,21 @@ function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
   ['competencia_em_dia', 'ecd', 'ecf', 'envio_reinf', 'distribuicao_lucros', 'cliente_notificado'].forEach((key) => {
     if (!Array.isArray(merged[key]) || !merged[key].length) {
       merged[key] = simNao;
+    }
+  });
+  return merged;
+}
+
+function mergeListagensFromClients(baseListagens, clients) {
+  const merged = { ...baseListagens };
+  const listFields = FIELD_DEFINITIONS.filter((field) => field.listKey);
+  listFields.forEach((field) => {
+    const values = uniqueValues([
+      ...(merged[field.listKey] ?? []),
+      ...clients.map((client) => client?.[field.key]),
+    ]);
+    if (values.length) {
+      merged[field.listKey] = values;
     }
   });
   return merged;
@@ -4695,8 +4715,9 @@ export default function App() {
 
   function persist(nextClients, nextListagens = listagens, nextMetadata = metadata) {
     const normalizedClients = nextClients.map(withClientDefaults);
+    const normalizedListagens = mergeListagensFromClients(nextListagens, normalizedClients);
     setClients(normalizedClients);
-    setListagens(nextListagens);
+    setListagens(normalizedListagens);
     setMetadata(nextMetadata);
   }
 
@@ -4786,9 +4807,9 @@ export default function App() {
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
 
-      const nextListagens = mergeListagensFromSupabase(
-        { ...DEFAULT_LISTS, ...listasBase },
-        listagensSupabase,
+      const nextListagens = mergeListagensFromClients(
+        mergeListagensFromSupabase({ ...DEFAULT_LISTS }, listagensSupabase),
+        clientesComAcompanhamento,
       );
       persist(clientesComAcompanhamento, nextListagens, {
         ...metadata,
@@ -4823,7 +4844,7 @@ export default function App() {
     } catch (error) {
       const hasCurrentClients = Array.isArray(clients) && clients.length > 0;
       if (!hasCurrentClients) {
-        persist([], { ...DEFAULT_LISTS, ...listasBase }, {
+        persist([], { ...DEFAULT_LISTS }, {
           ...metadata,
           source: 'Supabase indisponivel',
           importedAt: metadata?.importedAt || '',
@@ -5472,7 +5493,18 @@ export default function App() {
       return;
     }
     if (!confirm('Restaurar os dados gerados a partir da planilha original? Alterações locais serão substituídas.')) return;
-    const sync = await sincronizarClientesSupabase(clientesContabeis.map(withClientDefaults));
+    let clientesSnapshot = [];
+    try {
+      clientesSnapshot = await loadClientesContabeisSnapshot();
+    } catch (error) {
+      setToast({
+        title: 'Falha ao carregar base de restaura????o',
+        message: error.message || 'N??o foi poss??vel carregar a base local de restaura????o.',
+      });
+      return;
+    }
+
+    const sync = await sincronizarClientesSupabase(clientesSnapshot.map(withClientDefaults));
     if (!sync.synced) {
       setToast({
         title: 'Falha ao restaurar',
