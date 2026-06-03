@@ -1041,6 +1041,26 @@ function getStatusAcompanhamentoCodigo(client) {
   return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
 }
 
+function getFollowupResponsavelUsuarioId(client) {
+  return String(getFollowupResumoText(client, 'proximo_followup_responsavel_usuario_id', '') || '').trim();
+}
+
+function getFollowupResponsavelNome(client) {
+  return getFollowupResumoText(client, 'proximo_followup_responsavel_nome', '').trim();
+}
+
+function getResponsavelOperacional(client) {
+  return getFollowupResponsavelNome(client) || getObrigacaoResponsavel(client) || client?.responsavel || '';
+}
+
+function getProximaAcaoOperacional(client) {
+  if (hasFollowupsRegistrados(client)) {
+    const followupAction = getFollowupResumoText(client, 'proximo_followup_proxima_acao', '').trim();
+    if (followupAction) return followupAction;
+  }
+  return getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '').trim();
+}
+
 function getObrigacaoResponsavel(client) {
   return getObrigacoesPersistidas(client)?.responsavel_exibicao || client?.responsavel_ecd || client?.responsavel || '';
 }
@@ -2266,13 +2286,7 @@ function getDetailObrigacoesSummary(client) {
 }
 
 function getDetailProximaAcaoSummary(client) {
-  const proximaAcao = hasFollowupsRegistrados(client)
-    ? getFollowupResumoText(
-      client,
-      'proximo_followup_proxima_acao',
-      getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || ''),
-    )
-    : getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '');
+  const proximaAcao = getProximaAcaoOperacional(client);
   const prazo = getPrazoProximaAcaoValue(client);
   const detail = prazo ? `Prazo: ${formatDateDisplay(prazo)}` : 'Sem prazo registrado';
   return {
@@ -3018,8 +3032,12 @@ function PendenciasPage({
   metadata,
   onRefresh,
   loading = false,
+  currentUserId = '',
 }) {
   const [attachmentFilter, setAttachmentFilter] = useState('all');
+  const [followupStatusFilter, setFollowupStatusFilter] = useState('');
+  const [followupResponsavelFilter, setFollowupResponsavelFilter] = useState('');
+  const [followupScopeFilter, setFollowupScopeFilter] = useState('');
   const [expandedPrioritySections, setExpandedPrioritySections] = useState({});
   const searchClientId = String(searchContext?.clientId ?? '');
   const searchQuery = normalizeText(searchContext?.query ?? '');
@@ -3028,8 +3046,9 @@ function PendenciasPage({
     if (!hasSearchContext) return true;
     if (searchClientId) return String(client.id ?? '') === searchClientId;
     const alerts = getClientAlerts(client).map((item) => item.label).join(' ');
+    const responsavelOperacional = getResponsavelOperacional(client);
     const searchable = normalizeText(
-      `${client.cnpj} ${client.nome_identificacao} ${client.razao_social} ${client.responsavel} ${client.situacao} ${alerts}`,
+      `${client.cnpj} ${client.nome_identificacao} ${client.razao_social} ${client.responsavel} ${responsavelOperacional} ${client.situacao} ${alerts}`,
     );
     return searchable.includes(searchQuery);
   }
@@ -3081,12 +3100,16 @@ function PendenciasPage({
       .map((alert) => {
         const config = PENDENCIA_ACTION_BY_SIGNAL[alert.key];
         const nextAction = alert.key === 'followup'
-          ? getFollowupResumoText(client, 'proximo_followup_proxima_acao', config.nextAction)
+          ? (getProximaAcaoOperacional(client) || config.nextAction)
           : config.nextAction;
         return {
           ...alert,
           ...config,
           nextAction,
+          followupStatusCodigo: getStatusAcompanhamentoCodigo(client),
+          followupStatusLabel: getStatusAcompanhamentoLabel(client),
+          followupResponsavelId: getFollowupResponsavelUsuarioId(client),
+          followupResponsavelNome: getFollowupResponsavelNome(client),
           signalKey: alert.key,
           label: alert.key === 'comunicacao' ? 'Cliente nao notificado' : alert.label,
         };
@@ -3109,8 +3132,30 @@ function PendenciasPage({
     if (filterKey === 'reinf') return row.item.key === 'reinf';
     if (filterKey === 'ecd') return row.item.key === 'ecd';
     if (filterKey === 'ecf') return row.item.key === 'ecf';
-    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey);
+    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey);
     return true;
+  }
+
+  function matchesFollowupFilters(row) {
+    const responsavelId = String(row.item.followupResponsavelId || '').trim();
+    const responsavelNome = normalizeText(row.item.followupResponsavelNome || '');
+    const statusCodigo = normalizeText(row.item.followupStatusCodigo || '');
+
+    if (followupScopeFilter === 'meus' && responsavelId !== String(currentUserId || '').trim()) return false;
+    if (followupScopeFilter === 'com_responsavel' && !responsavelId) return false;
+    if (followupResponsavelFilter && responsavelNome !== normalizeText(followupResponsavelFilter)) return false;
+    if (!followupStatusFilter) return true;
+
+    if (followupStatusFilter === 'pendente') return hasAcompanhamentoPendente(row.client);
+    if (followupStatusFilter === 'aguardando_retorno') return isAguardandoRetorno(row.client);
+    if (followupStatusFilter === 'prazo_vencido') return isPrazoProximaAcaoVencido(row.client);
+    if (followupStatusFilter === 'prazo_proximo') return !isPrazoProximaAcaoVencido(row.client) && isPrazoProximaAcaoProximo(row.client);
+    if (followupStatusFilter === 'sem_retorno') return isSemRetorno(row.client);
+    if (followupStatusFilter === 'em_aberto') {
+      return statusCodigo === 'em_aberto' || (hasFollowupsRegistrados(row.client) && hasAcompanhamentoPendente(row.client));
+    }
+
+    return statusCodigo === normalizeText(followupStatusFilter);
   }
 
   function prioritizeRows(rows) {
@@ -3143,44 +3188,60 @@ function PendenciasPage({
 
   const actionRows = prioritizeRows(allActionRows.filter(({ client, item }) => {
     if (!matchesSearchContext(client)) return false;
-    return matchesAttachmentFilter({ client, item }, attachmentFilter);
+    if (!matchesAttachmentFilter({ client, item }, attachmentFilter)) return false;
+    return matchesFollowupFilters({ client, item });
   }));
+
+  const followupResponsavelOptions = uniqueValues(
+    clients
+      .map((client) => getFollowupResponsavelNome(client))
+      .filter(Boolean),
+  );
+
+  const followupStatusOptions = [
+    { value: 'pendente', label: 'Com follow-up pendente' },
+    { value: 'aguardando_retorno', label: 'Aguardando retorno' },
+    { value: 'sem_retorno', label: 'Sem retorno' },
+    { value: 'prazo_vencido', label: 'Prazo vencido' },
+    { value: 'prazo_proximo', label: 'Prazo proximo' },
+    { value: 'em_aberto', label: 'Em aberto' },
+  ];
 
   const attachmentBuckets = [
     {
       key: 'all',
       label: 'Todas',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesFollowupFilters(row))).length,
       tone: 'info',
     },
     {
       key: 'reinf',
       label: 'REINF',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf'))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf') && matchesFollowupFilters(row))).length,
       tone: 'warning',
     },
     {
       key: 'ecd',
       label: 'ECD',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd'))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd') && matchesFollowupFilters(row))).length,
       tone: 'warning',
     },
     {
       key: 'ecf',
       label: 'ECF',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf'))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf') && matchesFollowupFilters(row))).length,
       tone: 'warning',
     },
     {
       key: 'comunicacao',
       label: 'Acompanhamento',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao') && matchesFollowupFilters(row))).length,
       tone: 'info',
     },
     {
       key: 'critico',
       label: 'Críticas',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico'))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico') && matchesFollowupFilters(row))).length,
       tone: 'danger',
     },
   ];
@@ -3271,10 +3332,24 @@ function PendenciasPage({
     {
       key: 'notificacao',
       title: 'Acompanhamento',
-      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
+      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey)),
       tone: 'info',
       detail: 'Clientes que ainda precisam de notificacao, retorno registrado ou acao antes do prazo vencer.',
-      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
+      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey)),
+    },
+    {
+      key: 'meus_followups',
+      title: 'Meus follow-ups',
+      value: uniqueClientCount(
+        actionRows,
+        (row) => String(row.item.followupResponsavelId || '').trim() === String(currentUserId || '').trim(),
+      ),
+      tone: 'info',
+      detail: 'Clientes com follow-up em que voce aparece como responsavel pela proxima acao.',
+      highlights: topClientNames(
+        actionRows,
+        (row) => String(row.item.followupResponsavelId || '').trim() === String(currentUserId || '').trim(),
+      ),
     },
   ];
 
@@ -3399,7 +3474,7 @@ function PendenciasPage({
             Atualizado com base no filtro atual
           </span>
         </div>
-        <div className="mt-4 grid gap-3 xl:grid-cols-4">
+        <div className="mt-4 grid gap-3 xl:grid-cols-5">
           {executiveSummary.map((item) => {
             const Icon = getExecutiveSummaryIcon(item.key);
 
@@ -3483,6 +3558,29 @@ function PendenciasPage({
               ))}
             </div>
           </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <FilterSelect
+              label="Status do follow-up"
+              value={followupStatusFilter}
+              options={followupStatusOptions}
+              onChange={setFollowupStatusFilter}
+            />
+            <FilterSelect
+              label="Responsável do follow-up"
+              value={followupResponsavelFilter}
+              options={followupResponsavelOptions}
+              onChange={setFollowupResponsavelFilter}
+            />
+            <FilterSelect
+              label="Escopo"
+              value={followupScopeFilter}
+              options={[
+                { value: 'meus', label: 'Meus follow-ups' },
+                { value: 'com_responsavel', label: 'Com responsável definido' },
+              ]}
+              onChange={setFollowupScopeFilter}
+            />
+          </div>
         </div>
         <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
           <p className="text-xs font-bold uppercase tracking-normal text-slate-500">
@@ -3544,11 +3642,27 @@ function PendenciasPage({
                               {item.label}
                             </span>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
-                            {getObrigacaoResponsavel(client) || 'Não informado'}
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-slate-700">
+                                {item.followupResponsavelNome || getObrigacaoResponsavel(client) || 'Não informado'}
+                              </p>
+                              {item.followupResponsavelNome ? (
+                                <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(String(item.followupResponsavelId || '').trim() === String(currentUserId || '').trim() ? 'info' : 'neutral')}`}>
+                                  {String(item.followupResponsavelId || '').trim() === String(currentUserId || '').trim() ? 'Meu follow-up' : 'Responsável do follow-up'}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">
-                            {item.nextAction}
+                          <td className="border-b border-slate-100 px-4 py-3">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-slate-600">{item.nextAction}</p>
+                              {item.followupStatusLabel ? (
+                                <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(item.tone)}`}>
+                                  {item.followupStatusLabel}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3">
                             <div className="flex flex-wrap gap-2">
@@ -6292,6 +6406,7 @@ export default function App() {
           metadata={metadata}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing}
+          currentUserId={currentUserFull?.id ?? ''}
         />
       )
       : <AccessDeniedPage />,
