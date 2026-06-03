@@ -101,6 +101,11 @@ import {
   registrarHistoricoAlteracoes as registrarHistoricoAlteracoesSupabase,
 } from './services/historico.service';
 import {
+  atualizarFollowup as atualizarFollowupSupabase,
+  criarFollowup as criarFollowupSupabase,
+  listarFollowupsPorCliente as listarFollowupsPorClienteSupabase,
+} from './services/followups.service';
+import {
   importarClientesExcel,
   previsualizarImportacaoExcel,
   sincronizarClientesRows,
@@ -2350,6 +2355,345 @@ function BaseClientesPage(props) {
   );
 }
 
+const FOLLOWUP_TYPE_OPTIONS = ['Notificacao', 'Cobranca', 'Retorno', 'Documentacao', 'Ata', 'REINF', 'ECD', 'ECF', 'Observacao'];
+const FOLLOWUP_STATUS_OPTIONS = ['Aberto', 'Aguardando retorno', 'Concluido', 'Cancelado'];
+const FOLLOWUP_PRIORITY_OPTIONS = ['Baixa', 'Media', 'Alta'];
+const FOLLOWUP_CHANNEL_OPTIONS = ['WhatsApp', 'E-mail', 'Telefone', 'Interno'];
+const FOLLOWUP_CONTEXT_AREA_OPTIONS = ['cliente', 'reinf', 'ecd', 'ecf'];
+
+function getFollowupStatusTone(status) {
+  const normalized = normalizeText(status);
+  if (normalized.includes('conclu')) return 'success';
+  if (normalized.includes('cancel')) return 'muted';
+  if (normalized.includes('aguardando')) return 'info';
+  return 'warning';
+}
+
+function getFollowupPriorityTone(priority) {
+  const normalized = normalizeText(priority);
+  if (normalized === 'alta') return 'danger';
+  if (normalized === 'media') return 'warning';
+  return 'neutral';
+}
+
+function getFollowupUserLabel(followup, key) {
+  const nested = followup?.[key];
+  if (nested?.nome) return nested.nome;
+  if (nested?.email) return nested.email;
+  return 'Nao informado';
+}
+
+function buildEmptyFollowup(currentUserId = '') {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    tipo: 'Observacao',
+    status: 'Aberto',
+    prioridade: 'Media',
+    canal: 'Interno',
+    descricao: '',
+    resultado: '',
+    proxima_acao: '',
+    data_contato: today,
+    data_prevista: '',
+    data_conclusao: '',
+    contexto_area: 'cliente',
+    contexto_chave: '',
+    responsavel_usuario_id: currentUserId || '',
+  };
+}
+
+function FollowupModal({ followup, users, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({ ...followup }));
+  const [errors, setErrors] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  function updateField(key, value) {
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      if (key === 'status' && normalizeText(value) !== 'concluido') {
+        next.data_conclusao = '';
+      }
+      if (key === 'status' && normalizeText(value) === 'concluido' && !next.data_conclusao) {
+        next.data_conclusao = new Date().toISOString().slice(0, 10);
+      }
+      return next;
+    });
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const nextErrors = [];
+    if (isBlank(form.tipo)) nextErrors.push('Tipo e obrigatorio.');
+    if (isBlank(form.descricao)) nextErrors.push('Descricao e obrigatoria.');
+    if (nextErrors.length) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        data_contato: normalizeDateInputValue(form.data_contato),
+        data_prevista: normalizeDateInputValue(form.data_prevista),
+        data_conclusao: normalizeDateInputValue(form.data_conclusao),
+      });
+    } catch (error) {
+      setErrors([error.message || 'Nao foi possivel salvar o follow-up.']);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
+      <form onSubmit={submit} className="mx-auto max-w-4xl rounded-lg bg-white shadow-panel">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">{followup?.id ? 'Editar follow-up' : 'Novo follow-up'}</h2>
+            <p className="text-sm font-semibold text-slate-500">Registro operacional do cliente</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-5">
+          {errors.length ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+              {errors.map((error) => (
+                <p key={error}>{error}</p>
+              ))}
+            </div>
+          ) : null}
+
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Tipo</span>
+              <select value={form.tipo ?? ''} onChange={(event) => updateField('tipo', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                {FOLLOWUP_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Status</span>
+              <select value={form.status ?? ''} onChange={(event) => updateField('status', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                {FOLLOWUP_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Prioridade</span>
+              <select value={form.prioridade ?? ''} onChange={(event) => updateField('prioridade', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                {FOLLOWUP_PRIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Canal</span>
+              <select value={form.canal ?? ''} onChange={(event) => updateField('canal', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                {FOLLOWUP_CHANNEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Responsavel</span>
+              <select value={form.responsavel_usuario_id ?? ''} onChange={(event) => updateField('responsavel_usuario_id', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                <option value="">Nao informado</option>
+                {users.map((user) => <option key={user.id} value={user.id}>{user.nome}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Origem</span>
+              <input value={form.origem ?? ''} onChange={(event) => updateField('origem', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" placeholder="Detalhe do Cliente" />
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Data do contato</span>
+              <input type="date" value={normalizeDateInputValue(form.data_contato)} onChange={(event) => updateField('data_contato', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Data prevista</span>
+              <input type="date" value={normalizeDateInputValue(form.data_prevista)} onChange={(event) => updateField('data_prevista', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Data de conclusao</span>
+              <input type="date" value={normalizeDateInputValue(form.data_conclusao)} onChange={(event) => updateField('data_conclusao', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700">
+              <span>Contexto da area</span>
+              <select value={form.contexto_area ?? ''} onChange={(event) => updateField('contexto_area', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+                <option value="">Nao informado</option>
+                {FOLLOWUP_CONTEXT_AREA_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-bold text-slate-700 md:col-span-2 xl:col-span-2">
+              <span>Contexto tecnico</span>
+              <input value={form.contexto_chave ?? ''} onChange={(event) => updateField('contexto_chave', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" placeholder="ata_pendente, recibo_reinf, documentacao_atrasada..." />
+            </label>
+          </section>
+
+          <label className="block space-y-1 text-sm font-bold text-slate-700">
+            <span>Descricao</span>
+            <textarea value={form.descricao ?? ''} onChange={(event) => updateField('descricao', event.target.value)} rows={4} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+          </label>
+
+          <div className="grid gap-3 xl:grid-cols-2">
+            <label className="block space-y-1 text-sm font-bold text-slate-700">
+              <span>Resultado</span>
+              <textarea value={form.resultado ?? ''} onChange={(event) => updateField('resultado', event.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+            </label>
+            <label className="block space-y-1 text-sm font-bold text-slate-700">
+              <span>Proxima acao</span>
+              <textarea value={form.proxima_acao ?? ''} onChange={(event) => updateField('proxima_acao', event.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">
+            Cancelar
+          </button>
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white disabled:opacity-60">
+            <Save size={16} aria-hidden="true" />
+            {saving ? 'Salvando...' : 'Salvar follow-up'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function FollowupsSection({ rows = [], loading = false, users = [], canManage = false, currentUserId = '', onCreate, onUpdate }) {
+  const [draft, setDraft] = useState(null);
+
+  async function handleCreate(values) {
+    await onCreate?.(values);
+    setDraft(null);
+  }
+
+  async function handleUpdate(id, values) {
+    await onUpdate?.(id, values);
+    setDraft(null);
+  }
+
+  async function concluir(followup) {
+    await onUpdate?.(followup.id, {
+      status: 'Concluido',
+      data_conclusao: followup.data_conclusao || new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  async function reabrir(followup) {
+    await onUpdate?.(followup.id, {
+      status: 'Aberto',
+      data_conclusao: '',
+    });
+  }
+
+  return (
+    <section className="surface-card p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-lg font-black text-slate-950">Follow-ups do cliente</h3>
+          <p className="text-sm font-semibold text-slate-500">Timeline operacional para contatos, retornos, cobrancas e proximas acoes.</p>
+        </div>
+        {canManage ? (
+          <button
+            type="button"
+            onClick={() => setDraft(buildEmptyFollowup(currentUserId))}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-navy-700"
+          >
+            <Plus size={16} aria-hidden="true" />
+            Novo follow-up
+          </button>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <p className="mt-4 text-sm font-semibold text-slate-500">Carregando follow-ups...</p>
+      ) : !rows.length ? (
+        <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+          Nenhum follow-up registrado para este cliente.
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {rows.map((followup) => (
+            <article key={followup.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700">
+                      {followup.tipo || 'Follow-up'}
+                    </span>
+                    <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(getFollowupStatusTone(followup.status))}`}>
+                      {followup.status || 'Aberto'}
+                    </span>
+                    <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(getFollowupPriorityTone(followup.prioridade))}`}>
+                      {followup.prioridade || 'Media'}
+                    </span>
+                    {followup.canal ? (
+                      <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass('neutral')}`}>
+                        {followup.canal}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm font-black text-slate-900">{followup.descricao}</p>
+                  {followup.resultado ? (
+                    <p className="text-sm font-semibold text-slate-600"><span className="font-black text-slate-700">Resultado:</span> {followup.resultado}</p>
+                  ) : null}
+                  {followup.proxima_acao ? (
+                    <p className="text-sm font-semibold text-slate-600"><span className="font-black text-slate-700">Proxima acao:</span> {followup.proxima_acao}</p>
+                  ) : null}
+                </div>
+                {canManage ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => setDraft({ ...followup })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
+                      Editar
+                    </button>
+                    {normalizeText(followup.status) === 'concluido' ? (
+                      <button type="button" onClick={() => reabrir(followup)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
+                        Reabrir
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => concluir(followup)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                        Concluir
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Responsavel</dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">{getFollowupUserLabel(followup, 'responsavel_usuario')}</dd>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Criado por</dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">{getFollowupUserLabel(followup, 'criado_por_usuario')}</dd>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Data prevista</dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateDisplay(followup.data_prevista)}</dd>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Conclusao</dt>
+                  <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateDisplay(followup.data_conclusao)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {draft ? (
+        <FollowupModal
+          followup={draft}
+          users={users}
+          onClose={() => setDraft(null)}
+          onSave={(values) => (draft.id ? handleUpdate(draft.id, values) : handleCreate(values))}
+        />
+      ) : null}
+    </section>
+  );
+}
+
 function DetailPage({
   client,
   onBack,
@@ -2358,6 +2702,13 @@ function DetailPage({
   canManageAttachments,
   onAnexoSuccess,
   onAnexoError,
+  followupRows = [],
+  followupLoading = false,
+  followupUsers = [],
+  canManageFollowups = false,
+  currentUserId = '',
+  onCreateFollowup,
+  onUpdateFollowup,
   historicoRows = [],
   historicoLoading = false,
 }) {
@@ -2455,6 +2806,16 @@ function DetailPage({
           </article>
         ))}
       </section>
+
+      <FollowupsSection
+        rows={followupRows}
+        loading={followupLoading}
+        users={followupUsers}
+        canManage={canManageFollowups}
+        currentUserId={currentUserId}
+        onCreate={onCreateFollowup}
+        onUpdate={onUpdateFollowup}
+      />
 
       <section className="surface-card p-5">
         <h3 className="text-lg font-black text-slate-950">Histórico de Alterações</h3>
@@ -4602,6 +4963,8 @@ export default function App() {
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
+  const [followupsCliente, setFollowupsCliente] = useState([]);
+  const [followupsClienteLoading, setFollowupsClienteLoading] = useState(false);
   const [authReady, setAuthReady] = useState(TEMP_DISABLE_LOGIN);
   const importInputRef = useRef(null);
 
@@ -4634,6 +4997,7 @@ export default function App() {
   useEffect(() => {
     if (page !== 'detalhe') return;
     carregarHistoricoCliente(selectedClientId);
+    carregarFollowupsCliente(selectedClientId);
   }, [page, selectedClientId]);
 
   useEffect(() => {
@@ -5075,6 +5439,61 @@ export default function App() {
       setHistoricoCliente([]);
     } finally {
       setHistoricoClienteLoading(false);
+    }
+  }
+
+  async function carregarFollowupsCliente(clienteId) {
+    if (!clienteId || !isUuid(clienteId)) {
+      setFollowupsCliente([]);
+      return;
+    }
+    setFollowupsClienteLoading(true);
+    try {
+      const rows = await listarFollowupsPorClienteSupabase(clienteId);
+      setFollowupsCliente(rows);
+    } catch (error) {
+      console.warn('[followups] Falha ao carregar follow-ups do cliente:', error);
+      setFollowupsCliente([]);
+    } finally {
+      setFollowupsClienteLoading(false);
+    }
+  }
+
+  async function criarFollowupCliente(clienteId, values) {
+    if (!currentUserFull?.id || !clienteId || !isUuid(clienteId)) return;
+    const payload = {
+      ...values,
+      cliente_id: clienteId,
+      criado_por: currentUserFull.id,
+      responsavel_usuario_id: values.responsavel_usuario_id || currentUserFull.id,
+      origem: values.origem || 'Detalhe do Cliente',
+      contexto_area: values.contexto_area || 'cliente',
+    };
+    try {
+      await criarFollowupSupabase(payload);
+      await carregarFollowupsCliente(clienteId);
+      setToast({ title: 'Follow-up registrado', message: 'A timeline do cliente foi atualizada.' });
+    } catch (error) {
+      setToast({
+        title: 'Falha ao registrar follow-up',
+        message: error.message || 'Nao foi possivel salvar o follow-up no Supabase.',
+      });
+      throw error;
+    }
+  }
+
+  async function atualizarFollowupCliente(clienteId, followupId, values) {
+    if (!currentUserFull?.id || !clienteId || !followupId || !isUuid(clienteId)) return;
+    try {
+      await atualizarFollowupSupabase(followupId, values);
+      await carregarFollowupsCliente(clienteId);
+      setToast({ title: 'Follow-up atualizado', message: 'A timeline do cliente foi sincronizada.' });
+    } catch (error) {
+      setToast({
+        title: 'Falha ao atualizar follow-up',
+        message: error.message || 'Nao foi possivel atualizar o follow-up no Supabase.',
+      });
+      throw error;
     }
   }
 
@@ -5633,6 +6052,9 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
+  const followupUsers = (security.usuarios ?? [])
+    .filter((user) => user.status === 'Ativo' && isUuid(user.id))
+    .sort((a, b) => String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' }));
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -5695,6 +6117,13 @@ export default function App() {
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoError={handleAnexoError}
+        followupRows={followupsCliente}
+        followupLoading={followupsClienteLoading}
+        followupUsers={followupUsers}
+        canManageFollowups={selectedClient ? canEditClient(currentUserFull, selectedClient) : false}
+        currentUserId={currentUserFull?.id ?? ''}
+        onCreateFollowup={(values) => criarFollowupCliente(selectedClient?.id, values)}
+        onUpdateFollowup={(followupId, values) => atualizarFollowupCliente(selectedClient?.id, followupId, values)}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
       />
