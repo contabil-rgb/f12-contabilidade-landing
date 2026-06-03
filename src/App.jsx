@@ -513,7 +513,7 @@ function parseAttachment(value) {
       };
     }
   } catch {
-    // Plain text/link attachment values are expected while there is no backend.
+    // Plain text/link attachment values may still exist from legacy data.
   }
 
   return {
@@ -5238,17 +5238,6 @@ export default function App() {
             : client,
         ),
       );
-      if (selectedClient?.id === clientId) {
-        setSelectedClient((current) =>
-          current
-            ? {
-              ...current,
-              [fieldKey]: valorNovo,
-              atualizado_em: new Date().toISOString(),
-            }
-            : current,
-        );
-      }
     }
 
     if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId) && currentUserFull?.id) {
