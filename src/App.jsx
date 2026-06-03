@@ -123,6 +123,10 @@ import {
   listarAcompanhamentoOperacionalClientes,
 } from './services/acompanhamento-operacional.service';
 import {
+  indexarFollowupsResumo,
+  listarFollowupsResumoClientes,
+} from './services/followups-resumo.service';
+import {
   atualizarUltimoAcessoUsuarioPortal,
   atualizarUsuarioPortal,
   buscarPerfilPorAuthUserId,
@@ -665,12 +669,30 @@ function hydrateClientesComAcompanhamentoOperacional(clientesBase, acompanhament
   });
 }
 
+function hydrateClientesComFollowupsResumo(clientesBase, followupsResumoIndex = {}) {
+  return (clientesBase ?? []).map((client) => {
+    const followupsResumo = followupsResumoIndex[String(client.id ?? '').trim()];
+    if (!followupsResumo) return client;
+    return {
+      ...client,
+      _db_followups_resumo: followupsResumo,
+    };
+  });
+}
+
 function clearPersistedObrigacoes(client) {
-  if (!client || (!client._db_obrigacoes && !client._db_risco_operacional && !client._db_acompanhamento_operacional)) return client;
+  if (
+    !client
+    || (!client._db_obrigacoes
+      && !client._db_risco_operacional
+      && !client._db_acompanhamento_operacional
+      && !client._db_followups_resumo)
+  ) return client;
   const next = { ...client };
   delete next._db_obrigacoes;
   delete next._db_risco_operacional;
   delete next._db_acompanhamento_operacional;
+  delete next._db_followups_resumo;
   return next;
 }
 
@@ -726,6 +748,10 @@ function getAcompanhamentoPersistido(client) {
   return client?._db_acompanhamento_operacional ?? {};
 }
 
+function getFollowupResumoPersistido(client) {
+  return client?._db_followups_resumo ?? {};
+}
+
 function getObrigacaoFlag(client, key, fallback = false) {
   const value = getObrigacoesPersistidas(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
@@ -754,6 +780,31 @@ function getAcompanhamentoText(client, key, fallback = '') {
   const value = getAcompanhamentoPersistido(client)?.[key];
   if (typeof value === 'string') return value;
   return fallback;
+}
+
+function getFollowupResumoFlag(client, key, fallback = false) {
+  const value = getFollowupResumoPersistido(client)?.[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function getFollowupResumoNumber(client, key) {
+  const value = getFollowupResumoPersistido(client)?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getFollowupResumoText(client, key, fallback = '') {
+  const value = getFollowupResumoPersistido(client)?.[key];
+  if (typeof value === 'string') return value;
+  return fallback;
+}
+
+function hasFollowupsRegistrados(client) {
+  const total = getFollowupResumoNumber(client, 'total_followups');
+  if (total !== null) return total > 0;
+  return Boolean(
+    getFollowupResumoText(client, 'ultimo_followup_id', '')
+    || getFollowupResumoText(client, 'proximo_followup_id', ''),
+  );
 }
 
 function getDiasAtrasoValue(client) {
@@ -799,6 +850,12 @@ function getDataRetornoClienteValue(client) {
 }
 
 function getPrazoProximaAcaoValue(client) {
+  if (hasFollowupsRegistrados(client)) {
+    const prazoFollowup = normalizeDateInputValue(
+      getFollowupResumoText(client, 'proximo_followup_data_prevista', ''),
+    );
+    if (prazoFollowup) return prazoFollowup;
+  }
   return normalizeDateInputValue(
     getAcompanhamentoText(client, 'prazo_proxima_acao', client?.prazo_proxima_acao || ''),
   );
@@ -823,6 +880,14 @@ function isAguardandoRetorno(client) {
     const status = getStatusRetornoClienteValue(client);
     return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
   })();
+  const followupsResumo = getFollowupResumoPersistido(client);
+  if (
+    hasFollowupsRegistrados(client)
+    && followupsResumo
+    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_aguardando_retorno')
+  ) {
+    return (getFollowupResumoNumber(client, 'followups_aguardando_retorno') || 0) > 0;
+  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'aguardando_retorno')) {
     return getAcompanhamentoFlag(client, 'aguardando_retorno', fallback);
@@ -834,6 +899,11 @@ function isSemRetorno(client) {
   const fallback = isYes(client?.cliente_notificado)
     && !hasRetornoConcluido(client)
     && getStatusRetornoClienteValue(client) === normalizeText('Sem retorno');
+  const followupsResumo = getFollowupResumoPersistido(client);
+  const statusCodigo = normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''));
+  if (hasFollowupsRegistrados(client) && followupsResumo && statusCodigo) {
+    return statusCodigo === 'sem_retorno';
+  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'sem_retorno')) {
     return getAcompanhamentoFlag(client, 'sem_retorno', fallback);
@@ -851,6 +921,10 @@ function isClienteNotificado(client) {
 }
 
 function getPrazoDiffDias(client) {
+  if (hasFollowupsRegistrados(client)) {
+    const followupPrazo = getFollowupResumoNumber(client, 'dias_para_proximo_followup');
+    if (followupPrazo !== null) return followupPrazo;
+  }
   const persisted = getAcompanhamentoNumber(client, 'dias_para_prazo');
   if (persisted !== null) return persisted;
   const prazo = getPrazoProximaAcaoValue(client);
@@ -879,6 +953,14 @@ function isPrazoProximaAcaoVencido(client) {
     const diff = getPrazoDiffDias(client);
     return diff !== null && diff < 0;
   })();
+  const followupsResumo = getFollowupResumoPersistido(client);
+  if (
+    hasFollowupsRegistrados(client)
+    && followupsResumo
+    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_atrasados')
+  ) {
+    return (getFollowupResumoNumber(client, 'followups_atrasados') || 0) > 0;
+  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_vencido')) {
     return getAcompanhamentoFlag(client, 'prazo_proxima_acao_vencido', fallback);
@@ -891,6 +973,14 @@ function isPrazoProximaAcaoProximo(client) {
     const diff = getPrazoDiffDias(client);
     return diff !== null && diff >= 0 && diff <= 3;
   })();
+  const followupsResumo = getFollowupResumoPersistido(client);
+  if (
+    hasFollowupsRegistrados(client)
+    && followupsResumo
+    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_proximos')
+  ) {
+    return (getFollowupResumoNumber(client, 'followups_proximos') || 0) > 0;
+  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_proximo')) {
     return getAcompanhamentoFlag(client, 'prazo_proxima_acao_proximo', fallback);
@@ -904,6 +994,14 @@ function hasAcompanhamentoPendente(client) {
     || isAguardandoRetorno(client)
     || isPrazoProximaAcaoVencido(client)
     || isPrazoProximaAcaoProximo(client);
+  const followupsResumo = getFollowupResumoPersistido(client);
+  if (
+    hasFollowupsRegistrados(client)
+    && followupsResumo
+    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followup_pendente')
+  ) {
+    return getFollowupResumoFlag(client, 'followup_pendente', fallback) || isComunicacaoPendente(client);
+  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
     return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback) || isComunicacaoPendente(client);
@@ -920,6 +1018,10 @@ function getStatusAcompanhamentoLabel(client) {
     if (isClienteNotificado(client)) return 'Notificado';
     return 'Sem notificacao';
   })();
+  const followupLabel = hasFollowupsRegistrados(client)
+    ? getFollowupResumoText(client, 'status_followup_label', '')
+    : '';
+  if (followupLabel) return followupLabel;
   return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
 }
 
@@ -932,6 +1034,10 @@ function getStatusAcompanhamentoCodigo(client) {
     if (isClienteNotificado(client)) return 'notificado';
     return 'sem_notificacao';
   })();
+  const followupCode = hasFollowupsRegistrados(client)
+    ? normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''))
+    : '';
+  if (followupCode) return followupCode;
   return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
 }
 
@@ -1026,6 +1132,16 @@ function getClientAlertSignals(client) {
       label: prazoProximaAcao ? `Prazo em ${formatDateDisplay(prazoProximaAcao)}` : 'Prazo da proxima acao proximo',
       tone: 'warning',
     },
+    hasFollowupsRegistrados(client)
+      && hasAcompanhamentoPendente(client)
+      && !isComunicacaoPendente(client)
+      && !isAguardandoRetorno(client)
+      && !isPrazoProximaAcaoVencido(client)
+      && !isPrazoProximaAcaoProximo(client) && {
+      key: 'followup',
+      label: getStatusAcompanhamentoLabel(client),
+      tone: 'info',
+    },
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
@@ -1047,6 +1163,7 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
   prazo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 88, priorityLabel: 'Alta', nextAction: 'Atuar na proxima acao hoje ou renegociar o prazo com o cliente.' },
   prazo_proximo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 72, priorityLabel: 'Media', nextAction: 'Antecipar a tratativa antes do prazo vencer.' },
+  followup: { key: 'acompanhamento', area: 'Follow-up', route: 'cliente', priority: 69, priorityLabel: 'Media', nextAction: 'Revisar o follow-up aberto e atualizar a proxima acao do cliente.' },
 };
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -2065,10 +2182,14 @@ function getDetailAcompanhamentoSummary(client) {
   const diasSemRetorno = getDiasSemRetorno(client);
   const toneMap = {
     prazo_vencido: 'danger',
+    prazo_proximo: 'warning',
     sem_retorno: 'danger',
     aguardando_retorno: 'warning',
+    em_aberto: 'info',
+    concluido: 'success',
     retorno_recebido: 'success',
     notificado: 'info',
+    sem_followup: 'neutral',
     sem_notificacao: 'neutral',
   };
 
@@ -2145,7 +2266,13 @@ function getDetailObrigacoesSummary(client) {
 }
 
 function getDetailProximaAcaoSummary(client) {
-  const proximaAcao = getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '');
+  const proximaAcao = hasFollowupsRegistrados(client)
+    ? getFollowupResumoText(
+      client,
+      'proximo_followup_proxima_acao',
+      getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || ''),
+    )
+    : getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '');
   const prazo = getPrazoProximaAcaoValue(client);
   const detail = prazo ? `Prazo: ${formatDateDisplay(prazo)}` : 'Sem prazo registrado';
   return {
@@ -2953,9 +3080,13 @@ function PendenciasPage({
       .filter((alert) => alert.key in PENDENCIA_ACTION_BY_SIGNAL)
       .map((alert) => {
         const config = PENDENCIA_ACTION_BY_SIGNAL[alert.key];
+        const nextAction = alert.key === 'followup'
+          ? getFollowupResumoText(client, 'proximo_followup_proxima_acao', config.nextAction)
+          : config.nextAction;
         return {
           ...alert,
           ...config,
+          nextAction,
           signalKey: alert.key,
           label: alert.key === 'comunicacao' ? 'Cliente nao notificado' : alert.label,
         };
@@ -5147,7 +5278,7 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, followupsResumoResult, usuariosResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
@@ -5157,6 +5288,9 @@ export default function App() {
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarAcompanhamentoOperacionalClientes()
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
+        listarFollowupsResumoClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarUsuariosPortal()
@@ -5170,12 +5304,14 @@ export default function App() {
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
+      const followupsResumoIndex = followupsResumoResult.ok ? indexarFollowupsResumo(followupsResumoResult.rows) : {};
+      const clientesComFollowupsResumo = hydrateClientesComFollowupsResumo(clientesComAcompanhamento, followupsResumoIndex);
 
       const nextListagens = mergeListagensFromClients(
         mergeListagensFromSupabase({ ...DEFAULT_LISTS }, listagensSupabase),
-        clientesComAcompanhamento,
+        clientesComFollowupsResumo,
       );
-      persist(clientesComAcompanhamento, nextListagens, {
+      persist(clientesComFollowupsResumo, nextListagens, {
         ...metadata,
         source: 'Supabase',
         importedAt: metadata?.importedAt || todayBr(),
@@ -5187,13 +5323,16 @@ export default function App() {
       }
       setSupabaseStatus({
         connected: true,
-        message: `Conectado ao Supabase (${formatNumber(clientesComAcompanhamento.length)} cliente(s))`,
+        message: `Conectado ao Supabase (${formatNumber(clientesComFollowupsResumo.length)} cliente(s))`,
       });
       if (!obrigacoesResult.ok) {
         console.warn('[obrigacoes] Falha ao carregar view persistente de obrigacoes:', obrigacoesResult.error);
       }
       if (!riscoResult.ok) {
         console.warn('[risco_operacional] Falha ao carregar view persistente de risco operacional:', riscoResult.error);
+      }
+      if (!followupsResumoResult.ok) {
+        console.warn('[followups_resumo] Falha ao carregar view persistente de follow-ups:', followupsResumoResult.error);
       }
       if (!acompanhamentoResult.ok) {
         console.warn('[acompanhamento_operacional] Falha ao carregar view persistente de acompanhamento operacional:', acompanhamentoResult.error);
