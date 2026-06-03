@@ -4204,7 +4204,7 @@ function FormField({
     const attachment = parseAttachment(value);
     const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[field.key];
     const anexo = tipoAnexo ? fieldValueToAnexo(value, tipoAnexo, cliente) : null;
-    const canUpload = Boolean(tipoAnexo && cliente?.id);
+    const canUpload = Boolean(tipoAnexo && isUuid(cliente?.id));
 
     return (
       <div className="text-xs font-black uppercase tracking-normal text-slate-500">
@@ -4254,7 +4254,7 @@ function FormField({
         <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">
           {canUpload
             ? 'Upload real via Supabase Storage privado. Links de visualização são temporários.'
-            : 'Salve o cliente antes de anexar arquivos no Supabase.'}
+            : 'Salve primeiro o cliente no Supabase para anexar arquivos.'}
         </span>
       </div>
     );
@@ -5260,7 +5260,6 @@ export default function App() {
     if (!importPreview?.buffer || !importPreview?.fileName) return;
     setImportBusy(true);
     try {
-      const { mergeLists } = await import('./lib/excel.js');
       const clientesAntesImportacao = [...clients];
       const result = await importarClientesExcel(importPreview.buffer, importPreview.fileName);
       if (!result.ok) {
@@ -5294,13 +5293,13 @@ export default function App() {
         });
       }
 
-      const mergedLists = mergeLists({ ...DEFAULT_LISTS, ...listasBase, ...listagens, ...result.payload?.listagens }, result.payload?.clientes ?? []);
-      setListagens(mergedLists);
-      await carregarDadosSupabase({ silent: true });
+      const recarregado = await carregarDadosSupabase({ silent: true });
       setImportPreview(null);
       setToast({
         title: 'Planilha importada',
-        message: `Linhas: ${result.summary.totalLinhasLidas} | Criados: ${result.summary.criados} | Atualizados: ${result.summary.atualizados} | Ignorados: ${result.summary.ignorados} | Erros: ${result.summary.erros}`,
+        message: recarregado
+          ? `Linhas: ${result.summary.totalLinhasLidas} | Criados: ${result.summary.criados} | Atualizados: ${result.summary.atualizados} | Ignorados: ${result.summary.ignorados} | Erros: ${result.summary.erros}`
+          : 'Importacao concluida no Supabase, mas a interface nao conseguiu recarregar automaticamente.',
       });
     } catch (error) {
       setToast({ title: 'Falha ao importar', message: error.message });
@@ -5350,13 +5349,14 @@ export default function App() {
       return;
     }
 
-    persist(clientesContabeis.map(withClientDefaults), { ...DEFAULT_LISTS, ...listasBase }, importMetadata);
-    setMetadata(importMetadata);
+    const recarregado = await carregarDadosSupabase({ silent: true });
     setToast({
       title: 'Base restaurada',
-      message: sync.summary
-        ? `Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
-        : `${sync.synced} cliente(s) restaurado(s).`,
+      message: recarregado
+        ? (sync.summary
+            ? `Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
+            : `${sync.synced} cliente(s) restaurado(s).`)
+        : 'Restauracao concluida no Supabase, mas a interface nao conseguiu recarregar automaticamente.',
     });
   }
 
