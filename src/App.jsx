@@ -5,7 +5,6 @@ import {
   BarChart3,
   BellRing,
   BookOpenCheck,
-  BriefcaseBusiness,
   Building2,
   CheckCircle2,
   ChevronRight,
@@ -66,7 +65,6 @@ import {
 import {
   AUTH_SESSION_KEY,
   ACCESS_PROFILE_OPTIONS,
-  ACCESS_PROFILE_KEYS,
   ACCESS_PROFILES,
   HISTORY_FIELDS,
   PERMISSIONS,
@@ -3113,25 +3111,6 @@ function PendenciasPage({
   );
 }
 
-function InlineSelect({ value, options, onChange, disabled = false }) {
-  const allOptions = uniqueValues([...(options ?? []), value]);
-  return (
-    <select
-      value={value ?? ''}
-      onChange={(event) => onChange(event.target.value)}
-      disabled={disabled}
-      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:bg-slate-100 disabled:text-slate-400"
-    >
-      <option value="">Não informado</option>
-      {allOptions.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 function FilterSelect({ label, value, options, onChange, includeBlank = true }) {
   return (
     <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
@@ -3981,14 +3960,6 @@ function ForgotPasswordPage({ onBack, onRequestReset }) {
       <form onSubmit={submit} className="space-y-4">
         <AuthTextField label="E-mail profissional" type="email" value={email} onChange={setEmail} icon={Mail} />
         {message ? <div className={`rounded-lg border p-3 text-sm font-bold ${chipClass('info')}`}>{message}</div> : null}
-        {false ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-            Ambiente local: token gerado para simular o link de e-mail.
-            <button type="button" onClick={onBack} className="mt-2 block font-black text-amber-900 underline">
-              Abrir redefinição neste navegador
-            </button>
-          </div>
-        ) : null}
         <button type="submit" className="w-full rounded-lg bg-brand-blue px-4 py-3 text-sm font-black text-white">
           Solicitar redefinição
         </button>
