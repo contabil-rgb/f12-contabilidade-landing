@@ -101,11 +101,6 @@ import {
   registrarHistoricoAlteracoes as registrarHistoricoAlteracoesSupabase,
 } from './services/historico.service';
 import {
-  atualizarFollowup as atualizarFollowupSupabase,
-  criarFollowup as criarFollowupSupabase,
-  listarFollowupsPorCliente as listarFollowupsPorClienteSupabase,
-} from './services/followups.service';
-import {
   importarClientesExcel,
   previsualizarImportacaoExcel,
   sincronizarClientesRows,
@@ -122,10 +117,6 @@ import {
   indexarAcompanhamentoOperacional,
   listarAcompanhamentoOperacionalClientes,
 } from './services/acompanhamento-operacional.service';
-import {
-  indexarFollowupsResumo,
-  listarFollowupsResumoClientes,
-} from './services/followups-resumo.service';
 import {
   atualizarUltimoAcessoUsuarioPortal,
   atualizarUsuarioPortal,
@@ -184,9 +175,6 @@ const DEFAULT_FILTERS = {
   distribuicao_lucros: '',
   dificuldade: '',
   alerta: '',
-  followup_status: '',
-  followup_responsavel: '',
-  followup_scope: '',
 };
 
 const FILTER_FIELDS = [
@@ -677,30 +665,17 @@ function hydrateClientesComAcompanhamentoOperacional(clientesBase, acompanhament
   });
 }
 
-function hydrateClientesComFollowupsResumo(clientesBase, followupsResumoIndex = {}) {
-  return (clientesBase ?? []).map((client) => {
-    const followupsResumo = followupsResumoIndex[String(client.id ?? '').trim()];
-    if (!followupsResumo) return client;
-    return {
-      ...client,
-      _db_followups_resumo: followupsResumo,
-    };
-  });
-}
-
 function clearPersistedObrigacoes(client) {
   if (
     !client
     || (!client._db_obrigacoes
       && !client._db_risco_operacional
-      && !client._db_acompanhamento_operacional
-      && !client._db_followups_resumo)
+      && !client._db_acompanhamento_operacional)
   ) return client;
   const next = { ...client };
   delete next._db_obrigacoes;
   delete next._db_risco_operacional;
   delete next._db_acompanhamento_operacional;
-  delete next._db_followups_resumo;
   return next;
 }
 
@@ -756,10 +731,6 @@ function getAcompanhamentoPersistido(client) {
   return client?._db_acompanhamento_operacional ?? {};
 }
 
-function getFollowupResumoPersistido(client) {
-  return client?._db_followups_resumo ?? {};
-}
-
 function getObrigacaoFlag(client, key, fallback = false) {
   const value = getObrigacoesPersistidas(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
@@ -790,47 +761,7 @@ function getAcompanhamentoText(client, key, fallback = '') {
   return fallback;
 }
 
-function getFollowupResumoFlag(client, key, fallback = false) {
-  const value = getFollowupResumoPersistido(client)?.[key];
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-function getFollowupResumoNumber(client, key) {
-  const value = getFollowupResumoPersistido(client)?.[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function getFollowupResumoText(client, key, fallback = '') {
-  const value = getFollowupResumoPersistido(client)?.[key];
-  if (typeof value === 'string') return value;
-  return fallback;
-}
-
-function hasFollowupsRegistrados(client) {
-  const total = getFollowupResumoNumber(client, 'total_followups');
-  if (total !== null) return total > 0;
-  return Boolean(
-    getFollowupResumoText(client, 'ultimo_followup_id', '')
-    || getFollowupResumoText(client, 'proximo_followup_id', ''),
-  );
-}
-
-function getTotalFollowupsAbertos(client) {
-  const total = getFollowupResumoNumber(client, 'followups_abertos');
-  if (total !== null) return total;
-  return hasFollowupsRegistrados(client) && getStatusAcompanhamentoCodigo(client) !== 'concluido' ? 1 : 0;
-}
-
-function hasFollowupsEmAberto(client) {
-  return getTotalFollowupsAbertos(client) > 0;
-}
-
-function isFollowupSemResponsavel(client) {
-  return hasFollowupsEmAberto(client) && !getFollowupResponsavelUsuarioId(client);
-}
-
 function getPrazoOperacionalBaseLabel(client) {
-  if (hasFollowupsRegistrados(client)) return 'Prazo da próxima ação';
   return 'Prazo da próxima ação';
 }
 
@@ -898,12 +829,6 @@ function getDataRetornoClienteValue(client) {
 }
 
 function getPrazoProximaAcaoValue(client) {
-  if (hasFollowupsRegistrados(client)) {
-    const prazoFollowup = normalizeDateInputValue(
-      getFollowupResumoText(client, 'proximo_followup_data_prevista', ''),
-    );
-    if (prazoFollowup) return prazoFollowup;
-  }
   return '';
 }
 
@@ -926,14 +851,6 @@ function isAguardandoRetorno(client) {
     const status = getStatusRetornoClienteValue(client);
     return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
   })();
-  const followupsResumo = getFollowupResumoPersistido(client);
-  if (
-    hasFollowupsRegistrados(client)
-    && followupsResumo
-    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_aguardando_retorno')
-  ) {
-    return (getFollowupResumoNumber(client, 'followups_aguardando_retorno') || 0) > 0;
-  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'aguardando_retorno')) {
     return getAcompanhamentoFlag(client, 'aguardando_retorno', fallback);
@@ -945,11 +862,6 @@ function isSemRetorno(client) {
   const fallback = isYes(client?.cliente_notificado)
     && !hasRetornoConcluido(client)
     && getStatusRetornoClienteValue(client) === normalizeText('Sem retorno');
-  const followupsResumo = getFollowupResumoPersistido(client);
-  const statusCodigo = normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''));
-  if (hasFollowupsRegistrados(client) && followupsResumo && statusCodigo) {
-    return statusCodigo === 'sem_retorno';
-  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'sem_retorno')) {
     return getAcompanhamentoFlag(client, 'sem_retorno', fallback);
@@ -967,10 +879,6 @@ function isClienteNotificado(client) {
 }
 
 function getPrazoDiffDias(client) {
-  if (hasFollowupsRegistrados(client)) {
-    const followupPrazo = getFollowupResumoNumber(client, 'dias_para_proximo_followup');
-    if (followupPrazo !== null) return followupPrazo;
-  }
   const prazo = getPrazoProximaAcaoValue(client);
   if (!prazo) return null;
   const today = new Date();
@@ -997,14 +905,6 @@ function isPrazoProximaAcaoVencido(client) {
     const diff = getPrazoDiffDias(client);
     return diff !== null && diff < 0;
   })();
-  const followupsResumo = getFollowupResumoPersistido(client);
-  if (
-    hasFollowupsRegistrados(client)
-    && followupsResumo
-    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_atrasados')
-  ) {
-    return (getFollowupResumoNumber(client, 'followups_atrasados') || 0) > 0;
-  }
   return fallback;
 }
 
@@ -1013,14 +913,6 @@ function isPrazoProximaAcaoProximo(client) {
     const diff = getPrazoDiffDias(client);
     return diff !== null && diff >= 0 && diff <= 3;
   })();
-  const followupsResumo = getFollowupResumoPersistido(client);
-  if (
-    hasFollowupsRegistrados(client)
-    && followupsResumo
-    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_proximos')
-  ) {
-    return (getFollowupResumoNumber(client, 'followups_proximos') || 0) > 0;
-  }
   return fallback;
 }
 
@@ -1030,14 +922,6 @@ function hasAcompanhamentoPendente(client) {
     || isAguardandoRetorno(client)
     || isPrazoProximaAcaoVencido(client)
     || isPrazoProximaAcaoProximo(client);
-  const followupsResumo = getFollowupResumoPersistido(client);
-  if (
-    hasFollowupsRegistrados(client)
-    && followupsResumo
-    && Object.prototype.hasOwnProperty.call(followupsResumo, 'followup_pendente')
-  ) {
-    return getFollowupResumoFlag(client, 'followup_pendente', fallback) || isComunicacaoPendente(client);
-  }
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
     return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback) || isComunicacaoPendente(client);
@@ -1055,15 +939,6 @@ function getStatusAcompanhamentoLabel(client) {
     if (isClienteNotificado(client)) return 'Notificado';
     return 'Sem notificacao';
   })();
-  const followupCode = hasFollowupsRegistrados(client)
-    ? normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''))
-    : '';
-  if (followupCode === 'prazo_vencido') return getPrazoOperacionalStatusLabel(client, 'vencido');
-  if (followupCode === 'prazo_proximo') return getPrazoOperacionalStatusLabel(client, 'proximo');
-  const followupLabel = hasFollowupsRegistrados(client)
-    ? getFollowupResumoText(client, 'status_followup_label', '')
-    : '';
-  if (followupLabel) return followupLabel;
   const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', ''));
   if (persistedCode === 'prazo_vencido') return getPrazoOperacionalStatusLabel(client, 'vencido');
   if (persistedCode === 'prazo_proximo') return getPrazoOperacionalStatusLabel(client, 'proximo');
@@ -1079,30 +954,14 @@ function getStatusAcompanhamentoCodigo(client) {
     if (isClienteNotificado(client)) return 'notificado';
     return 'sem_notificacao';
   })();
-  const followupCode = hasFollowupsRegistrados(client)
-    ? normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''))
-    : '';
-  if (followupCode) return followupCode;
   return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
 }
 
-function getFollowupResponsavelUsuarioId(client) {
-  return String(getFollowupResumoText(client, 'proximo_followup_responsavel_usuario_id', '') || '').trim();
-}
-
-function getFollowupResponsavelNome(client) {
-  return getFollowupResumoText(client, 'proximo_followup_responsavel_nome', '').trim();
-}
-
 function getResponsavelOperacional(client) {
-  return getFollowupResponsavelNome(client) || getObrigacaoResponsavel(client) || client?.responsavel || '';
+  return getObrigacaoResponsavel(client) || client?.responsavel || '';
 }
 
 function getProximaAcaoOperacional(client) {
-  if (hasFollowupsRegistrados(client)) {
-    const followupAction = getFollowupResumoText(client, 'proximo_followup_proxima_acao', '').trim();
-    if (followupAction) return followupAction;
-  }
   return '';
 }
 
@@ -1201,16 +1060,6 @@ function getClientAlertSignals(client) {
         : getPrazoOperacionalStatusLabel(client, 'proximo'),
       tone: 'warning',
     },
-    hasFollowupsRegistrados(client)
-      && hasAcompanhamentoPendente(client)
-      && !isComunicacaoPendente(client)
-      && !isAguardandoRetorno(client)
-      && !isPrazoProximaAcaoVencido(client)
-      && !isPrazoProximaAcaoProximo(client) && {
-      key: 'followup',
-      label: getStatusAcompanhamentoLabel(client),
-      tone: 'info',
-    },
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
@@ -1232,7 +1081,6 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
   prazo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 88, priorityLabel: 'Alta', nextAction: 'Atuar na proxima acao hoje ou renegociar o prazo com o cliente.' },
   prazo_proximo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 72, priorityLabel: 'Media', nextAction: 'Antecipar a tratativa antes do prazo vencer.' },
-  followup: { key: 'acompanhamento', area: 'Follow-up', route: 'cliente', priority: 69, priorityLabel: 'Media', nextAction: 'Revisar o follow-up aberto e atualizar a proxima acao do cliente.' },
 };
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -1402,30 +1250,6 @@ function filterClients(clients, filters) {
     }
 
     if (!matchesAlert(client, filters.alerta)) return false;
-
-    const followupStatus = normalizeText(filters.followup_status);
-    if (followupStatus) {
-      if (followupStatus === 'pendente' && !hasAcompanhamentoPendente(client)) return false;
-      if (followupStatus === 'em_aberto' && !hasFollowupsEmAberto(client)) return false;
-      if (followupStatus === 'aguardando_retorno' && !isAguardandoRetorno(client)) return false;
-      if (followupStatus === 'prazo_vencido' && !isPrazoProximaAcaoVencido(client)) return false;
-      if (followupStatus === 'prazo_proximo' && (isPrazoProximaAcaoVencido(client) || !isPrazoProximaAcaoProximo(client))) return false;
-      if (followupStatus === 'sem_retorno' && !isSemRetorno(client)) return false;
-      if (!['pendente', 'em_aberto', 'aguardando_retorno', 'prazo_vencido', 'prazo_proximo', 'sem_retorno'].includes(followupStatus)) {
-        if (normalizeText(getStatusAcompanhamentoCodigo(client)) !== followupStatus) return false;
-      }
-    }
-
-    const followupResponsavel = normalizeText(filters.followup_responsavel);
-    if (followupResponsavel && normalizeText(getFollowupResponsavelNome(client)) !== followupResponsavel) {
-      return false;
-    }
-
-    const followupScope = filters.followup_scope;
-    if (followupScope === 'com_followup' && !hasFollowupsRegistrados(client)) return false;
-    if (followupScope === 'sem_followup' && hasFollowupsRegistrados(client)) return false;
-    if (followupScope === 'com_responsavel' && !getFollowupResponsavelUsuarioId(client)) return false;
-    if (followupScope === 'sem_responsavel' && !isFollowupSemResponsavel(client)) return false;
 
     return FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
@@ -1918,7 +1742,7 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
 }
 
-function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false, currentUserId = '' }) {
+function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
@@ -1934,46 +1758,6 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
     ).toFixed(1)
     : '0.0';
   const percentualEmDia = total ? ((emDia / total) * 100).toFixed(1) : '0.0';
-  const clientesComFollowup = countWhere(clients, (client) => hasFollowupsRegistrados(client));
-  const followupsEmAberto = countWhere(
-    clients,
-    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getStatusAcompanhamentoCodigo(client) === 'em_aberto',
-  );
-  const meusFollowups = countWhere(
-    clients,
-    (client) => String(getFollowupResponsavelUsuarioId(client)) === String(currentUserId) && hasAcompanhamentoPendente(client),
-  );
-  const followupsSemResponsavel = countWhere(
-    clients,
-    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && !getFollowupResponsavelUsuarioId(client),
-  );
-  const filaFollowups = clients
-    .filter((client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client))
-    .map((client) => ({
-      client,
-      prioridade: isPrazoProximaAcaoVencido(client)
-        ? 4
-        : isSemRetorno(client)
-          ? 3
-          : isAguardandoRetorno(client)
-            ? 2
-            : isPrazoProximaAcaoProximo(client)
-              ? 1
-              : 0,
-    }))
-    .sort((left, right) => {
-      if (right.prioridade !== left.prioridade) return right.prioridade - left.prioridade;
-      const leftDiff = getPrazoDiffDias(left.client);
-      const rightDiff = getPrazoDiffDias(right.client);
-      if (leftDiff !== null && rightDiff !== null && leftDiff !== rightDiff) return leftDiff - rightDiff;
-      if (leftDiff !== null && rightDiff === null) return -1;
-      if (leftDiff === null && rightDiff !== null) return 1;
-      return String(left.client.nome_identificacao || left.client.razao_social || '').localeCompare(
-        String(right.client.nome_identificacao || right.client.razao_social || ''),
-        'pt-BR',
-      );
-    })
-    .slice(0, 6);
   const metrics = [
     { title: 'Total de clientes', value: total, icon: Users, tone: 'info', filter: {} },
     {
@@ -2047,44 +1831,6 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       filter: { alerta: 'comunicacao' },
     },
   ];
-  const followupMetrics = [
-    {
-      title: 'Clientes com follow-up',
-      value: clientesComFollowup,
-      detail: 'Clientes que já têm timeline operacional registrada',
-      icon: ClipboardList,
-      tone: 'info',
-    },
-    {
-      title: 'Follow-ups em aberto',
-      value: followupsEmAberto,
-      detail: 'Casos abertos sem atraso, mas ainda pedindo ação',
-      icon: Mail,
-      tone: 'warning',
-    },
-    {
-      title: 'Meus follow-ups',
-      value: meusFollowups,
-      detail: 'Clientes com próxima ação atribuída a você',
-      icon: UserCheck,
-      tone: 'info',
-    },
-    {
-      title: 'Sem responsável',
-      value: followupsSemResponsavel,
-      detail: 'Follow-ups pendentes que ainda não têm dono',
-      icon: AlertTriangle,
-      tone: 'danger',
-    },
-  ];
-  const followupsPorResponsavel = toBreakdownByResolver(
-    clients,
-    (client) => getFollowupResponsavelNome(client),
-    {
-      filter: (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client),
-    },
-  );
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -2132,76 +1878,6 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
             onClick={() => onPreset(metric.filter, metric.title)}
           />
         ))}
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {followupMetrics.map((metric) => (
-          <MetricCard
-            key={metric.title}
-            {...metric}
-          />
-        ))}
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.3fr,0.9fr]">
-        <section className="surface-card p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-black text-slate-950">Fila operacional de follow-ups</h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Clientes que merecem atenção primeiro, já considerando prazo, retorno e próxima ação.
-              </p>
-            </div>
-            <Mail className="text-brand-blue" size={18} aria-hidden="true" />
-          </div>
-          <div className="mt-4 space-y-3">
-            {filaFollowups.length ? filaFollowups.map(({ client }) => (
-              <button
-                key={client.id}
-                type="button"
-                onClick={() => onPreset({ alerta: 'comunicacao', search: client.nome_identificacao || client.razao_social || '' }, `Follow-up: ${client.nome_identificacao || client.razao_social || 'Cliente'}`)}
-                className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-brand-blue/40 hover:bg-sky-50/30"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj || '-'}</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-600">{getProximaAcaoOperacional(client) || 'Sem próxima ação registrada'}</p>
-                  </div>
-                  <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(
-                    isPrazoProximaAcaoVencido(client)
-                      ? 'danger'
-                      : isAguardandoRetorno(client)
-                        ? 'warning'
-                        : 'info',
-                  )}`}>
-                    {getStatusAcompanhamentoLabel(client)}
-                  </span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                    Resp. {getResponsavelOperacional(client) || 'Nao informado'}
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                    Prazo {getPrazoProximaAcaoValue(client) ? formatDateDisplay(getPrazoProximaAcaoValue(client)) : 'Nao informado'}
-                  </span>
-                </div>
-              </button>
-            )) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
-                Nenhum follow-up prioritário no momento.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <BreakdownPanel
-          title="Follow-ups por responsável"
-          rows={followupsPorResponsavel}
-          total={Math.max(clientesComFollowup, 1)}
-          field="responsavel"
-          onSelect={onPreset}
-        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-3">
@@ -2284,20 +1960,6 @@ function SearchAndFilters({
     value,
     label,
   }));
-  const followupResponsavelOptions = uniqueValues(
-    (clientsForOptions ?? [])
-      .map((client) => getFollowupResponsavelNome(client))
-      .filter(Boolean),
-  );
-  const followupStatusOptions = [
-    { value: 'pendente', label: 'Com acompanhamento pendente' },
-    { value: 'em_aberto', label: 'Follow-up em aberto' },
-    { value: 'aguardando_retorno', label: 'Aguardando retorno' },
-    { value: 'prazo_vencido', label: 'Prazo da próxima ação vencido' },
-    { value: 'prazo_proximo', label: 'Prazo da próxima ação próximo' },
-    { value: 'sem_retorno', label: 'Sem retorno' },
-  ];
-
   return (
     <section className="surface-card p-5">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -2359,50 +2021,6 @@ function SearchAndFilters({
                 {option.label}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
-          Status do follow-up
-          <select
-            value={filters.followup_status}
-            onChange={(event) => updateFilter({ followup_status: event.target.value })}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-          >
-            <option value="">Todos</option>
-            {followupStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
-          Responsável do follow-up
-          <select
-            value={filters.followup_responsavel}
-            onChange={(event) => updateFilter({ followup_responsavel: event.target.value })}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-          >
-            <option value="">Todos</option>
-            {followupResponsavelOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
-          Escopo do follow-up
-          <select
-            value={filters.followup_scope}
-            onChange={(event) => updateFilter({ followup_scope: event.target.value })}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-          >
-            <option value="">Todos</option>
-            <option value="com_followup">Com follow-up</option>
-            <option value="sem_followup">Sem follow-up</option>
-            <option value="com_responsavel">Com responsável definido</option>
-            <option value="sem_responsavel">Sem responsável</option>
           </select>
         </label>
         {FILTER_FIELDS.map((fieldKey) => {
@@ -2512,7 +2130,6 @@ function getDetailAcompanhamentoSummary(client) {
     concluido: 'success',
     retorno_recebido: 'success',
     notificado: 'info',
-    sem_followup: 'neutral',
     sem_notificacao: 'neutral',
   };
 
@@ -2655,29 +2272,6 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                     <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj}</p>
                     <p className="mt-1 truncate text-xs text-slate-500">{client.razao_social}</p>
-                    {hasFollowupsRegistrados(client) ? (
-                      <>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(
-                            isPrazoProximaAcaoVencido(client)
-                              ? 'danger'
-                              : isPrazoProximaAcaoProximo(client) || isAguardandoRetorno(client)
-                                ? 'warning'
-                                : hasFollowupsEmAberto(client)
-                                  ? 'info'
-                                  : 'neutral',
-                          )}`}>
-                            {getStatusAcompanhamentoLabel(client)}
-                          </span>
-                          <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(getFollowupResponsavelNome(client) ? 'info' : 'danger')}`}>
-                            {getFollowupResponsavelNome(client) ? `Resp. ${getFollowupResponsavelNome(client)}` : 'Sem responsável'}
-                          </span>
-                        </div>
-                        <p className="mt-2 line-clamp-2 text-xs font-semibold text-slate-600">
-                          {getProximaAcaoOperacional(client) || 'Sem próxima ação registrada'}
-                        </p>
-                      </>
-                    ) : null}
                   </div>
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3 align-top">
@@ -2755,31 +2349,13 @@ function BaseClientesPage(props) {
       patch: { alerta: 'comunicacao' },
     },
     {
-      key: 'com_followup',
-      title: 'Com follow-up',
-      value: countWhere(props.clients, (client) => hasFollowupsRegistrados(client)),
-      detail: 'Clientes que ja tem timeline operacional registrada',
-      icon: ClipboardList,
-      tone: 'info',
-      patch: { followup_scope: 'com_followup', alerta: '' },
-    },
-    {
-      key: 'em_aberto',
-      title: 'Follow-up em aberto',
-      value: countWhere(props.clients, (client) => hasFollowupsEmAberto(client)),
-      detail: 'Casos com proxima acao ainda em andamento',
-      icon: Mail,
-      tone: 'warning',
-      patch: { followup_status: 'em_aberto', alerta: '' },
-    },
-    {
       key: 'retorno',
       title: 'Aguardando retorno',
       value: countWhere(props.clients, (client) => isAguardandoRetorno(client)),
       detail: 'Clientes notificados sem retorno concluido',
       icon: Mail,
       tone: 'warning',
-      patch: { followup_status: 'aguardando_retorno', alerta: '' },
+      patch: { alerta: 'retorno' },
     },
     {
       key: 'prazo',
@@ -2788,16 +2364,7 @@ function BaseClientesPage(props) {
       detail: 'Proxima acao que ja passou do prazo',
       icon: BellRing,
       tone: 'danger',
-      patch: { followup_status: 'prazo_vencido', alerta: '' },
-    },
-    {
-      key: 'sem_responsavel',
-      title: 'Sem responsavel',
-      value: countWhere(props.clients, (client) => isFollowupSemResponsavel(client)),
-      detail: 'Follow-ups abertos sem dono operacional definido',
-      icon: Users,
-      tone: 'danger',
-      patch: { followup_scope: 'sem_responsavel', alerta: '' },
+      patch: { alerta: 'prazo' },
     },
   ];
 
@@ -2844,345 +2411,6 @@ function BaseClientesPage(props) {
   );
 }
 
-const FOLLOWUP_TYPE_OPTIONS = ['Notificacao', 'Cobranca', 'Retorno', 'Documentacao', 'Ata', 'REINF', 'ECD', 'ECF', 'Observacao'];
-const FOLLOWUP_STATUS_OPTIONS = ['Aberto', 'Aguardando retorno', 'Concluido', 'Cancelado'];
-const FOLLOWUP_PRIORITY_OPTIONS = ['Baixa', 'Media', 'Alta'];
-const FOLLOWUP_CHANNEL_OPTIONS = ['WhatsApp', 'E-mail', 'Telefone', 'Interno'];
-const FOLLOWUP_CONTEXT_AREA_OPTIONS = ['cliente', 'reinf', 'ecd', 'ecf'];
-
-function getFollowupStatusTone(status) {
-  const normalized = normalizeText(status);
-  if (normalized.includes('conclu')) return 'success';
-  if (normalized.includes('cancel')) return 'muted';
-  if (normalized.includes('aguardando')) return 'info';
-  return 'warning';
-}
-
-function getFollowupPriorityTone(priority) {
-  const normalized = normalizeText(priority);
-  if (normalized === 'alta') return 'danger';
-  if (normalized === 'media') return 'warning';
-  return 'neutral';
-}
-
-function getFollowupUserLabel(followup, key) {
-  const nested = followup?.[key];
-  if (nested?.nome) return nested.nome;
-  if (nested?.email) return nested.email;
-  return 'Nao informado';
-}
-
-function buildEmptyFollowup(currentUserId = '') {
-  const today = new Date().toISOString().slice(0, 10);
-  return {
-    tipo: 'Observacao',
-    status: 'Aberto',
-    prioridade: 'Media',
-    canal: 'Interno',
-    descricao: '',
-    resultado: '',
-    proxima_acao: '',
-    data_contato: today,
-    data_prevista: '',
-    data_conclusao: '',
-    contexto_area: 'cliente',
-    contexto_chave: '',
-    responsavel_usuario_id: currentUserId || '',
-  };
-}
-
-function FollowupModal({ followup, users, onClose, onSave }) {
-  const [form, setForm] = useState(() => ({ ...followup }));
-  const [errors, setErrors] = useState([]);
-  const [saving, setSaving] = useState(false);
-
-  function updateField(key, value) {
-    setForm((current) => {
-      const next = { ...current, [key]: value };
-      if (key === 'status' && normalizeText(value) !== 'concluido') {
-        next.data_conclusao = '';
-      }
-      if (key === 'status' && normalizeText(value) === 'concluido' && !next.data_conclusao) {
-        next.data_conclusao = new Date().toISOString().slice(0, 10);
-      }
-      return next;
-    });
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    const nextErrors = [];
-    if (isBlank(form.tipo)) nextErrors.push('Tipo e obrigatorio.');
-    if (isBlank(form.descricao)) nextErrors.push('Descricao e obrigatoria.');
-    if (nextErrors.length) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await onSave({
-        ...form,
-        data_contato: normalizeDateInputValue(form.data_contato),
-        data_prevista: normalizeDateInputValue(form.data_prevista),
-        data_conclusao: normalizeDateInputValue(form.data_conclusao),
-      });
-    } catch (error) {
-      setErrors([error.message || 'Nao foi possivel salvar o follow-up.']);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
-      <form onSubmit={submit} className="mx-auto max-w-4xl rounded-lg bg-white shadow-panel">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
-          <div>
-            <h2 className="text-xl font-black text-slate-950">{followup?.id ? 'Editar follow-up' : 'Novo follow-up'}</h2>
-            <p className="text-sm font-semibold text-slate-500">Registro operacional do cliente</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="space-y-5 p-5">
-          {errors.length ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
-              {errors.map((error) => (
-                <p key={error}>{error}</p>
-              ))}
-            </div>
-          ) : null}
-
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Tipo</span>
-              <select value={form.tipo ?? ''} onChange={(event) => updateField('tipo', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                {FOLLOWUP_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Status</span>
-              <select value={form.status ?? ''} onChange={(event) => updateField('status', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                {FOLLOWUP_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Prioridade</span>
-              <select value={form.prioridade ?? ''} onChange={(event) => updateField('prioridade', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                {FOLLOWUP_PRIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Canal</span>
-              <select value={form.canal ?? ''} onChange={(event) => updateField('canal', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                {FOLLOWUP_CHANNEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Responsavel</span>
-              <select value={form.responsavel_usuario_id ?? ''} onChange={(event) => updateField('responsavel_usuario_id', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                <option value="">Nao informado</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.nome}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Origem</span>
-              <input value={form.origem ?? ''} onChange={(event) => updateField('origem', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" placeholder="Detalhe do Cliente" />
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Data do contato</span>
-              <input type="date" value={normalizeDateInputValue(form.data_contato)} onChange={(event) => updateField('data_contato', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Data prevista</span>
-              <input type="date" value={normalizeDateInputValue(form.data_prevista)} onChange={(event) => updateField('data_prevista', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Data de conclusao</span>
-              <input type="date" value={normalizeDateInputValue(form.data_conclusao)} onChange={(event) => updateField('data_conclusao', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700">
-              <span>Contexto da area</span>
-              <select value={form.contexto_area ?? ''} onChange={(event) => updateField('contexto_area', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
-                <option value="">Nao informado</option>
-                {FOLLOWUP_CONTEXT_AREA_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm font-bold text-slate-700 md:col-span-2 xl:col-span-2">
-              <span>Contexto tecnico</span>
-              <input value={form.contexto_chave ?? ''} onChange={(event) => updateField('contexto_chave', event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" placeholder="ata_pendente, recibo_reinf, documentacao_atrasada..." />
-            </label>
-          </section>
-
-          <label className="block space-y-1 text-sm font-bold text-slate-700">
-            <span>Descricao</span>
-            <textarea value={form.descricao ?? ''} onChange={(event) => updateField('descricao', event.target.value)} rows={4} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-          </label>
-
-          <div className="grid gap-3 xl:grid-cols-2">
-            <label className="block space-y-1 text-sm font-bold text-slate-700">
-              <span>Resultado</span>
-              <textarea value={form.resultado ?? ''} onChange={(event) => updateField('resultado', event.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-            </label>
-            <label className="block space-y-1 text-sm font-bold text-slate-700">
-              <span>Proxima acao</span>
-              <textarea value={form.proxima_acao ?? ''} onChange={(event) => updateField('proxima_acao', event.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900" />
-            </label>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">
-            Cancelar
-          </button>
-          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white disabled:opacity-60">
-            <Save size={16} aria-hidden="true" />
-            {saving ? 'Salvando...' : 'Salvar follow-up'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function FollowupsSection({ rows = [], loading = false, users = [], canManage = false, currentUserId = '', onCreate, onUpdate }) {
-  const [draft, setDraft] = useState(null);
-
-  async function handleCreate(values) {
-    await onCreate?.(values);
-    setDraft(null);
-  }
-
-  async function handleUpdate(id, values) {
-    await onUpdate?.(id, values);
-    setDraft(null);
-  }
-
-  async function concluir(followup) {
-    await onUpdate?.(followup.id, {
-      status: 'Concluido',
-      data_conclusao: followup.data_conclusao || new Date().toISOString().slice(0, 10),
-    });
-  }
-
-  async function reabrir(followup) {
-    await onUpdate?.(followup.id, {
-      status: 'Aberto',
-      data_conclusao: '',
-    });
-  }
-
-  return (
-    <section className="surface-card p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-black text-slate-950">Follow-ups do cliente</h3>
-          <p className="text-sm font-semibold text-slate-500">Timeline operacional para contatos, retornos, cobrancas e proximas acoes.</p>
-        </div>
-        {canManage ? (
-          <button
-            type="button"
-            onClick={() => setDraft(buildEmptyFollowup(currentUserId))}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-navy-700"
-          >
-            <Plus size={16} aria-hidden="true" />
-            Novo follow-up
-          </button>
-        ) : null}
-      </div>
-
-      {loading ? (
-        <p className="mt-4 text-sm font-semibold text-slate-500">Carregando follow-ups...</p>
-      ) : !rows.length ? (
-        <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
-          Nenhum follow-up registrado para este cliente.
-        </div>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {rows.map((followup) => (
-            <article key={followup.id} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700">
-                      {followup.tipo || 'Follow-up'}
-                    </span>
-                    <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(getFollowupStatusTone(followup.status))}`}>
-                      {followup.status || 'Aberto'}
-                    </span>
-                    <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(getFollowupPriorityTone(followup.prioridade))}`}>
-                      {followup.prioridade || 'Media'}
-                    </span>
-                    {followup.canal ? (
-                      <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass('neutral')}`}>
-                        {followup.canal}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-sm font-black text-slate-900">{followup.descricao}</p>
-                  {followup.resultado ? (
-                    <p className="text-sm font-semibold text-slate-600"><span className="font-black text-slate-700">Resultado:</span> {followup.resultado}</p>
-                  ) : null}
-                  {followup.proxima_acao ? (
-                    <p className="text-sm font-semibold text-slate-600"><span className="font-black text-slate-700">Proxima acao:</span> {followup.proxima_acao}</p>
-                  ) : null}
-                </div>
-                {canManage ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" onClick={() => setDraft({ ...followup })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
-                      Editar
-                    </button>
-                    {normalizeText(followup.status) === 'concluido' ? (
-                      <button type="button" onClick={() => reabrir(followup)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">
-                        Reabrir
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => concluir(followup)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
-                        Concluir
-                      </button>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-
-              <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Responsavel</dt>
-                  <dd className="mt-1 text-sm font-bold text-slate-900">{getFollowupUserLabel(followup, 'responsavel_usuario')}</dd>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Criado por</dt>
-                  <dd className="mt-1 text-sm font-bold text-slate-900">{getFollowupUserLabel(followup, 'criado_por_usuario')}</dd>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Data prevista</dt>
-                  <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateDisplay(followup.data_prevista)}</dd>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <dt className="text-xs font-black uppercase tracking-normal text-slate-500">Conclusao</dt>
-                  <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateDisplay(followup.data_conclusao)}</dd>
-                </div>
-              </dl>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {draft ? (
-        <FollowupModal
-          followup={draft}
-          users={users}
-          onClose={() => setDraft(null)}
-          onSave={(values) => (draft.id ? handleUpdate(draft.id, values) : handleCreate(values))}
-        />
-      ) : null}
-    </section>
-  );
-}
-
 function DetailPage({
   client,
   onBack,
@@ -3191,13 +2419,6 @@ function DetailPage({
   canManageAttachments,
   onAnexoSuccess,
   onAnexoError,
-  followupRows = [],
-  followupLoading = false,
-  followupUsers = [],
-  canManageFollowups = false,
-  currentUserId = '',
-  onCreateFollowup,
-  onUpdateFollowup,
   historicoRows = [],
   historicoLoading = false,
 }) {
@@ -3295,17 +2516,6 @@ function DetailPage({
           </article>
         ))}
       </section>
-
-      <FollowupsSection
-        rows={followupRows}
-        loading={followupLoading}
-        users={followupUsers}
-        canManage={canManageFollowups}
-        currentUserId={currentUserId}
-        onCreate={onCreateFollowup}
-        onUpdate={onUpdateFollowup}
-      />
-
       <section className="surface-card p-5">
         <h3 className="text-lg font-black text-slate-950">Histórico de Alterações</h3>
         {historicoLoading ? (
@@ -3380,12 +2590,8 @@ function PendenciasPage({
   metadata,
   onRefresh,
   loading = false,
-  currentUserId = '',
 }) {
   const [attachmentFilter, setAttachmentFilter] = useState('all');
-  const [followupStatusFilter, setFollowupStatusFilter] = useState('');
-  const [followupResponsavelFilter, setFollowupResponsavelFilter] = useState('');
-  const [followupScopeFilter, setFollowupScopeFilter] = useState('');
   const [expandedPrioritySections, setExpandedPrioritySections] = useState({});
   const searchClientId = String(searchContext?.clientId ?? '');
   const searchQuery = normalizeText(searchContext?.query ?? '');
@@ -3447,17 +2653,10 @@ function PendenciasPage({
       .filter((alert) => alert.key in PENDENCIA_ACTION_BY_SIGNAL)
       .map((alert) => {
         const config = PENDENCIA_ACTION_BY_SIGNAL[alert.key];
-        const nextAction = alert.key === 'followup'
-          ? (getProximaAcaoOperacional(client) || config.nextAction)
-          : config.nextAction;
         return {
           ...alert,
           ...config,
-          nextAction,
-          followupStatusCodigo: getStatusAcompanhamentoCodigo(client),
-          followupStatusLabel: getStatusAcompanhamentoLabel(client),
-          followupResponsavelId: getFollowupResponsavelUsuarioId(client),
-          followupResponsavelNome: getFollowupResponsavelNome(client),
+          nextAction: config.nextAction,
           signalKey: alert.key,
           label: alert.key === 'comunicacao' ? 'Cliente nao notificado' : alert.label,
         };
@@ -3480,30 +2679,8 @@ function PendenciasPage({
     if (filterKey === 'reinf') return row.item.key === 'reinf';
     if (filterKey === 'ecd') return row.item.key === 'ecd';
     if (filterKey === 'ecf') return row.item.key === 'ecf';
-    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey);
+    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey);
     return true;
-  }
-
-  function matchesFollowupFilters(row) {
-    const responsavelId = String(row.item.followupResponsavelId || '').trim();
-    const responsavelNome = normalizeText(row.item.followupResponsavelNome || '');
-    const statusCodigo = normalizeText(row.item.followupStatusCodigo || '');
-
-    if (followupScopeFilter === 'meus' && responsavelId !== String(currentUserId || '').trim()) return false;
-    if (followupScopeFilter === 'com_responsavel' && !responsavelId) return false;
-    if (followupResponsavelFilter && responsavelNome !== normalizeText(followupResponsavelFilter)) return false;
-    if (!followupStatusFilter) return true;
-
-    if (followupStatusFilter === 'pendente') return hasAcompanhamentoPendente(row.client);
-    if (followupStatusFilter === 'aguardando_retorno') return isAguardandoRetorno(row.client);
-    if (followupStatusFilter === 'prazo_vencido') return isPrazoProximaAcaoVencido(row.client);
-    if (followupStatusFilter === 'prazo_proximo') return !isPrazoProximaAcaoVencido(row.client) && isPrazoProximaAcaoProximo(row.client);
-    if (followupStatusFilter === 'sem_retorno') return isSemRetorno(row.client);
-    if (followupStatusFilter === 'em_aberto') {
-      return statusCodigo === 'em_aberto' || (hasFollowupsRegistrados(row.client) && hasAcompanhamentoPendente(row.client));
-    }
-
-    return statusCodigo === normalizeText(followupStatusFilter);
   }
 
   function prioritizeRows(rows) {
@@ -3537,59 +2714,44 @@ function PendenciasPage({
   const actionRows = prioritizeRows(allActionRows.filter(({ client, item }) => {
     if (!matchesSearchContext(client)) return false;
     if (!matchesAttachmentFilter({ client, item }, attachmentFilter)) return false;
-    return matchesFollowupFilters({ client, item });
+    return true;
   }));
-
-  const followupResponsavelOptions = uniqueValues(
-    clients
-      .map((client) => getFollowupResponsavelNome(client))
-      .filter(Boolean),
-  );
-
-  const followupStatusOptions = [
-    { value: 'pendente', label: 'Com follow-up pendente' },
-    { value: 'aguardando_retorno', label: 'Aguardando retorno' },
-    { value: 'sem_retorno', label: 'Sem retorno' },
-    { value: 'prazo_vencido', label: 'Prazo da próxima ação vencido' },
-    { value: 'prazo_proximo', label: 'Prazo da próxima ação próximo' },
-    { value: 'em_aberto', label: 'Em aberto' },
-  ];
 
   const attachmentBuckets = [
     {
       key: 'all',
       label: 'Todas',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client))).length,
       tone: 'info',
     },
     {
       key: 'reinf',
       label: 'REINF',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf') && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf'))).length,
       tone: 'warning',
     },
     {
       key: 'ecd',
       label: 'ECD',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd') && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd'))).length,
       tone: 'warning',
     },
     {
       key: 'ecf',
       label: 'ECF',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf') && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf'))).length,
       tone: 'warning',
     },
     {
       key: 'comunicacao',
       label: 'Acompanhamento',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao') && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length,
       tone: 'info',
     },
     {
       key: 'critico',
       label: 'Críticas',
-      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico') && matchesFollowupFilters(row))).length,
+      value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico'))).length,
       tone: 'danger',
     },
   ];
@@ -3680,24 +2842,10 @@ function PendenciasPage({
     {
       key: 'notificacao',
       title: 'Acompanhamento',
-      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey)),
+      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
       tone: 'info',
       detail: 'Clientes que ainda precisam de notificacao, retorno registrado ou acao antes do prazo vencer.',
-      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo', 'followup'].includes(row.item.signalKey)),
-    },
-    {
-      key: 'meus_followups',
-      title: 'Meus follow-ups',
-      value: uniqueClientCount(
-        actionRows,
-        (row) => String(row.item.followupResponsavelId || '').trim() === String(currentUserId || '').trim(),
-      ),
-      tone: 'info',
-      detail: 'Clientes com follow-up em que voce aparece como responsavel pela proxima acao.',
-      highlights: topClientNames(
-        actionRows,
-        (row) => String(row.item.followupResponsavelId || '').trim() === String(currentUserId || '').trim(),
-      ),
+      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
     },
   ];
 
@@ -3906,29 +3054,6 @@ function PendenciasPage({
               ))}
             </div>
           </div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            <FilterSelect
-              label="Status do follow-up"
-              value={followupStatusFilter}
-              options={followupStatusOptions}
-              onChange={setFollowupStatusFilter}
-            />
-            <FilterSelect
-              label="Responsável do follow-up"
-              value={followupResponsavelFilter}
-              options={followupResponsavelOptions}
-              onChange={setFollowupResponsavelFilter}
-            />
-            <FilterSelect
-              label="Escopo"
-              value={followupScopeFilter}
-              options={[
-                { value: 'meus', label: 'Meus follow-ups' },
-                { value: 'com_responsavel', label: 'Com responsável definido' },
-              ]}
-              onChange={setFollowupScopeFilter}
-            />
-          </div>
         </div>
         <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
           <p className="text-xs font-bold uppercase tracking-normal text-slate-500">
@@ -3991,26 +3116,12 @@ function PendenciasPage({
                             </span>
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3">
-                            <div className="space-y-1">
-                              <p className="text-sm font-semibold text-slate-700">
-                                {item.followupResponsavelNome || getObrigacaoResponsavel(client) || 'Não informado'}
-                              </p>
-                              {item.followupResponsavelNome ? (
-                                <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(String(item.followupResponsavelId || '').trim() === String(currentUserId || '').trim() ? 'info' : 'neutral')}`}>
-                                  {String(item.followupResponsavelId || '').trim() === String(currentUserId || '').trim() ? 'Meu follow-up' : 'Responsável do follow-up'}
-                                </span>
-                              ) : null}
-                            </div>
+                            <p className="text-sm font-semibold text-slate-700">
+                              {getObrigacaoResponsavel(client) || 'Não informado'}
+                            </p>
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3">
-                            <div className="space-y-1">
-                              <p className="text-sm font-semibold text-slate-600">{item.nextAction}</p>
-                              {item.followupStatusLabel ? (
-                                <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(item.tone)}`}>
-                                  {item.followupStatusLabel}
-                                </span>
-                              ) : null}
-                            </div>
+                            <p className="text-sm font-semibold text-slate-600">{item.nextAction}</p>
                           </td>
                           <td className="border-b border-slate-100 px-4 py-3">
                             <div className="flex flex-wrap gap-2">
@@ -4618,50 +3729,22 @@ function ReportsPage({
   loading = false,
 }) {
   const clientesComPendencias = clients.filter((client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
-  const clientesComFollowup = clients.filter((client) => hasFollowupsRegistrados(client));
-  const clientesFollowupEmAberto = clients.filter(
-    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getStatusAcompanhamentoCodigo(client) === 'em_aberto',
-  );
   const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
   const clientesPrazoVencido = clients.filter((client) => isPrazoProximaAcaoVencido(client));
   const clientesPrazoProximo = clients.filter((client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
   const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
   const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
   const clientesSemNotificacao = clients.filter((client) => !isClienteNotificado(client));
-  const clientesFollowupSemResponsavel = clients.filter(
-    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && !getFollowupResponsavelUsuarioId(client),
-  );
-  const clientesFollowupComResponsavel = clients.filter(
-    (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client) && getFollowupResponsavelUsuarioId(client),
-  );
-  const followupsPorResponsavelRows = toBreakdownByResolver(
-    clients,
-    (client) => getFollowupResponsavelNome(client),
-    {
-      filter: (client) => hasFollowupsRegistrados(client) && hasAcompanhamentoPendente(client),
-    },
-  );
-  const followupResumoRows = [
-    { label: 'Clientes com follow-up', value: clientesComFollowup.length },
-    { label: 'Follow-up em aberto', value: clientesFollowupEmAberto.length },
-    { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
-    { label: 'Sem responsável', value: clientesFollowupSemResponsavel.length },
-    { label: 'Com responsável', value: clientesFollowupComResponsavel.length },
-  ].filter((row) => row.value > 0);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
-    { label: 'Com follow-up', value: clientesComFollowup.length },
-    { label: 'Follow-up em aberto', value: clientesFollowupEmAberto.length },
     { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
     { label: 'Sem retorno', value: clientesSemRetorno.length },
     { label: 'Sem notificacao', value: clientesSemNotificacao.length },
-    { label: 'Sem responsável', value: clientesFollowupSemResponsavel.length },
     { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
     { label: 'Prazo da próxima ação vencido', value: clientesPrazoVencido.length },
     { label: 'Prazo da próxima ação próximo', value: clientesPrazoProximo.length },
-    { label: 'Com responsável', value: clientesFollowupComResponsavel.length },
     {
       label: 'Media dias sem retorno',
       value: clientesAguardandoRetorno.length
@@ -4793,21 +3876,6 @@ function ReportsPage({
             </article>
           );
         })}
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-2">
-        <StaticBreakdownPanel
-          title="Resumo de follow-ups"
-          rows={followupResumoRows}
-          total={Math.max(clientesComFollowup.length, 1)}
-          icon={ClipboardList}
-        />
-        <StaticBreakdownPanel
-          title="Follow-ups por responsável"
-          rows={followupsPorResponsavelRows}
-          total={Math.max(clientesComFollowup.length, 1)}
-          icon={UserCheck}
-        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
@@ -5599,8 +4667,6 @@ export default function App() {
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
-  const [followupsCliente, setFollowupsCliente] = useState([]);
-  const [followupsClienteLoading, setFollowupsClienteLoading] = useState(false);
   const [authReady, setAuthReady] = useState(TEMP_DISABLE_LOGIN);
   const importInputRef = useRef(null);
 
@@ -5633,7 +4699,6 @@ export default function App() {
   useEffect(() => {
     if (page !== 'detalhe') return;
     carregarHistoricoCliente(selectedClientId);
-    carregarFollowupsCliente(selectedClientId);
   }, [page, selectedClientId]);
 
   useEffect(() => {
@@ -5783,7 +4848,7 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, followupsResumoResult, usuariosResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
@@ -5793,9 +4858,6 @@ export default function App() {
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarAcompanhamentoOperacionalClientes()
-          .then((rows) => ({ ok: true, rows }))
-          .catch((error) => ({ ok: false, error })),
-        listarFollowupsResumoClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarUsuariosPortal()
@@ -5809,14 +4871,12 @@ export default function App() {
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
-      const followupsResumoIndex = followupsResumoResult.ok ? indexarFollowupsResumo(followupsResumoResult.rows) : {};
-      const clientesComFollowupsResumo = hydrateClientesComFollowupsResumo(clientesComAcompanhamento, followupsResumoIndex);
 
       const nextListagens = mergeListagensFromClients(
         mergeListagensFromSupabase({ ...DEFAULT_LISTS }, listagensSupabase),
-        clientesComFollowupsResumo,
+        clientesComAcompanhamento,
       );
-      persist(clientesComFollowupsResumo, nextListagens, {
+      persist(clientesComAcompanhamento, nextListagens, {
         ...metadata,
         source: 'Supabase',
         importedAt: metadata?.importedAt || todayBr(),
@@ -5828,16 +4888,13 @@ export default function App() {
       }
       setSupabaseStatus({
         connected: true,
-        message: `Conectado ao Supabase (${formatNumber(clientesComFollowupsResumo.length)} cliente(s))`,
+        message: `Conectado ao Supabase (${formatNumber(clientesComAcompanhamento.length)} cliente(s))`,
       });
       if (!obrigacoesResult.ok) {
         console.warn('[obrigacoes] Falha ao carregar view persistente de obrigacoes:', obrigacoesResult.error);
       }
       if (!riscoResult.ok) {
         console.warn('[risco_operacional] Falha ao carregar view persistente de risco operacional:', riscoResult.error);
-      }
-      if (!followupsResumoResult.ok) {
-        console.warn('[followups_resumo] Falha ao carregar view persistente de follow-ups:', followupsResumoResult.error);
       }
       if (!acompanhamentoResult.ok) {
         console.warn('[acompanhamento_operacional] Falha ao carregar view persistente de acompanhamento operacional:', acompanhamentoResult.error);
@@ -6083,61 +5140,6 @@ export default function App() {
       setHistoricoCliente([]);
     } finally {
       setHistoricoClienteLoading(false);
-    }
-  }
-
-  async function carregarFollowupsCliente(clienteId) {
-    if (!clienteId || !isUuid(clienteId)) {
-      setFollowupsCliente([]);
-      return;
-    }
-    setFollowupsClienteLoading(true);
-    try {
-      const rows = await listarFollowupsPorClienteSupabase(clienteId);
-      setFollowupsCliente(rows);
-    } catch (error) {
-      console.warn('[followups] Falha ao carregar follow-ups do cliente:', error);
-      setFollowupsCliente([]);
-    } finally {
-      setFollowupsClienteLoading(false);
-    }
-  }
-
-  async function criarFollowupCliente(clienteId, values) {
-    if (!currentUserFull?.id || !clienteId || !isUuid(clienteId)) return;
-    const payload = {
-      ...values,
-      cliente_id: clienteId,
-      criado_por: currentUserFull.id,
-      responsavel_usuario_id: values.responsavel_usuario_id || currentUserFull.id,
-      origem: values.origem || 'Detalhe do Cliente',
-      contexto_area: values.contexto_area || 'cliente',
-    };
-    try {
-      await criarFollowupSupabase(payload);
-      await carregarFollowupsCliente(clienteId);
-      setToast({ title: 'Follow-up registrado', message: 'A timeline do cliente foi atualizada.' });
-    } catch (error) {
-      setToast({
-        title: 'Falha ao registrar follow-up',
-        message: error.message || 'Nao foi possivel salvar o follow-up no Supabase.',
-      });
-      throw error;
-    }
-  }
-
-  async function atualizarFollowupCliente(clienteId, followupId, values) {
-    if (!currentUserFull?.id || !clienteId || !followupId || !isUuid(clienteId)) return;
-    try {
-      await atualizarFollowupSupabase(followupId, values);
-      await carregarFollowupsCliente(clienteId);
-      setToast({ title: 'Follow-up atualizado', message: 'A timeline do cliente foi sincronizada.' });
-    } catch (error) {
-      setToast({
-        title: 'Falha ao atualizar follow-up',
-        message: error.message || 'Nao foi possivel atualizar o follow-up no Supabase.',
-      });
-      throw error;
     }
   }
 
@@ -6696,9 +5698,6 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
-  const followupUsers = (security.usuarios ?? [])
-    .filter((user) => user.status === 'Ativo' && isUuid(user.id))
-    .sort((a, b) => String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' }));
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -6710,7 +5709,6 @@ export default function App() {
           metadata={metadata}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing}
-          currentUserId={currentUserFull?.id ?? ''}
         />
       )
       : <AccessDeniedPage />,
@@ -6763,13 +5761,6 @@ export default function App() {
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoError={handleAnexoError}
-        followupRows={followupsCliente}
-        followupLoading={followupsClienteLoading}
-        followupUsers={followupUsers}
-        canManageFollowups={selectedClient ? canEditClient(currentUserFull, selectedClient) : false}
-        currentUserId={currentUserFull?.id ?? ''}
-        onCreateFollowup={(values) => criarFollowupCliente(selectedClient?.id, values)}
-        onUpdateFollowup={(followupId, values) => atualizarFollowupCliente(selectedClient?.id, followupId, values)}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
       />
@@ -6799,7 +5790,6 @@ export default function App() {
           metadata={metadata}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing}
-          currentUserId={currentUserFull?.id ?? ''}
         />
       )
       : <AccessDeniedPage />,
