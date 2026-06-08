@@ -184,6 +184,9 @@ const DEFAULT_FILTERS = {
   distribuicao_lucros: '',
   dificuldade: '',
   alerta: '',
+  followup_status: '',
+  followup_responsavel: '',
+  followup_scope: '',
 };
 
 const FILTER_FIELDS = [
@@ -381,7 +384,12 @@ function isUuid(value) {
 }
 
 function withClientDefaults(client) {
-  return { ...CLIENT_FIELD_DEFAULTS, ...client };
+  return {
+    ...CLIENT_FIELD_DEFAULTS,
+    ...client,
+    proxima_acao: '',
+    prazo_proxima_acao: '',
+  };
 }
 
 async function loadClientesContabeisSnapshot() {
@@ -807,6 +815,46 @@ function hasFollowupsRegistrados(client) {
   );
 }
 
+function getTotalFollowupsAbertos(client) {
+  const total = getFollowupResumoNumber(client, 'followups_abertos');
+  if (total !== null) return total;
+  return hasFollowupsRegistrados(client) && getStatusAcompanhamentoCodigo(client) !== 'concluido' ? 1 : 0;
+}
+
+function hasFollowupsEmAberto(client) {
+  return getTotalFollowupsAbertos(client) > 0;
+}
+
+function isFollowupSemResponsavel(client) {
+  return hasFollowupsEmAberto(client) && !getFollowupResponsavelUsuarioId(client);
+}
+
+function getPrazoOperacionalBaseLabel(client) {
+  if (hasFollowupsRegistrados(client)) return 'Prazo da próxima ação';
+  return 'Prazo da próxima ação';
+}
+
+function getPrazoOperacionalStatusLabel(client, mode = 'vencido') {
+  const base = getPrazoOperacionalBaseLabel(client);
+  return mode === 'proximo' ? `${base} próximo` : `${base} vencido`;
+}
+
+function getPrazoOperacionalDetail(client, mode = 'vencido') {
+  const prazo = getPrazoProximaAcaoValue(client);
+  const proximaAcao = getProximaAcaoOperacional(client);
+  const prazoFormatado = prazo ? formatDateDisplay(prazo) : '';
+
+  if (mode === 'proximo') {
+    if (proximaAcao && prazoFormatado) return `Próxima ação prevista para ${prazoFormatado}: ${proximaAcao}.`;
+    if (prazoFormatado) return `Prazo da próxima ação previsto para ${prazoFormatado}, mas sem descrição da ação.`;
+    return 'Há um prazo próximo registrado para acompanhamento.';
+  }
+
+  if (proximaAcao && prazoFormatado) return `Próxima ação em atraso desde ${prazoFormatado}: ${proximaAcao}.`;
+  if (prazoFormatado) return `Prazo da próxima ação vencido em ${prazoFormatado}, mas sem descrição da ação.`;
+  return 'Há uma próxima ação com prazo vencido para este cliente.';
+}
+
 function getDiasAtrasoValue(client) {
   const persisted = getRiscoPersistido(client)?.dias_atraso;
   if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
@@ -856,9 +904,7 @@ function getPrazoProximaAcaoValue(client) {
     );
     if (prazoFollowup) return prazoFollowup;
   }
-  return normalizeDateInputValue(
-    getAcompanhamentoText(client, 'prazo_proxima_acao', client?.prazo_proxima_acao || ''),
-  );
+  return '';
 }
 
 function getStatusRetornoClienteValue(client) {
@@ -925,8 +971,6 @@ function getPrazoDiffDias(client) {
     const followupPrazo = getFollowupResumoNumber(client, 'dias_para_proximo_followup');
     if (followupPrazo !== null) return followupPrazo;
   }
-  const persisted = getAcompanhamentoNumber(client, 'dias_para_prazo');
-  if (persisted !== null) return persisted;
   const prazo = getPrazoProximaAcaoValue(client);
   if (!prazo) return null;
   const today = new Date();
@@ -961,10 +1005,6 @@ function isPrazoProximaAcaoVencido(client) {
   ) {
     return (getFollowupResumoNumber(client, 'followups_atrasados') || 0) > 0;
   }
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_vencido')) {
-    return getAcompanhamentoFlag(client, 'prazo_proxima_acao_vencido', fallback);
-  }
   return fallback;
 }
 
@@ -980,10 +1020,6 @@ function isPrazoProximaAcaoProximo(client) {
     && Object.prototype.hasOwnProperty.call(followupsResumo, 'followups_proximos')
   ) {
     return (getFollowupResumoNumber(client, 'followups_proximos') || 0) > 0;
-  }
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'prazo_proxima_acao_proximo')) {
-    return getAcompanhamentoFlag(client, 'prazo_proxima_acao_proximo', fallback);
   }
   return fallback;
 }
@@ -1011,17 +1047,26 @@ function hasAcompanhamentoPendente(client) {
 
 function getStatusAcompanhamentoLabel(client) {
   const fallback = (() => {
-    if (isPrazoProximaAcaoVencido(client)) return 'Prazo vencido';
+    if (isPrazoProximaAcaoVencido(client)) return getPrazoOperacionalStatusLabel(client, 'vencido');
+    if (isPrazoProximaAcaoProximo(client)) return getPrazoOperacionalStatusLabel(client, 'proximo');
     if (isSemRetorno(client)) return 'Sem retorno';
     if (isAguardandoRetorno(client)) return 'Aguardando retorno';
     if (hasRetornoConcluido(client)) return 'Retorno recebido';
     if (isClienteNotificado(client)) return 'Notificado';
     return 'Sem notificacao';
   })();
+  const followupCode = hasFollowupsRegistrados(client)
+    ? normalizeText(getFollowupResumoText(client, 'status_followup_codigo', ''))
+    : '';
+  if (followupCode === 'prazo_vencido') return getPrazoOperacionalStatusLabel(client, 'vencido');
+  if (followupCode === 'prazo_proximo') return getPrazoOperacionalStatusLabel(client, 'proximo');
   const followupLabel = hasFollowupsRegistrados(client)
     ? getFollowupResumoText(client, 'status_followup_label', '')
     : '';
   if (followupLabel) return followupLabel;
+  const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', ''));
+  if (persistedCode === 'prazo_vencido') return getPrazoOperacionalStatusLabel(client, 'vencido');
+  if (persistedCode === 'prazo_proximo') return getPrazoOperacionalStatusLabel(client, 'proximo');
   return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
 }
 
@@ -1058,7 +1103,7 @@ function getProximaAcaoOperacional(client) {
     const followupAction = getFollowupResumoText(client, 'proximo_followup_proxima_acao', '').trim();
     if (followupAction) return followupAction;
   }
-  return getAcompanhamentoText(client, 'proxima_acao', client?.proxima_acao || '').trim();
+  return '';
 }
 
 function getObrigacaoResponsavel(client) {
@@ -1144,12 +1189,16 @@ function getClientAlertSignals(client) {
     },
     isPrazoProximaAcaoVencido(client) && {
       key: 'prazo',
-      label: prazoProximaAcao ? `Prazo vencido em ${formatDateDisplay(prazoProximaAcao)}` : 'Prazo da proxima acao vencido',
+      label: prazoProximaAcao
+        ? `${getPrazoOperacionalStatusLabel(client, 'vencido')} em ${formatDateDisplay(prazoProximaAcao)}`
+        : getPrazoOperacionalStatusLabel(client, 'vencido'),
       tone: 'danger',
     },
     !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client) && {
       key: 'prazo_proximo',
-      label: prazoProximaAcao ? `Prazo em ${formatDateDisplay(prazoProximaAcao)}` : 'Prazo da proxima acao proximo',
+      label: prazoProximaAcao
+        ? `${getPrazoOperacionalStatusLabel(client, 'proximo')} em ${formatDateDisplay(prazoProximaAcao)}`
+        : getPrazoOperacionalStatusLabel(client, 'proximo'),
       tone: 'warning',
     },
     hasFollowupsRegistrados(client)
@@ -1353,6 +1402,30 @@ function filterClients(clients, filters) {
     }
 
     if (!matchesAlert(client, filters.alerta)) return false;
+
+    const followupStatus = normalizeText(filters.followup_status);
+    if (followupStatus) {
+      if (followupStatus === 'pendente' && !hasAcompanhamentoPendente(client)) return false;
+      if (followupStatus === 'em_aberto' && !hasFollowupsEmAberto(client)) return false;
+      if (followupStatus === 'aguardando_retorno' && !isAguardandoRetorno(client)) return false;
+      if (followupStatus === 'prazo_vencido' && !isPrazoProximaAcaoVencido(client)) return false;
+      if (followupStatus === 'prazo_proximo' && (isPrazoProximaAcaoVencido(client) || !isPrazoProximaAcaoProximo(client))) return false;
+      if (followupStatus === 'sem_retorno' && !isSemRetorno(client)) return false;
+      if (!['pendente', 'em_aberto', 'aguardando_retorno', 'prazo_vencido', 'prazo_proximo', 'sem_retorno'].includes(followupStatus)) {
+        if (normalizeText(getStatusAcompanhamentoCodigo(client)) !== followupStatus) return false;
+      }
+    }
+
+    const followupResponsavel = normalizeText(filters.followup_responsavel);
+    if (followupResponsavel && normalizeText(getFollowupResponsavelNome(client)) !== followupResponsavel) {
+      return false;
+    }
+
+    const followupScope = filters.followup_scope;
+    if (followupScope === 'com_followup' && !hasFollowupsRegistrados(client)) return false;
+    if (followupScope === 'sem_followup' && hasFollowupsRegistrados(client)) return false;
+    if (followupScope === 'com_responsavel' && !getFollowupResponsavelUsuarioId(client)) return false;
+    if (followupScope === 'sem_responsavel' && !isFollowupSemResponsavel(client)) return false;
 
     return FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
@@ -1953,7 +2026,7 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       filter: { alerta: 'retorno' },
     },
     {
-      title: 'Prazo vencido',
+      title: 'Prazo da próxima ação vencido',
       value: prazoVencido,
       icon: BellRing,
       tone: 'danger',
@@ -2189,7 +2262,19 @@ function PageHeader({ title, description, right }) {
   );
 }
 
-function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, onClear, onNewClient, onManualFilter, visibleCount, totalCount, canCreateClient }) {
+function SearchAndFilters({
+  filters,
+  setFilters,
+  listagens,
+  quickFilterLabel,
+  onClear,
+  onNewClient,
+  onManualFilter,
+  visibleCount,
+  totalCount,
+  canCreateClient,
+  clientsForOptions = [],
+}) {
   function updateFilter(patch) {
     setFilters((current) => ({ ...current, ...patch }));
     onManualFilter?.();
@@ -2199,6 +2284,19 @@ function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, on
     value,
     label,
   }));
+  const followupResponsavelOptions = uniqueValues(
+    (clientsForOptions ?? [])
+      .map((client) => getFollowupResponsavelNome(client))
+      .filter(Boolean),
+  );
+  const followupStatusOptions = [
+    { value: 'pendente', label: 'Com acompanhamento pendente' },
+    { value: 'em_aberto', label: 'Follow-up em aberto' },
+    { value: 'aguardando_retorno', label: 'Aguardando retorno' },
+    { value: 'prazo_vencido', label: 'Prazo da próxima ação vencido' },
+    { value: 'prazo_proximo', label: 'Prazo da próxima ação próximo' },
+    { value: 'sem_retorno', label: 'Sem retorno' },
+  ];
 
   return (
     <section className="surface-card p-5">
@@ -2261,6 +2359,50 @@ function SearchAndFilters({ filters, setFilters, listagens, quickFilterLabel, on
                 {option.label}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          Status do follow-up
+          <select
+            value={filters.followup_status}
+            onChange={(event) => updateFilter({ followup_status: event.target.value })}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+          >
+            <option value="">Todos</option>
+            {followupStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          Responsável do follow-up
+          <select
+            value={filters.followup_responsavel}
+            onChange={(event) => updateFilter({ followup_responsavel: event.target.value })}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+          >
+            <option value="">Todos</option>
+            {followupResponsavelOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          Escopo do follow-up
+          <select
+            value={filters.followup_scope}
+            onChange={(event) => updateFilter({ followup_scope: event.target.value })}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+          >
+            <option value="">Todos</option>
+            <option value="com_followup">Com follow-up</option>
+            <option value="sem_followup">Sem follow-up</option>
+            <option value="com_responsavel">Com responsável definido</option>
+            <option value="sem_responsavel">Sem responsável</option>
           </select>
         </label>
         {FILTER_FIELDS.map((fieldKey) => {
@@ -2376,9 +2518,9 @@ function getDetailAcompanhamentoSummary(client) {
 
   let detail = 'Sem notificacao registrada.';
   if (isPrazoProximaAcaoVencido(client) && prazo) {
-    detail = `Prazo definido para ${formatDateDisplay(prazo)}.`;
+    detail = getPrazoOperacionalDetail(client, 'vencido');
   } else if (isPrazoProximaAcaoProximo(client) && prazo) {
-    detail = `Prazo proximo em ${formatDateDisplay(prazo)}.`;
+    detail = getPrazoOperacionalDetail(client, 'proximo');
   } else if (isAguardandoRetorno(client) && dataNotificacao) {
     detail = diasSemRetorno !== null
       ? `${diasSemRetorno} dia(s) sem retorno desde ${formatDateDisplay(dataNotificacao)}.`
@@ -2449,9 +2591,13 @@ function getDetailObrigacoesSummary(client) {
 function getDetailProximaAcaoSummary(client) {
   const proximaAcao = getProximaAcaoOperacional(client);
   const prazo = getPrazoProximaAcaoValue(client);
-  const detail = prazo ? `Prazo: ${formatDateDisplay(prazo)}` : 'Sem prazo registrado';
+  const detail = prazo
+    ? (proximaAcao
+      ? `Prazo da ação: ${formatDateDisplay(prazo)}`
+      : `Prazo registrado para ${formatDateDisplay(prazo)}, mas sem descrição da ação.`)
+    : 'Sem prazo registrado';
   return {
-    label: proximaAcao || 'Nenhuma proxima acao registrada',
+    label: proximaAcao || 'Nenhuma próxima ação registrada',
     detail,
     tone: isPrazoProximaAcaoVencido(client) ? 'danger' : isPrazoProximaAcaoProximo(client) ? 'warning' : 'info',
   };
@@ -2509,6 +2655,29 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                     <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj}</p>
                     <p className="mt-1 truncate text-xs text-slate-500">{client.razao_social}</p>
+                    {hasFollowupsRegistrados(client) ? (
+                      <>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(
+                            isPrazoProximaAcaoVencido(client)
+                              ? 'danger'
+                              : isPrazoProximaAcaoProximo(client) || isAguardandoRetorno(client)
+                                ? 'warning'
+                                : hasFollowupsEmAberto(client)
+                                  ? 'info'
+                                  : 'neutral',
+                          )}`}>
+                            {getStatusAcompanhamentoLabel(client)}
+                          </span>
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${chipClass(getFollowupResponsavelNome(client) ? 'info' : 'danger')}`}>
+                            {getFollowupResponsavelNome(client) ? `Resp. ${getFollowupResponsavelNome(client)}` : 'Sem responsável'}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-xs font-semibold text-slate-600">
+                          {getProximaAcaoOperacional(client) || 'Sem próxima ação registrada'}
+                        </p>
+                      </>
+                    ) : null}
                   </div>
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3 align-top">
@@ -2583,7 +2752,25 @@ function BaseClientesPage(props) {
       detail: 'Clientes com retorno ou prazo para acompanhar',
       icon: Mail,
       tone: 'info',
-      alerta: 'comunicacao',
+      patch: { alerta: 'comunicacao' },
+    },
+    {
+      key: 'com_followup',
+      title: 'Com follow-up',
+      value: countWhere(props.clients, (client) => hasFollowupsRegistrados(client)),
+      detail: 'Clientes que ja tem timeline operacional registrada',
+      icon: ClipboardList,
+      tone: 'info',
+      patch: { followup_scope: 'com_followup', alerta: '' },
+    },
+    {
+      key: 'em_aberto',
+      title: 'Follow-up em aberto',
+      value: countWhere(props.clients, (client) => hasFollowupsEmAberto(client)),
+      detail: 'Casos com proxima acao ainda em andamento',
+      icon: Mail,
+      tone: 'warning',
+      patch: { followup_status: 'em_aberto', alerta: '' },
     },
     {
       key: 'retorno',
@@ -2592,33 +2779,33 @@ function BaseClientesPage(props) {
       detail: 'Clientes notificados sem retorno concluido',
       icon: Mail,
       tone: 'warning',
-      alerta: 'retorno',
+      patch: { followup_status: 'aguardando_retorno', alerta: '' },
     },
     {
       key: 'prazo',
-      title: 'Prazo vencido',
+      title: 'Prazo da próxima ação vencido',
       value: countWhere(props.clients, (client) => isPrazoProximaAcaoVencido(client)),
       detail: 'Proxima acao que ja passou do prazo',
       icon: BellRing,
       tone: 'danger',
-      alerta: 'prazo',
+      patch: { followup_status: 'prazo_vencido', alerta: '' },
     },
     {
-      key: 'prazo_proximo',
-      title: 'Prazo proximo',
-      value: countWhere(
-        props.clients,
-        (client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client),
-      ),
-      detail: 'Acoes que vencem nos proximos 3 dias',
-      icon: ClipboardList,
-      tone: 'warning',
-      alerta: 'prazo_proximo',
+      key: 'sem_responsavel',
+      title: 'Sem responsavel',
+      value: countWhere(props.clients, (client) => isFollowupSemResponsavel(client)),
+      detail: 'Follow-ups abertos sem dono operacional definido',
+      icon: Users,
+      tone: 'danger',
+      patch: { followup_scope: 'sem_responsavel', alerta: '' },
     },
   ];
 
-  function applyAlertFilter(alerta) {
-    props.setFilters((current) => ({ ...current, alerta }));
+  function applyAlertFilter(patch) {
+    props.setFilters((current) => ({
+      ...current,
+      ...patch,
+    }));
     props.onManualFilter?.();
   }
 
@@ -2637,11 +2824,11 @@ function BaseClientesPage(props) {
             detail={metric.detail}
             icon={metric.icon}
             tone={metric.tone}
-            onClick={() => applyAlertFilter(metric.alerta)}
+            onClick={() => applyAlertFilter(metric.patch)}
           />
         ))}
       </section>
-      <SearchAndFilters {...props} />
+      <SearchAndFilters {...props} clientsForOptions={props.allClients ?? props.clients} />
       <ClientsTable
         clients={props.clients}
         sort={props.sort}
@@ -3363,8 +3550,8 @@ function PendenciasPage({
     { value: 'pendente', label: 'Com follow-up pendente' },
     { value: 'aguardando_retorno', label: 'Aguardando retorno' },
     { value: 'sem_retorno', label: 'Sem retorno' },
-    { value: 'prazo_vencido', label: 'Prazo vencido' },
-    { value: 'prazo_proximo', label: 'Prazo proximo' },
+    { value: 'prazo_vencido', label: 'Prazo da próxima ação vencido' },
+    { value: 'prazo_proximo', label: 'Prazo da próxima ação próximo' },
     { value: 'em_aberto', label: 'Em aberto' },
   ];
 
@@ -4472,8 +4659,8 @@ function ReportsPage({
     { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
-    { label: 'Prazo vencido', value: clientesPrazoVencido.length },
-    { label: 'Prazo proximo', value: clientesPrazoProximo.length },
+    { label: 'Prazo da próxima ação vencido', value: clientesPrazoVencido.length },
+    { label: 'Prazo da próxima ação próximo', value: clientesPrazoProximo.length },
     { label: 'Com responsável', value: clientesFollowupComResponsavel.length },
     {
       label: 'Media dias sem retorno',
@@ -6545,11 +6732,12 @@ export default function App() {
         onEdit={setEditingClient}
         onInactivate={inactivateClient}
         canCreateClient={canCreateClient}
+        allClients={enrichedClients}
         canEditRow={(client) => canEditClient(currentUserFull, client)}
         canInactivateRow={(client) => can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         renderClientCell={(client, fieldKey) => {
           if (fieldKey === 'responsavel') {
-            return renderFieldValue(getObrigacaoResponsavel(client));
+            return renderFieldValue(getResponsavelOperacional(client));
           }
           const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[fieldKey];
           if (!tipoAnexo) return undefined;

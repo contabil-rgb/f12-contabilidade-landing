@@ -35,8 +35,6 @@ const CLIENT_DB_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
   'status',
   'atualizado_em',
 ];
@@ -115,8 +113,6 @@ function normalizeClienteRow(input) {
     data_notificacao_cliente: toIsoDate(input.data_notificacao_cliente),
     status_retorno_cliente: normalizeString(input.status_retorno_cliente),
     data_retorno_cliente: toIsoDate(input.data_retorno_cliente),
-    proxima_acao: normalizeString(input.proxima_acao),
-    prazo_proxima_acao: toIsoDate(input.prazo_proxima_acao),
     status: normalizeString(input.status) || 'Ativo',
     atualizado_em: new Date().toISOString(),
   };
