@@ -203,8 +203,6 @@ const ALERT_FILTER_LABELS = {
   ata: 'Ata pendente',
   comunicacao: 'Comunicação pendente',
   retorno: 'Aguardando retorno',
-  prazo: 'Prazo da proxima acao vencido',
-  prazo_proximo: 'Prazo da proxima acao proximo',
 };
 
 const CLIENT_FIELD_DEFAULTS = {
@@ -761,31 +759,6 @@ function getAcompanhamentoText(client, key, fallback = '') {
   return fallback;
 }
 
-function getPrazoOperacionalBaseLabel(client) {
-  return 'Prazo da próxima ação';
-}
-
-function getPrazoOperacionalStatusLabel(client, mode = 'vencido') {
-  const base = getPrazoOperacionalBaseLabel(client);
-  return mode === 'proximo' ? `${base} próximo` : `${base} vencido`;
-}
-
-function getPrazoOperacionalDetail(client, mode = 'vencido') {
-  const prazo = getPrazoProximaAcaoValue(client);
-  const proximaAcao = getProximaAcaoOperacional(client);
-  const prazoFormatado = prazo ? formatDateDisplay(prazo) : '';
-
-  if (mode === 'proximo') {
-    if (proximaAcao && prazoFormatado) return `Próxima ação prevista para ${prazoFormatado}: ${proximaAcao}.`;
-    if (prazoFormatado) return `Prazo da próxima ação previsto para ${prazoFormatado}, mas sem descrição da ação.`;
-    return 'Há um prazo próximo registrado para acompanhamento.';
-  }
-
-  if (proximaAcao && prazoFormatado) return `Próxima ação em atraso desde ${prazoFormatado}: ${proximaAcao}.`;
-  if (prazoFormatado) return `Prazo da próxima ação vencido em ${prazoFormatado}, mas sem descrição da ação.`;
-  return 'Há uma próxima ação com prazo vencido para este cliente.';
-}
-
 function getDiasAtrasoValue(client) {
   const persisted = getRiscoPersistido(client)?.dias_atraso;
   if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
@@ -878,16 +851,6 @@ function isClienteNotificado(client) {
   return fallback;
 }
 
-function getPrazoDiffDias(client) {
-  const prazo = getPrazoProximaAcaoValue(client);
-  if (!prazo) return null;
-  const today = new Date();
-  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const dueDate = new Date(`${prazo}T00:00:00`);
-  if (Number.isNaN(dueDate.getTime())) return null;
-  return Math.round((dueDate.getTime() - startToday.getTime()) / 86400000);
-}
-
 function getDiasSemRetorno(client) {
   const persisted = getAcompanhamentoNumber(client, 'dias_sem_retorno');
   if (persisted !== null) return persisted;
@@ -900,39 +863,19 @@ function getDiasSemRetorno(client) {
   return Math.round((startToday.getTime() - notificadoEm.getTime()) / 86400000);
 }
 
-function isPrazoProximaAcaoVencido(client) {
-  const fallback = (() => {
-    const diff = getPrazoDiffDias(client);
-    return diff !== null && diff < 0;
-  })();
-  return fallback;
-}
-
-function isPrazoProximaAcaoProximo(client) {
-  const fallback = (() => {
-    const diff = getPrazoDiffDias(client);
-    return diff !== null && diff >= 0 && diff <= 3;
-  })();
-  return fallback;
-}
-
 function hasAcompanhamentoPendente(client) {
   const fallback =
     isComunicacaoPendente(client)
-    || isAguardandoRetorno(client)
-    || isPrazoProximaAcaoVencido(client)
-    || isPrazoProximaAcaoProximo(client);
+    || isAguardandoRetorno(client);
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
-    return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback) || isComunicacaoPendente(client);
+    return fallback;
   }
   return fallback;
 }
 
 function getStatusAcompanhamentoLabel(client) {
   const fallback = (() => {
-    if (isPrazoProximaAcaoVencido(client)) return getPrazoOperacionalStatusLabel(client, 'vencido');
-    if (isPrazoProximaAcaoProximo(client)) return getPrazoOperacionalStatusLabel(client, 'proximo');
     if (isSemRetorno(client)) return 'Sem retorno';
     if (isAguardandoRetorno(client)) return 'Aguardando retorno';
     if (hasRetornoConcluido(client)) return 'Retorno recebido';
@@ -940,21 +883,21 @@ function getStatusAcompanhamentoLabel(client) {
     return 'Sem notificacao';
   })();
   const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', ''));
-  if (persistedCode === 'prazo_vencido') return getPrazoOperacionalStatusLabel(client, 'vencido');
-  if (persistedCode === 'prazo_proximo') return getPrazoOperacionalStatusLabel(client, 'proximo');
+  if (persistedCode === 'prazo_vencido' || persistedCode === 'prazo_proximo') return fallback;
   return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
 }
 
 function getStatusAcompanhamentoCodigo(client) {
   const fallback = (() => {
-    if (isPrazoProximaAcaoVencido(client)) return 'prazo_vencido';
     if (isSemRetorno(client)) return 'sem_retorno';
     if (isAguardandoRetorno(client)) return 'aguardando_retorno';
     if (hasRetornoConcluido(client)) return 'retorno_recebido';
     if (isClienteNotificado(client)) return 'notificado';
     return 'sem_notificacao';
   })();
-  return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
+  const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
+  if (persistedCode === 'prazo_vencido' || persistedCode === 'prazo_proximo') return fallback;
+  return persistedCode;
 }
 
 function getResponsavelOperacional(client) {
@@ -1020,7 +963,6 @@ function isPendenciaCritica(client) {
 function getClientAlertSignals(client) {
   const diasAtraso = getDiasAtrasoValue(client);
   const dataNotificacao = getDataNotificacaoClienteValue(client);
-  const prazoProximaAcao = getPrazoProximaAcaoValue(client);
   return [
     isEmAtraso(client) && {
       key: 'atraso',
@@ -1046,20 +988,6 @@ function getClientAlertSignals(client) {
         : 'Aguardando retorno do cliente',
       tone: isSemRetorno(client) ? 'danger' : 'warning',
     },
-    isPrazoProximaAcaoVencido(client) && {
-      key: 'prazo',
-      label: prazoProximaAcao
-        ? `${getPrazoOperacionalStatusLabel(client, 'vencido')} em ${formatDateDisplay(prazoProximaAcao)}`
-        : getPrazoOperacionalStatusLabel(client, 'vencido'),
-      tone: 'danger',
-    },
-    !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client) && {
-      key: 'prazo_proximo',
-      label: prazoProximaAcao
-        ? `${getPrazoOperacionalStatusLabel(client, 'proximo')} em ${formatDateDisplay(prazoProximaAcao)}`
-        : getPrazoOperacionalStatusLabel(client, 'proximo'),
-      tone: 'warning',
-    },
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
@@ -1079,8 +1007,6 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Media', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
   comunicacao: { key: 'comunicacao', area: 'Comunicacao', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
-  prazo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 88, priorityLabel: 'Alta', nextAction: 'Atuar na proxima acao hoje ou renegociar o prazo com o cliente.' },
-  prazo_proximo: { key: 'acompanhamento', area: 'Prazo', route: 'cliente', priority: 72, priorityLabel: 'Media', nextAction: 'Antecipar a tratativa antes do prazo vencer.' },
 };
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -1749,8 +1675,6 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
   const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
   const acompanhamentoPendente = countWhere(clients, (client) => hasAcompanhamentoPendente(client));
   const retornoPendente = countWhere(clients, (client) => isAguardandoRetorno(client));
-  const prazoVencido = countWhere(clients, (client) => isPrazoProximaAcaoVencido(client));
-  const prazoProximo = countWhere(clients, (client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
   const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
   const diasAtrasoMedio = total
     ? (
@@ -1808,20 +1732,6 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       icon: Mail,
       tone: 'warning',
       filter: { alerta: 'retorno' },
-    },
-    {
-      title: 'Prazo da próxima ação vencido',
-      value: prazoVencido,
-      icon: BellRing,
-      tone: 'danger',
-      filter: { alerta: 'prazo' },
-    },
-    {
-      title: 'Prazo próximo',
-      value: prazoProximo,
-      icon: ClipboardList,
-      tone: 'info',
-      filter: { alerta: 'prazo_proximo' },
     },
     {
       title: 'Acompanhamento pendente',
@@ -2119,11 +2029,8 @@ function getDetailAcompanhamentoSummary(client) {
   const label = getStatusAcompanhamentoLabel(client);
   const dataNotificacao = getDataNotificacaoClienteValue(client);
   const dataRetorno = getDataRetornoClienteValue(client);
-  const prazo = getPrazoProximaAcaoValue(client);
   const diasSemRetorno = getDiasSemRetorno(client);
   const toneMap = {
-    prazo_vencido: 'danger',
-    prazo_proximo: 'warning',
     sem_retorno: 'danger',
     aguardando_retorno: 'warning',
     em_aberto: 'info',
@@ -2134,11 +2041,7 @@ function getDetailAcompanhamentoSummary(client) {
   };
 
   let detail = 'Sem notificacao registrada.';
-  if (isPrazoProximaAcaoVencido(client) && prazo) {
-    detail = getPrazoOperacionalDetail(client, 'vencido');
-  } else if (isPrazoProximaAcaoProximo(client) && prazo) {
-    detail = getPrazoOperacionalDetail(client, 'proximo');
-  } else if (isAguardandoRetorno(client) && dataNotificacao) {
+  if (isAguardandoRetorno(client) && dataNotificacao) {
     detail = diasSemRetorno !== null
       ? `${diasSemRetorno} dia(s) sem retorno desde ${formatDateDisplay(dataNotificacao)}.`
       : `Aguardando retorno desde ${formatDateDisplay(dataNotificacao)}.`;
@@ -2202,21 +2105,6 @@ function getDetailObrigacoesSummary(client) {
     label,
     detail,
     tone: toneMap[code] || 'neutral',
-  };
-}
-
-function getDetailProximaAcaoSummary(client) {
-  const proximaAcao = getProximaAcaoOperacional(client);
-  const prazo = getPrazoProximaAcaoValue(client);
-  const detail = prazo
-    ? (proximaAcao
-      ? `Prazo da ação: ${formatDateDisplay(prazo)}`
-      : `Prazo registrado para ${formatDateDisplay(prazo)}, mas sem descrição da ação.`)
-    : 'Sem prazo registrado';
-  return {
-    label: proximaAcao || 'Nenhuma próxima ação registrada',
-    detail,
-    tone: isPrazoProximaAcaoVencido(client) ? 'danger' : isPrazoProximaAcaoProximo(client) ? 'warning' : 'info',
   };
 }
 
@@ -2357,15 +2245,6 @@ function BaseClientesPage(props) {
       tone: 'warning',
       patch: { alerta: 'retorno' },
     },
-    {
-      key: 'prazo',
-      title: 'Prazo da próxima ação vencido',
-      value: countWhere(props.clients, (client) => isPrazoProximaAcaoVencido(client)),
-      detail: 'Proxima acao que ja passou do prazo',
-      icon: BellRing,
-      tone: 'danger',
-      patch: { alerta: 'prazo' },
-    },
   ];
 
   function applyAlertFilter(patch) {
@@ -2436,7 +2315,6 @@ function DetailPage({
   const acompanhamentoSummary = getDetailAcompanhamentoSummary(client);
   const riscoSummary = getDetailRiscoSummary(client);
   const obrigacoesSummary = getDetailObrigacoesSummary(client);
-  const proximaAcaoSummary = getDetailProximaAcaoSummary(client);
 
   return (
     <div className="space-y-5">
@@ -2467,7 +2345,7 @@ function DetailPage({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DetailStatusCard
           title="Acompanhamento"
           label={acompanhamentoSummary.label}
@@ -2488,13 +2366,6 @@ function DetailPage({
           detail={obrigacoesSummary.detail}
           icon={BookOpenCheck}
           tone={obrigacoesSummary.tone}
-        />
-        <DetailStatusCard
-          title="Proxima acao"
-          label={proximaAcaoSummary.label}
-          detail={proximaAcaoSummary.detail}
-          icon={FolderClock}
-          tone={proximaAcaoSummary.tone}
         />
       </section>
 
@@ -2679,7 +2550,7 @@ function PendenciasPage({
     if (filterKey === 'reinf') return row.item.key === 'reinf';
     if (filterKey === 'ecd') return row.item.key === 'ecd';
     if (filterKey === 'ecf') return row.item.key === 'ecf';
-    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey);
+    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno'].includes(row.item.signalKey);
     return true;
   }
 
@@ -2842,10 +2713,10 @@ function PendenciasPage({
     {
       key: 'notificacao',
       title: 'Acompanhamento',
-      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
+      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
       tone: 'info',
-      detail: 'Clientes que ainda precisam de notificacao, retorno registrado ou acao antes do prazo vencer.',
-      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno', 'prazo', 'prazo_proximo'].includes(row.item.signalKey)),
+      detail: 'Clientes que ainda precisam de notificacao ou retorno registrado.',
+      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
     },
   ];
 
@@ -3730,8 +3601,6 @@ function ReportsPage({
 }) {
   const clientesComPendencias = clients.filter((client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
   const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
-  const clientesPrazoVencido = clients.filter((client) => isPrazoProximaAcaoVencido(client));
-  const clientesPrazoProximo = clients.filter((client) => !isPrazoProximaAcaoVencido(client) && isPrazoProximaAcaoProximo(client));
   const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
   const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
   const clientesSemNotificacao = clients.filter((client) => !isClienteNotificado(client));
@@ -3743,8 +3612,6 @@ function ReportsPage({
     { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
-    { label: 'Prazo da próxima ação vencido', value: clientesPrazoVencido.length },
-    { label: 'Prazo da próxima ação próximo', value: clientesPrazoProximo.length },
     {
       label: 'Media dias sem retorno',
       value: clientesAguardandoRetorno.length
@@ -3765,8 +3632,6 @@ function ReportsPage({
     { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail },
     { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle },
-    { title: 'Prazo da próxima ação vencido', rows: clientesPrazoVencido, icon: BellRing },
-    { title: 'Prazo da próxima ação próximo', rows: clientesPrazoProximo, icon: ClipboardList },
     { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff },
     { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
     { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
