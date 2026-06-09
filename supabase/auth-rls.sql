@@ -68,6 +68,26 @@ grant select, update on table public.usuarios to authenticated;
 grant select, insert, update on table public.clientes to authenticated;
 grant select on table public.listagens to authenticated;
 
+-- 3.1) Helper para identificar coordenador pelo perfil persistido no portal
+create or replace function public.is_portal_coordenador()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.usuarios u
+    where u.auth_user_id = auth.uid()
+      and u.status = 'Ativo'
+      and u.perfil_acesso = 'coordenador_administrador'
+  );
+$$;
+
+revoke all on function public.is_portal_coordenador() from public;
+grant execute on function public.is_portal_coordenador() to authenticated;
+
 -- 4) RLS basico
 alter table public.usuarios enable row level security;
 alter table public.clientes enable row level security;
@@ -86,7 +106,7 @@ create policy "usuarios_select_all_coordenador"
 on public.usuarios
 for select
 to authenticated
-using (lower((auth.jwt() ->> 'email')) = 'leticiacampos@f12contabilidade.com.br');
+using (public.is_portal_coordenador());
 
 drop policy if exists "usuarios_update_own_profile" on public.usuarios;
 create policy "usuarios_update_own_profile"
@@ -101,8 +121,8 @@ create policy "usuarios_update_all_coordenador"
 on public.usuarios
 for update
 to authenticated
-using (lower((auth.jwt() ->> 'email')) = 'leticiacampos@f12contabilidade.com.br')
-with check (lower((auth.jwt() ->> 'email')) = 'leticiacampos@f12contabilidade.com.br');
+using (public.is_portal_coordenador())
+with check (public.is_portal_coordenador());
 
 -- public.listagens (somente leitura para autenticados)
 drop policy if exists "listagens_select_authenticated" on public.listagens;

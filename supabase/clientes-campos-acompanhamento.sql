@@ -5,8 +5,7 @@
 alter table public.clientes
   add column if not exists data_notificacao_cliente date,
   add column if not exists status_retorno_cliente text,
-  add column if not exists data_retorno_cliente date,
-  add column if not exists prazo_proxima_acao date;
+  add column if not exists data_retorno_cliente date;
 
 insert into public.listagens (categoria, valor, ordem)
 values

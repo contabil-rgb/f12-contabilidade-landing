@@ -150,8 +150,6 @@ export const HISTORY_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
 ];
 
 export const SENSITIVE_CLIENT_FIELDS = [
@@ -174,8 +172,6 @@ export const STATUS_CLIENT_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
 ];
 
 export const OPERATIONAL_CLIENT_FIELDS = [
@@ -207,8 +203,6 @@ export const OPERATIONAL_CLIENT_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
   'envio_reinf',
   'data_enviada_reinf',
   'anexo_recibo_reinf',
@@ -233,8 +227,6 @@ export const SIMPLE_OPERATIONAL_CLIENT_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
 ];
 
 export const COMMON_PASSWORDS = [

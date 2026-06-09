@@ -7,7 +7,6 @@ const DATE_FIELDS = new Set([
   'data_entrega_ata',
   'data_notificacao_cliente',
   'data_retorno_cliente',
-  'prazo_proxima_acao',
 ]);
 const CLIENTE_FIELDS = new Set([
   'cnpj',
@@ -42,8 +41,6 @@ const CLIENTE_FIELDS = new Set([
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
   'status',
   'atualizado_em',
 ]);

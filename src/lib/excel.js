@@ -69,8 +69,6 @@ const EXTRA_BASE_HEADER_MAP = {
   'data da notificacao': 'data_notificacao_cliente',
   'status do retorno': 'status_retorno_cliente',
   'data do retorno': 'data_retorno_cliente',
-  'proxima acao': 'proxima_acao',
-  'prazo da proxima acao': 'prazo_proxima_acao',
 };
 
 function normalizeHeader(header) {

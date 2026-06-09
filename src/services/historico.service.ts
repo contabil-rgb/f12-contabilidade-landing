@@ -29,8 +29,6 @@ export const CAMPOS_HISTORICO_RELEVANTES = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
-  'proxima_acao',
-  'prazo_proxima_acao',
   'status',
 ];
 

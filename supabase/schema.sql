@@ -39,8 +39,6 @@ create table if not exists public.clientes (
   data_notificacao_cliente date,
   status_retorno_cliente text,
   data_retorno_cliente date,
-  proxima_acao text,
-  prazo_proxima_acao date,
   status text default 'Ativo',
   criado_em timestamptz default now(),
   atualizado_em timestamptz default now()

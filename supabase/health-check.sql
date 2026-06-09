@@ -35,12 +35,18 @@ where schemaname = 'public'
   and tablename in ('clientes', 'listagens', 'usuarios', 'historico_alteracoes', 'anexos')
 order by tablename, policyname;
 
--- 6) Bucket de anexos
+-- 6) Helper de permissao para coordenador
+select routine_name, routine_type
+from information_schema.routines
+where routine_schema = 'public'
+  and routine_name = 'is_portal_coordenador';
+
+-- 7) Bucket de anexos
 select id, name, public, file_size_limit, allowed_mime_types
 from storage.buckets
 where name = 'documentos-clientes';
 
--- 7) Policies de storage.objects para o bucket
+-- 8) Policies de storage.objects para o bucket
 select policyname, cmd
 from pg_policies
 where schemaname = 'storage'

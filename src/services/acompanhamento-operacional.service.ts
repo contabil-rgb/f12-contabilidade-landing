@@ -9,16 +9,11 @@ export type AcompanhamentoOperacionalClienteRow = {
   data_notificacao_cliente?: string | null;
   status_retorno_cliente?: string | null;
   data_retorno_cliente?: string | null;
-  proxima_acao?: string | null;
-  prazo_proxima_acao?: string | null;
   retorno_recebido?: boolean | null;
   aguardando_retorno?: boolean | null;
   sem_retorno?: boolean | null;
-  prazo_proxima_acao_vencido?: boolean | null;
-  prazo_proxima_acao_proximo?: boolean | null;
   acompanhamento_pendente?: boolean | null;
   dias_sem_retorno?: number | null;
-  dias_para_prazo?: number | null;
   status_acompanhamento_codigo?: string | null;
   status_acompanhamento_label?: string | null;
 };
@@ -28,12 +23,10 @@ function normalizeAcompanhamentoRow(row: Record<string, unknown>) {
     value === null || value === undefined || value === '' ? null : Number(value);
 
   const diasSemRetorno = toNullableNumber(row.dias_sem_retorno);
-  const diasParaPrazo = toNullableNumber(row.dias_para_prazo);
 
   return {
     ...row,
     dias_sem_retorno: Number.isFinite(diasSemRetorno) ? diasSemRetorno : null,
-    dias_para_prazo: Number.isFinite(diasParaPrazo) ? diasParaPrazo : null,
   } as AcompanhamentoOperacionalClienteRow;
 }
 

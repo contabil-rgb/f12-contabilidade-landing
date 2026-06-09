@@ -373,8 +373,6 @@ function withClientDefaults(client) {
   return {
     ...CLIENT_FIELD_DEFAULTS,
     ...client,
-    proxima_acao: '',
-    prazo_proxima_acao: '',
   };
 }
 
@@ -902,10 +900,6 @@ function getStatusAcompanhamentoCodigo(client) {
 
 function getResponsavelOperacional(client) {
   return getObrigacaoResponsavel(client) || client?.responsavel || '';
-}
-
-function getProximaAcaoOperacional(client) {
-  return '';
 }
 
 function getObrigacaoResponsavel(client) {
