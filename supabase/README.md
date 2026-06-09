@@ -1,22 +1,24 @@
-# Supabase (fase atual)
+# Supabase
 
-Arquivos SQL ativos:
+Arquivos SQL ativos do projeto.
 
-- `supabase/schema.sql` -> estrutura base (`clientes`, `listagens`)
-- `supabase/seed.sql` -> listagens iniciais e categorias estaveis do portal
-- `supabase/auth-rls.sql` -> `usuarios` + Auth/RLS basico
-- `supabase/usuarios-hardening.sql` -> reforco de seguranca para a gestao de usuarios com base no perfil do portal
-- `supabase/usuarios-campos-gestao.sql` -> campos complementares da Gestao de Usuarios
-- `supabase/historico.sql` -> tabela `historico_alteracoes` + RLS basico do historico
-- `supabase/obrigacoes-status.sql` -> view persistente de status e pendencias de REINF / ECD / ECF
-- `supabase/clientes-campos-operacionais.sql` -> colunas operacionais adicionais usadas pelo risco resumido
-- `supabase/clientes-campos-acompanhamento.sql` -> datas e status operacionais de notificacao e retorno
-- `supabase/acompanhamento-operacional.sql` -> view persistente de acompanhamento operacional do cliente
-- `supabase/risco-operacional.sql` -> view persistente de risco operacional resumido
-- `supabase/clientes-remover-legado-acompanhamento.sql` -> limpeza opcional para bases antigas que ainda tenham `proxima_acao` e `prazo_proxima_acao`
-- `supabase/listagens-ampliar-categorias.sql` -> complemento opcional para bases antigas que ainda nao tenham todas as categorias estaveis de listagens
+## Estrutura principal
 
-Ordem recomendada no SQL Editor:
+- `supabase/schema.sql` -> estrutura base de `clientes` e `listagens`
+- `supabase/seed.sql` -> categorias estaveis iniciais de listagens
+- `supabase/auth-rls.sql` -> Auth + RLS basico de `clientes`, `listagens` e `usuarios`
+- `supabase/usuarios-hardening.sql` -> reforco de seguranca para a gestao de usuarios
+- `supabase/usuarios-campos-gestao.sql` -> campos complementares da gestao de usuarios
+- `supabase/historico.sql` -> tabela `historico_alteracoes` + policies
+- `supabase/anexos.sql` -> tabela `anexos` + policies
+- `supabase/storage.sql` -> bucket privado e policies de Storage
+- `supabase/obrigacoes-status.sql` -> view persistente de obrigacoes
+- `supabase/clientes-campos-operacionais.sql` -> colunas operacionais complementares
+- `supabase/clientes-campos-acompanhamento.sql` -> datas e status de notificacao e retorno
+- `supabase/acompanhamento-operacional.sql` -> view persistente de acompanhamento
+- `supabase/risco-operacional.sql` -> view persistente de risco resumido
+
+## Ordem recomendada no SQL Editor
 
 1. `schema.sql`
 2. `seed.sql`
@@ -24,13 +26,33 @@ Ordem recomendada no SQL Editor:
 4. `usuarios-hardening.sql`
 5. `usuarios-campos-gestao.sql`
 6. `historico.sql`
-7. `obrigacoes-status.sql`
-8. `clientes-campos-operacionais.sql`
-9. `clientes-campos-acompanhamento.sql`
-10. `acompanhamento-operacional.sql`
-11. `risco-operacional.sql`
+7. `anexos.sql`
+8. `storage.sql`
+9. `obrigacoes-status.sql`
+10. `clientes-campos-operacionais.sql`
+11. `clientes-campos-acompanhamento.sql`
+12. `acompanhamento-operacional.sql`
+13. `risco-operacional.sql`
 
-Migracao opcional para bases ja existentes:
+## Scripts auxiliares para bases ja existentes
 
-- depois de aplicar a versao nova de `acompanhamento-operacional.sql`, rode `clientes-remover-legado-acompanhamento.sql` para remover `proxima_acao` e `prazo_proxima_acao` da tabela `clientes`.
-- rode `listagens-ampliar-categorias.sql` para complementar categorias de listagens que antes estavam mais dependentes de `DEFAULT_LISTS`.
+- `supabase/clientes-remover-legado-acompanhamento.sql`
+  - remove `proxima_acao` e `prazo_proxima_acao` de bases antigas
+
+- `supabase/listagens-ampliar-categorias.sql`
+  - complementa categorias de listagens que antes dependiam mais do bootstrap local
+
+## Validacao rapida
+
+Use:
+
+- `supabase/health-check.sql`
+
+Esse script nao altera dados e ajuda a conferir:
+
+- tabelas;
+- contagens;
+- RLS;
+- policies;
+- helper de coordenador;
+- bucket e policies de anexos.

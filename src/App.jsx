@@ -3694,7 +3694,7 @@ function ReportsPage({
                 className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-black text-red-600"
               >
                 <RefreshCcw size={16} aria-hidden="true" />
-                Restaurar base importada
+                Reaplicar snapshot local
               </button>
             ) : null}
           </div>
@@ -5420,17 +5420,17 @@ export default function App() {
 
   async function resetBase() {
     if (!isAdmin(currentUserFull)) {
-      setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode restaurar a base.' });
+      setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode reaplicar o snapshot local de clientes.' });
       return;
     }
-    if (!confirm('Restaurar os dados gerados a partir da planilha original? Alterações locais serão substituídas.')) return;
+    if (!confirm('Reaplicar os clientes do snapshot local da planilha original no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
     let clientesSnapshot = [];
     try {
       clientesSnapshot = await loadClientesContabeisSnapshot();
     } catch (error) {
       setToast({
-        title: 'Falha ao carregar base de restaura????o',
-        message: error.message || 'N??o foi poss??vel carregar a base local de restaura????o.',
+        title: 'Falha ao carregar snapshot local',
+        message: error.message || 'Não foi possível carregar o snapshot local de clientes.',
       });
       return;
     }
@@ -5438,20 +5438,20 @@ export default function App() {
     const sync = await sincronizarClientesSupabase(clientesSnapshot.map(withClientDefaults));
     if (!sync.synced) {
       setToast({
-        title: 'Falha ao restaurar',
-        message: sync.failedMessages?.[0] ?? 'Não foi possível restaurar a base local.',
+        title: 'Falha ao reaplicar snapshot',
+        message: sync.failedMessages?.[0] ?? 'Não foi possível reaplicar o snapshot local de clientes.',
       });
       return;
     }
 
     const recarregado = await carregarDadosSupabase({ silent: true });
     setToast({
-      title: 'Base restaurada',
+      title: 'Snapshot reaplicado',
       message: recarregado
         ? (sync.summary
-            ? `Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
-            : `${sync.synced} cliente(s) restaurado(s).`)
-        : 'Restauracao concluida no Supabase, mas a interface nao conseguiu recarregar automaticamente.',
+            ? `Snapshot local reaplicado | Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
+            : `${sync.synced} cliente(s) reaplicado(s) do snapshot local.`)
+        : 'A reaplicacao no Supabase foi concluida, mas a interface nao conseguiu recarregar automaticamente.',
     });
   }
 
