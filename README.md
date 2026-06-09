@@ -23,7 +23,7 @@ Observacoes importantes:
 
 - follow-ups foram removidos do projeto;
 - `proxima_acao` e `prazo_proxima_acao` deixaram de fazer parte do fluxo atual;
-- o snapshot local da base ainda existe apenas como apoio administrativo para reaplicacao controlada de clientes.
+- o snapshot local da base ainda existe apenas como apoio administrativo isolado para reaplicacao controlada de clientes.
 
 ## Estrutura principal
 
@@ -32,6 +32,7 @@ Observacoes importantes:
 - [src/services/clientes.service.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/clientes.service.ts)
 - [src/services/listagens.service.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/listagens.service.ts)
 - [src/services/importacao.service.js](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/importacao.service.js)
+- [src/services/snapshot-clientes.service.js](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/snapshot-clientes.service.js)
 - [supabase/README.md](C:/Users/F12 CONTABILIDADE 13/Documents/New project/supabase/README.md)
 - [OPERACAO-REAL.md](C:/Users/F12 CONTABILIDADE 13/Documents/New project/OPERACAO-REAL.md)
 
@@ -104,7 +105,7 @@ Fluxo principal:
 
 ## Reaplicacao do snapshot local
 
-O portal possui um fluxo administrativo para reaplicar os clientes do snapshot local no Supabase.
+O portal possui um fluxo administrativo isolado para reaplicar os clientes do snapshot local no Supabase.
 
 Esse fluxo:
 

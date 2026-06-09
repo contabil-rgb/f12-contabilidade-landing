@@ -73,6 +73,7 @@ O botao administrativo de reaplicacao:
 - nao remove clientes extras do banco;
 - nao remove nem recompõe anexos;
 - nao recompõe historico;
+- existe apenas como ferramenta administrativa isolada;
 - deve ser usado com consciencia administrativa.
 
 ### Importacao Excel
@@ -108,3 +109,4 @@ Hoje o projeto ja esta utilizavel, mas ainda merece vigilancia em:
 - executar `npm run build` antes de fechar rodada;
 - manter SQLs versionados e aplicados com cuidado;
 - registrar qualquer ajuste operacional sensivel.
+

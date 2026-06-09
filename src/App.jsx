@@ -35,7 +35,6 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { importMetadata } from './data/baseContabilidade.metadata.js';
 import {
   createDefaultLists,
   DETAIL_SECTIONS,
@@ -103,8 +102,8 @@ import {
 import {
   importarClientesExcel,
   previsualizarImportacaoExcel,
-  sincronizarClientesRows,
 } from './services/importacao.service';
+import { reaplicarSnapshotClientesLocal } from './services/snapshot-clientes.service';
 import {
   indexarStatusObrigacoes,
   listarStatusObrigacoesClientes,
@@ -128,6 +127,13 @@ import { supabase } from './lib/supabase';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
 const LazyHistoryPage = lazy(() => import('./components/pages/HistoryPage.jsx'));
+const INITIAL_METADATA = Object.freeze({
+  source: 'Inicializacao do portal',
+  importedAt: '',
+  baseRows: 0,
+  sheets: [],
+  generatedAt: '',
+});
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
@@ -376,16 +382,10 @@ function withClientDefaults(client) {
   };
 }
 
-async function loadClientesContabeisSnapshot() {
-  const module = await import('./data/baseContabilidade.js');
-  return module.clientesContabeis ?? [];
-}
-
 function loadInitialState() {
   return {
     clientes: [],
     listagens: createDefaultLists(),
-    savedAt: '',
   };
 }
 
@@ -485,6 +485,19 @@ function formatDateTime(value) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(date);
+}
+
+function getLatestClienteAtualizadoEm(clientes) {
+  let latest = 0;
+  (clientes ?? []).forEach((client) => {
+    const raw = String(client?.atualizado_em ?? '').trim();
+    if (!raw) return;
+    const timestamp = new Date(raw).getTime();
+    if (Number.isFinite(timestamp) && timestamp > latest) {
+      latest = timestamp;
+    }
+  });
+  return latest ? new Date(latest).toISOString() : '';
 }
 
 function statusTone(value, client) {
@@ -874,7 +887,7 @@ function hasAcompanhamentoPendente(client) {
     || isAguardandoRetorno(client);
   const persisted = getAcompanhamentoPersistido(client);
   if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
-    return fallback;
+    return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback);
   }
   return fallback;
 }
@@ -887,8 +900,6 @@ function getStatusAcompanhamentoLabel(client) {
     if (isClienteNotificado(client)) return 'Notificado';
     return 'Sem notificacao';
   })();
-  const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', ''));
-  if (persistedCode === 'prazo_vencido' || persistedCode === 'prazo_proximo') return fallback;
   return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
 }
 
@@ -900,9 +911,7 @@ function getStatusAcompanhamentoCodigo(client) {
     if (isClienteNotificado(client)) return 'notificado';
     return 'sem_notificacao';
   })();
-  const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
-  if (persistedCode === 'prazo_vencido' || persistedCode === 'prazo_proximo') return fallback;
-  return persistedCode;
+  return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', fallback) || fallback);
 }
 
 function getResponsavelOperacional(client) {
@@ -1526,7 +1535,7 @@ function AppShell({
                 <LogOut size={17} aria-hidden="true" />
                 Sair
               </button>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt ?? metadata.generatedAt ?? 'não informado'}</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
               <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{supabaseStatus?.message ?? 'Dados locais'}</div>
             </div>
           </div>
@@ -1753,7 +1762,7 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
               {supabaseStatus?.message ?? 'Dados locais'}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source ?? 'Local'} | Atualizado: {metadata?.importedAt ?? 'N/A'}
+              Fonte: {metadata?.source || 'Local'} | Atualizado: {metadata?.importedAt || metadata?.generatedAt || 'N/A'}
             </span>
             <button
               type="button"
@@ -2777,7 +2786,7 @@ function PendenciasPage({
               {supabaseStatus?.message ?? 'Dados locais'}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source ?? 'Local'}
+              Fonte: {metadata?.source || 'Local'}
             </span>
             <button
               type="button"
@@ -3171,7 +3180,7 @@ function ReinfPage({
               {supabaseStatus?.message ?? 'Dados locais'}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source ?? 'Local'}
+              Fonte: {metadata?.source || 'Local'}
             </span>
             <button
               type="button"
@@ -3390,7 +3399,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
               {supabaseStatus?.message ?? 'Dados locais'}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source ?? 'Local'}
+              Fonte: {metadata?.source || 'Local'}
             </span>
             <button
               type="button"
@@ -3656,7 +3665,7 @@ function ReportsPage({
               {supabaseStatus?.message ?? 'Dados locais'}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source ?? 'Local'}
+              Fonte: {metadata?.source || 'Local'}
             </span>
             <button
               type="button"
@@ -4512,7 +4521,7 @@ export default function App() {
   const initialSecurityState = useMemo(loadSecurityState, []);
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
-  const [metadata, setMetadata] = useState({ ...importMetadata, importedAt: initialState.savedAt || importMetadata.importedAt });
+  const [metadata, setMetadata] = useState({ ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(loadSession);
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
@@ -4737,6 +4746,7 @@ export default function App() {
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
+      const latestUpdatedAt = getLatestClienteAtualizadoEm(clientesComAcompanhamento);
 
       const nextListagens = mergeListagensFromClients(
         mergeListagensFromSupabase(createDefaultLists(), listagensSupabase),
@@ -4745,7 +4755,7 @@ export default function App() {
       persist(clientesComAcompanhamento, nextListagens, {
         ...metadata,
         source: 'Supabase',
-        importedAt: metadata?.importedAt || todayBr(),
+        importedAt: latestUpdatedAt ? formatDateTime(latestUpdatedAt) : (metadata?.importedAt || todayBr()),
       });
       if (usuariosResult.ok) {
         sincronizarUsuariosSupabase(usuariosResult.rows);
@@ -5230,38 +5240,6 @@ export default function App() {
     return canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey);
   }
 
-  async function sincronizarClientesSupabase(rows) {
-    try {
-      const result = await sincronizarClientesRows(rows, 'sincronizacao-manual');
-      if (!result.ok) {
-        setSupabaseStatus({ connected: false, message: 'Falha ao sincronizar clientes no Supabase' });
-        return {
-          synced: 0,
-          failed: result.summary?.totalConsideradas ?? rows.length,
-          failedMessages: result.errors,
-          summary: result.summary,
-        };
-      }
-      setSupabaseStatus({
-        connected: true,
-        message: `Sincronizacao concluida (${formatNumber(result.summary.totalConsideradas)} registro(s))`,
-      });
-      return {
-        synced: result.summary.totalConsideradas,
-        failed: 0,
-        failedMessages: [],
-        summary: result.summary,
-      };
-    } catch (error) {
-      setSupabaseStatus({ connected: false, message: 'Erro na sincronizacao com Supabase' });
-      return {
-        synced: 0,
-        failed: rows.length,
-        failedMessages: [error.message || 'Falha ao sincronizar clientes no Supabase.'],
-      };
-    }
-  }
-
   async function inactivateClient(client) {
     if (!can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode inativar clientes.' });
@@ -5423,11 +5401,13 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode reaplicar o snapshot local de clientes.' });
       return;
     }
-    if (!confirm('Reaplicar os clientes do snapshot local da planilha original no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
-    let clientesSnapshot = [];
+    if (!confirm('Reaplicar os clientes do snapshot administrativo local no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
+
+    let sync;
     try {
-      clientesSnapshot = await loadClientesContabeisSnapshot();
+      sync = await reaplicarSnapshotClientesLocal({ transformRow: withClientDefaults });
     } catch (error) {
+      setSupabaseStatus({ connected: false, message: 'Falha ao carregar snapshot local' });
       setToast({
         title: 'Falha ao carregar snapshot local',
         message: error.message || 'Não foi possível carregar o snapshot local de clientes.',
@@ -5435,22 +5415,26 @@ export default function App() {
       return;
     }
 
-    const sync = await sincronizarClientesSupabase(clientesSnapshot.map(withClientDefaults));
-    if (!sync.synced) {
+    if (!sync?.ok) {
+      setSupabaseStatus({ connected: false, message: 'Falha ao sincronizar snapshot no Supabase' });
       setToast({
         title: 'Falha ao reaplicar snapshot',
-        message: sync.failedMessages?.[0] ?? 'Não foi possível reaplicar o snapshot local de clientes.',
+        message: sync?.errors?.[0] ?? 'Não foi possível reaplicar o snapshot local de clientes.',
       });
       return;
     }
 
+    setSupabaseStatus({
+      connected: true,
+      message: `Snapshot reaplicado (${formatNumber(sync.summary?.totalConsideradas ?? 0)} registro(s))`,
+    });
     const recarregado = await carregarDadosSupabase({ silent: true });
     setToast({
       title: 'Snapshot reaplicado',
       message: recarregado
         ? (sync.summary
             ? `Snapshot local reaplicado | Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
-            : `${sync.synced} cliente(s) reaplicado(s) do snapshot local.`)
+            : 'Snapshot local reaplicado com sucesso.')
         : 'A reaplicacao no Supabase foi concluida, mas a interface nao conseguiu recarregar automaticamente.',
     });
   }
@@ -5809,5 +5793,6 @@ export default function App() {
     </>
   );
 }
+
 
 
