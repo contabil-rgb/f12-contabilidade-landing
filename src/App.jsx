@@ -272,25 +272,7 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
   motivo_atraso: 'Motivo do atraso',
 };
 
-// Modo temporario sem autenticacao (fase de integracao inicial com banco).
-// Quando false, o fluxo normal de login/recuperacao volta a ser obrigatorio.
-const TEMP_DISABLE_LOGIN = false;
-const TEMP_DEV_USER = {
-  id: 'dev-user-local',
-  nome: 'Usuário Temporário',
-  email: 'dev@local',
-  perfil_acesso: 'coordenador_administrador',
-  status: 'Ativo',
-  precisa_trocar_senha: false,
-};
-const ALLOWED_LOCAL_EMAILS = new Set([
-  'leticiacampos@f12contabilidade.com.br',
-  'contabil@f12contabilidade.com.br',
-]);
-
-function isAllowedPortalEmail(email) {
-  return ALLOWED_LOCAL_EMAILS.has(String(email ?? '').trim().toLowerCase());
-}
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 
 async function loginSupabase(email, senha) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -371,6 +353,25 @@ async function prepararSessaoRecuperacaoSenha() {
   return null;
 }
 
+async function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function isAuthTimeoutError(error) {
+  return String(error?.message ?? '').includes('demorou mais do que o esperado');
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value ?? ''));
 }
@@ -439,6 +440,7 @@ function loadSession() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.usuario_id || !parsed.auth_user_id) return null;
     return parsed;
   } catch {
     return null;
@@ -4542,14 +4544,16 @@ export default function App() {
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
-  const [authReady, setAuthReady] = useState(TEMP_DISABLE_LOGIN);
+  const [authReady, setAuthReady] = useState(false);
+  const [authRestoring, setAuthRestoring] = useState(false);
   const importInputRef = useRef(null);
+  const hasStoredSession = Boolean(session?.usuario_id && session?.auth_user_id);
 
   const currentUserFull = useMemo(() => {
-    if (TEMP_DISABLE_LOGIN) return TEMP_DEV_USER;
     if (!session?.usuario_id) return null;
     const user = security.usuarios.find((item) => item.id === session.usuario_id);
     if (!user || user.status !== 'Ativo') return null;
+    if (session?.auth_user_id && user?.auth_user_id && session.auth_user_id !== user.auth_user_id) return null;
     return user;
   }, [security.usuarios, session]);
 
@@ -4577,26 +4581,31 @@ export default function App() {
   }, [page, selectedClientId]);
 
   useEffect(() => {
-    if (!TEMP_DISABLE_LOGIN && (!currentUserFull || currentUserFull.precisa_trocar_senha)) return;
+    if (!currentUserFull || currentUserFull.precisa_trocar_senha) return;
     carregarDadosSupabase({ silent: true });
   }, [currentUserFull?.id]);
 
   useEffect(() => {
     let active = true;
-    if (TEMP_DISABLE_LOGIN) {
-      setAuthReady(true);
-      return undefined;
-    }
 
     async function bootstrapAuth() {
+      if (hasStoredSession) {
+        setAuthRestoring(true);
+      }
       try {
-        const perfil = await recuperarPerfilSessaoSupabase();
+        const perfil = await withTimeout(
+          recuperarPerfilSessaoSupabase(),
+          AUTH_BOOTSTRAP_TIMEOUT_MS,
+          'A validacao da sessao demorou mais do que o esperado.',
+        );
         if (!active) return;
 
         if (perfil) {
-          startSession(perfil.id);
+          startSession(perfil);
+          setAuthRestoring(false);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
         } else {
+          setAuthRestoring(false);
           clearSession();
           setSession(null);
           if (!shouldOpenResetViewFromUrl()) {
@@ -4605,13 +4614,43 @@ export default function App() {
         }
       } catch (error) {
         if (!active) return;
+        if (isAuthTimeoutError(error) && hasStoredSession) {
+          void recuperarPerfilSessaoSupabase()
+            .then((perfil) => {
+              if (!active) return;
+              if (perfil) {
+                startSession(perfil);
+              } else {
+                clearSession();
+                setSession(null);
+                if (!shouldOpenResetViewFromUrl()) {
+                  setAuthView('login');
+                }
+              }
+            })
+            .catch(() => {
+              if (!active) return;
+              clearSession();
+              setSession(null);
+              if (!shouldOpenResetViewFromUrl()) {
+                setAuthView('login');
+              }
+            })
+            .finally(() => {
+              if (active) setAuthRestoring(false);
+            });
+          return;
+        }
+        setAuthRestoring(false);
         clearSession();
         setSession(null);
         setAuthView('login');
-        setToast({
-          title: 'Falha ao validar sessão',
-          message: error.message || 'Nao foi possivel validar a sessao atual no Supabase.',
-        });
+        if (!isAuthTimeoutError(error)) {
+          setToast({
+            title: 'Falha ao validar sessao',
+            message: error.message || 'Nao foi possivel validar a sessao atual no Supabase.',
+          });
+        }
       } finally {
         if (active) setAuthReady(true);
       }
@@ -4619,12 +4658,39 @@ export default function App() {
 
     bootstrapAuth();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event) => {
       if (!active) return;
       if (event === 'SIGNED_OUT') {
+        setAuthRestoring(false);
         clearSession();
         setSession(null);
         setAuthView('login');
+        return;
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        try {
+          const perfil = await withTimeout(
+            recuperarPerfilSessaoSupabase(),
+            AUTH_BOOTSTRAP_TIMEOUT_MS,
+            'A atualizacao da sessao demorou mais do que o esperado.',
+          );
+          if (!active) return;
+          if (perfil) {
+            startSession(perfil);
+            setAuthRestoring(false);
+          } else {
+            setAuthRestoring(false);
+            clearSession();
+            setSession(null);
+            setAuthView('login');
+          }
+        } catch {
+          if (!active) return;
+          setAuthRestoring(false);
+          clearSession();
+          setSession(null);
+          setAuthView('login');
+        }
       }
     });
 
@@ -4632,7 +4698,7 @@ export default function App() {
       active = false;
       subscription?.subscription?.unsubscribe?.();
     };
-  }, []);
+  }, [hasStoredSession]);
 
   useEffect(() => {
     if (authView !== 'reset') return;
@@ -4824,9 +4890,12 @@ export default function App() {
     return ok;
   }
 
-  function startSession(userId) {
+  function startSession(perfil) {
+    if (!perfil?.id || !perfil?.auth_user_id) return;
     const nextSession = {
-      usuario_id: userId,
+      usuario_id: perfil.id,
+      auth_user_id: perfil.auth_user_id,
+      email: perfil.email ?? '',
       inicio: Date.now(),
       ultima_atividade: Date.now(),
     };
@@ -4835,25 +4904,15 @@ export default function App() {
   }
 
   function logout(message) {
-    if (TEMP_DISABLE_LOGIN) {
-      setToast({
-        title: 'Login desativado temporariamente',
-        message: 'Fluxo de autenticacao pausado durante a integracao inicial com o banco.',
-      });
-      return;
-    }
     logoutSupabase().catch(() => {});
     clearSession();
     setSession(null);
     setAuthView('login');
     setPage('dashboard');
-    if (message) setToast({ title: 'Sessão encerrada', message });
+    if (message) setToast({ title: 'Sessao encerrada', message });
   }
 
   async function createFirstAccessPassword(email) {
-    if (!isAllowedPortalEmail(email)) {
-      return { ok: false, errors: ['E-mail não habilitado para primeiro acesso.'] };
-    }
     try {
       await enviarResetSenhaSupabase(email);
       return { ok: true };
@@ -4864,9 +4923,6 @@ export default function App() {
 
   async function login(email, senha) {
     const emailNorm = String(email ?? '').trim().toLowerCase();
-    if (!isAllowedPortalEmail(emailNorm)) {
-      return { ok: false, message: 'E-mail não autorizado para este portal.' };
-    }
 
     const auth = await loginSupabase(emailNorm, senha);
     if (!auth.ok || !auth.authUser) {
@@ -4883,21 +4939,21 @@ export default function App() {
 
     if (!perfil) {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: 'Usuário autenticado sem perfil em public.usuarios. Execute seed.sql e vincule auth_user_id.' };
+      return { ok: false, message: 'Usuario autenticado sem perfil em public.usuarios. Execute seed.sql e vincule auth_user_id.' };
     }
 
     if (perfil.status !== 'Ativo') {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: 'Usuário inativo. Solicite reativação ao Coordenador.' };
+      return { ok: false, message: 'Usuario inativo. Solicite reativacao ao Coordenador.' };
     }
 
     if (perfil.bloqueado_ate && new Date(perfil.bloqueado_ate).getTime() > Date.now()) {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: `Usuário bloqueado temporariamente até ${formatDateTime(perfil.bloqueado_ate)}.` };
+      return { ok: false, message: `Usuario bloqueado temporariamente ate ${formatDateTime(perfil.bloqueado_ate)}.` };
     }
 
     sincronizarPerfilUsuario(perfil);
-    startSession(perfil.id);
+    startSession(perfil);
     setPage('dashboard');
     updateUltimoAcessoUsuario(perfil.id).catch(() => {});
     return { ok: true };
@@ -4905,9 +4961,7 @@ export default function App() {
 
   async function requestPasswordReset(email) {
     try {
-      if (isAllowedPortalEmail(email)) {
-        await enviarResetSenhaSupabase(email);
-      }
+      await enviarResetSenhaSupabase(email);
     } catch {
       // Mensagem generica por seguranca.
     }
@@ -5513,7 +5567,14 @@ export default function App() {
     );
   }
 
-  if (!TEMP_DISABLE_LOGIN && !currentUserFull) {
+  if (!currentUserFull) {
+    if (authRestoring && hasStoredSession) {
+      return (
+        <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
+          <p className="text-sm font-semibold">Restaurando sessao...</p>
+        </div>
+      );
+    }
     if (authView === 'firstAccess') {
       return (
         <FirstAccessPage
@@ -5536,7 +5597,7 @@ export default function App() {
     return <LoginPage onLogin={login} onForgot={() => setAuthView('forgot')} onReset={() => setAuthView('reset')} onFirstAccess={() => setAuthView('firstAccess')} />;
   }
 
-  if (!TEMP_DISABLE_LOGIN && currentUserFull.precisa_trocar_senha) {
+  if (currentUserFull.precisa_trocar_senha) {
     return (
       <ForcedPasswordPage
         currentUser={currentUserFull}
