@@ -154,6 +154,8 @@ export const LIST_HEADER_MAP = {
   ECD: 'ecd',
 };
 
+// Bootstrap tecnico do portal e fallback da importacao.
+// O Supabase continua sendo a fonte primaria das listagens persistidas.
 export const DEFAULT_LISTS = {
   tipo_cliente: ['Bodó', 'Tambaqui', 'Salmão'],
   regime_tributario: ['Simples Nacional', 'Lucro Presumido', 'Lucro Real', 'Isento'],
@@ -174,6 +176,12 @@ export const DEFAULT_LISTS = {
   dificuldade: ['Baixa', 'Média', 'Alta', 'Altíssima'],
   ecd: ['Sim', 'Não'],
 };
+
+export function createDefaultLists() {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_LISTS).map(([key, values]) => [key, Array.isArray(values) ? [...values] : []]),
+  );
+}
 
 export const YES_NO_OPTIONS = ['Sim', 'Não'];
 

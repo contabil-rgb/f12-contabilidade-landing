@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { importMetadata } from './data/baseContabilidade.metadata.js';
 import {
-  DEFAULT_LISTS,
+  createDefaultLists,
   DETAIL_SECTIONS,
   EDITABLE_FIELDS,
   EMPTY_CLIENT,
@@ -384,10 +384,18 @@ async function loadClientesContabeisSnapshot() {
 function loadInitialState() {
   return {
     clientes: [],
-    listagens: { ...DEFAULT_LISTS },
+    listagens: createDefaultLists(),
     savedAt: '',
   };
 }
+
+// Selects persistidos no cliente que ainda precisam de um fallback tecnico minimo
+// caso a carga do Supabase venha incompleta.
+const SELECT_LIST_FALLBACKS = {
+  competencia_em_dia: YES_NO_OPTIONS,
+  cliente_notificado: YES_NO_OPTIONS,
+  ecd: YES_NO_OPTIONS,
+};
 
 function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
   const merged = { ...baseListagens };
@@ -395,10 +403,9 @@ function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
     if (!Array.isArray(valores) || !valores.length) return;
     merged[categoria] = uniqueValues(valores);
   });
-  const simNao = merged.sim_nao ?? ['Sim', 'Nao'];
-  ['competencia_em_dia', 'ecd', 'ecf', 'envio_reinf', 'distribuicao_lucros', 'cliente_notificado'].forEach((key) => {
+  Object.entries(SELECT_LIST_FALLBACKS).forEach(([key, values]) => {
     if (!Array.isArray(merged[key]) || !merged[key].length) {
-      merged[key] = simNao;
+      merged[key] = [...values];
     }
   });
   return merged;
@@ -4732,7 +4739,7 @@ export default function App() {
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
 
       const nextListagens = mergeListagensFromClients(
-        mergeListagensFromSupabase({ ...DEFAULT_LISTS }, listagensSupabase),
+        mergeListagensFromSupabase(createDefaultLists(), listagensSupabase),
         clientesComAcompanhamento,
       );
       persist(clientesComAcompanhamento, nextListagens, {
@@ -4768,7 +4775,7 @@ export default function App() {
     } catch (error) {
       const hasCurrentClients = Array.isArray(clients) && clients.length > 0;
       if (!hasCurrentClients) {
-        persist([], { ...DEFAULT_LISTS }, {
+        persist([], createDefaultLists(), {
           ...metadata,
           source: 'Supabase indisponivel',
           importedAt: metadata?.importedAt || '',

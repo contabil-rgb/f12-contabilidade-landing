@@ -39,7 +39,6 @@ const CATEGORY_ALIASES: Record<string, string> = {
   dificuldade: 'dificuldade',
   ecd: 'ecd',
   ecf: 'ecf',
-  sim_nao: 'sim_nao',
   simnao: 'sim_nao',
 };
 

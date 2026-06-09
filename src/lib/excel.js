@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import {
-  DEFAULT_LISTS,
+  createDefaultLists,
   EXCEL_HEADER_MAP,
   FIELD_DEFINITIONS,
   LIST_HEADER_MAP,
@@ -223,7 +223,7 @@ export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidad
 }
 
 export function parseListagens(sheet) {
-  const lists = { ...DEFAULT_LISTS };
+  const lists = createDefaultLists();
   if (!sheet) return lists;
 
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
@@ -247,7 +247,7 @@ export function parseListagens(sheet) {
 }
 
 export function mergeLists(lists, clients) {
-  const merged = { ...DEFAULT_LISTS, ...lists };
+  const merged = { ...createDefaultLists(), ...lists };
   const listFields = FIELD_DEFINITIONS.filter((field) => field.listKey);
   listFields.forEach((field) => {
     merged[field.listKey] = uniqueValues([
