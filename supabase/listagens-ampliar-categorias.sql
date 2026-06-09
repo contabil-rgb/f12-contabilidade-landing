@@ -1,27 +1,10 @@
+-- Portal de Gestao Contabil - Ampliacao das categorias de listagens
+-- Use este script em bases ja existentes para complementar categorias
+-- estaveis que hoje o portal ainda mantinha parcialmente em DEFAULT_LISTS.
+-- Pode ser executado mais de uma vez com seguranca.
+
 insert into public.listagens (categoria, valor, ordem)
 values
-  ('tipo_cliente', 'Bodo', 1),
-  ('tipo_cliente', 'Tambaqui', 2),
-  ('tipo_cliente', 'Salmao', 3),
-
-  ('regime_tributario', 'Simples Nacional', 1),
-  ('regime_tributario', 'Lucro Presumido', 2),
-  ('regime_tributario', 'Lucro Real', 3),
-  ('regime_tributario', 'Isento', 4),
-
-  ('atividades', 'Comercio', 1),
-  ('atividades', 'Servico', 2),
-  ('atividades', 'Comercio e Servico', 3),
-  ('atividades', 'Industria', 4),
-  ('atividades', 'Holding', 5),
-
-  ('sim_nao', 'Sim', 1),
-  ('sim_nao', 'Nao', 2),
-
-  ('situacao', 'Em dia', 1),
-  ('situacao', 'Atencao', 2),
-  ('situacao', 'Atrasado', 3),
-  ('situacao', 'Critico', 4),
   ('situacao', 'Culpa da F12', 5),
   ('situacao', 'Inativo', 6),
 
@@ -58,11 +41,6 @@ values
 
   ('cliente_notificado', 'Sim', 1),
   ('cliente_notificado', 'Nao', 2),
-
-  ('status_retorno_cliente', 'Aguardando retorno', 1),
-  ('status_retorno_cliente', 'Retorno recebido', 2),
-  ('status_retorno_cliente', 'Sem retorno', 3),
-  ('status_retorno_cliente', 'Concluido', 4),
 
   ('dificuldade', 'Baixa', 1),
   ('dificuldade', 'Media', 2),
