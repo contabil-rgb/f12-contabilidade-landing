@@ -2,40 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { clientesContabeis } from '../src/data/baseContabilidade.js';
+import { normalizeClienteRowForSync } from '../src/lib/clientes-sync.js';
 
 const ROOT = process.cwd();
 const ENV_PATH = path.join(ROOT, '.env.local');
 const APPLY_MODE = process.argv.includes('--apply');
 const BATCH_SIZE = 200;
-
-const DB_FIELDS = [
-  'cnpj',
-  'razao_social',
-  'nome_identificacao',
-  'tipo_cliente',
-  'regime_tributario',
-  'atividades',
-  'responsavel',
-  'revisor',
-  'situacao',
-  'competencia_em_dia',
-  'dias_atraso',
-  'distribuicao_lucros',
-  'envio_reinf',
-  'data_enviada_reinf',
-  'valor_lucro_acumulado',
-  'ecd',
-  'ultima_ecd_entregue',
-  'data_entrega_ecd',
-  'data_envio_ecd',
-  'responsavel_ecd',
-  'ecf',
-  'ultima_ecf_entregue',
-  'pendencia_tecnica',
-  'cliente_notificado',
-  'proxima_acao',
-  'status',
-];
 
 function readEnvLocal() {
   if (!fs.existsSync(ENV_PATH)) return {};
@@ -51,77 +23,6 @@ function readEnvLocal() {
     const value = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, '');
     out[key] = value;
   }
-  return out;
-}
-
-function normalizeText(value) {
-  const raw = String(value ?? '').trim();
-  return raw || null;
-}
-
-function normalizeCnpj(value) {
-  const digits = String(value ?? '').replace(/\D+/g, '');
-  if (!digits) return null;
-  if (digits.length !== 14) return null;
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
-}
-
-function parseDateBrOrIso(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
-  return null;
-}
-
-function parseMoney(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  const parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseIntSafe(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return 0;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
-}
-
-function toClienteRow(row) {
-  const mapped = {
-    cnpj: normalizeCnpj(row.cnpj),
-    razao_social: normalizeText(row.razao_social),
-    nome_identificacao: normalizeText(row.nome_identificacao),
-    tipo_cliente: normalizeText(row.tipo_cliente),
-    regime_tributario: normalizeText(row.regime_tributario),
-    atividades: normalizeText(row.atividades),
-    responsavel: normalizeText(row.responsavel),
-    revisor: normalizeText(row.revisor),
-    situacao: normalizeText(row.situacao),
-    competencia_em_dia: normalizeText(row.competencia_em_dia),
-    dias_atraso: parseIntSafe(row.dias_atraso),
-    distribuicao_lucros: normalizeText(row.distribuicao_lucros),
-    envio_reinf: normalizeText(row.envio_reinf),
-    data_enviada_reinf: parseDateBrOrIso(row.data_enviada_reinf),
-    valor_lucro_acumulado: parseMoney(row.valor_lucro_acumulado),
-    ecd: normalizeText(row.ecd),
-    ultima_ecd_entregue: normalizeText(row.ultima_ecd_entregue),
-    data_entrega_ecd: parseDateBrOrIso(row.data_entrega_ecd),
-    data_envio_ecd: parseDateBrOrIso(row.data_envio_ecd),
-    responsavel_ecd: normalizeText(row.responsavel_ecd),
-    ecf: normalizeText(row.ecf),
-    ultima_ecf_entregue: normalizeText(row.ultima_ecf_entregue),
-    pendencia_tecnica: normalizeText(row.pendencia_tecnica),
-    cliente_notificado: normalizeText(row.cliente_notificado),
-    proxima_acao: normalizeText(row.proxima_acao),
-    status: 'Ativo',
-  };
-
-  if (!mapped.cnpj || !mapped.razao_social) return null;
-  const out = {};
-  for (const key of DB_FIELDS) out[key] = mapped[key] ?? null;
   return out;
 }
 
@@ -152,7 +53,7 @@ async function run() {
   const url = String(urlRaw).replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const supabase = createClient(url, key);
 
-  const rows = uniqueByCnpj(clientesContabeis.map(toClienteRow).filter(Boolean));
+  const rows = uniqueByCnpj(clientesContabeis.map((row) => normalizeClienteRowForSync(row)).filter(Boolean));
   console.log(`[sync-clientes] clientes validos para upsert: ${rows.length}`);
 
   if (!APPLY_MODE) {

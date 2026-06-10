@@ -1,77 +1,7 @@
-import { formatCnpj, normalizeCnpj } from '../lib/formatters.js';
+import { normalizeClienteRowForSync } from '../lib/clientes-sync.js';
 import { supabase } from '../lib/supabase';
 
 const BATCH_SIZE = 200;
-const CLIENT_DB_FIELDS = [
-  'cnpj',
-  'razao_social',
-  'nome_identificacao',
-  'tipo_cliente',
-  'regime_tributario',
-  'atividades',
-  'dificuldade',
-  'lucro',
-  'responsavel',
-  'revisor',
-  'primeira_competencia',
-  'tem_folha',
-  'ultima_importacao',
-  'ultima_competencia_entregue',
-  'situacao',
-  'competencia_em_dia',
-  'dias_atraso',
-  'distribuicao_lucros',
-  'envio_reinf',
-  'data_enviada_reinf',
-  'valor_lucro_acumulado',
-  'precisa_ata',
-  'ata_entregue',
-  'data_entrega_ata',
-  'ecd',
-  'ultima_ecd_entregue',
-  'data_entrega_ecd',
-  'data_envio_ecd',
-  'responsavel_ecd',
-  'ecf',
-  'ultima_ecf_entregue',
-  'enviam_documentos',
-  'modo_entrega',
-  'curva_envio',
-  'ultima_competencia_enviada',
-  'data_envio_documentos',
-  'revisado_coordenador',
-  'lancamentos_padrao',
-  'motivo_atraso',
-  'pendencia_tecnica',
-  'cliente_notificado',
-  'data_notificacao_cliente',
-  'status_retorno_cliente',
-  'data_retorno_cliente',
-  'status',
-  'atualizado_em',
-];
-
-function toIsoDate(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
-  return null;
-}
-
-function parseMoney(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  const normalized = raw.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizeString(value) {
-  const raw = String(value ?? '').trim();
-  return raw || null;
-}
 
 async function workbookFromBuffer(buffer, source) {
   const { workbookFromArrayBuffer } = await import('../lib/excel.js');
@@ -84,68 +14,6 @@ function toBatch(items, size = BATCH_SIZE) {
     batches.push(items.slice(i, i + size));
   }
   return batches;
-}
-
-function normalizeClienteRow(input) {
-  const cnpjDigits = normalizeCnpj(input.cnpj);
-  const cnpj = cnpjDigits ? formatCnpj(cnpjDigits) : null;
-  const razaoSocial = normalizeString(input.razao_social);
-  if (!cnpj || !razaoSocial) return null;
-
-  const payload = {
-    cnpj,
-    razao_social: razaoSocial,
-    nome_identificacao: normalizeString(input.nome_identificacao),
-    tipo_cliente: normalizeString(input.tipo_cliente),
-    regime_tributario: normalizeString(input.regime_tributario),
-    atividades: normalizeString(input.atividades),
-    dificuldade: normalizeString(input.dificuldade),
-    lucro: normalizeString(input.lucro),
-    responsavel: normalizeString(input.responsavel),
-    revisor: normalizeString(input.revisor),
-    primeira_competencia: normalizeString(input.primeira_competencia),
-    tem_folha: normalizeString(input.tem_folha),
-    ultima_importacao: toIsoDate(input.ultima_importacao),
-    ultima_competencia_entregue: normalizeString(input.ultima_competencia_entregue),
-    situacao: normalizeString(input.situacao),
-    competencia_em_dia: normalizeString(input.competencia_em_dia),
-    dias_atraso: Number(input.dias_atraso ?? 0) || 0,
-    distribuicao_lucros: normalizeString(input.distribuicao_lucros),
-    envio_reinf: normalizeString(input.envio_reinf),
-    data_enviada_reinf: toIsoDate(input.data_enviada_reinf),
-    valor_lucro_acumulado: parseMoney(input.valor_lucro_acumulado),
-    precisa_ata: normalizeString(input.precisa_ata),
-    ata_entregue: normalizeString(input.ata_entregue),
-    data_entrega_ata: toIsoDate(input.data_entrega_ata),
-    ecd: normalizeString(input.ecd),
-    ultima_ecd_entregue: normalizeString(input.ultima_ecd_entregue),
-    data_entrega_ecd: toIsoDate(input.data_entrega_ecd),
-    data_envio_ecd: toIsoDate(input.data_envio_ecd),
-    responsavel_ecd: normalizeString(input.responsavel_ecd),
-    ecf: normalizeString(input.ecf),
-    ultima_ecf_entregue: normalizeString(input.ultima_ecf_entregue),
-    enviam_documentos: normalizeString(input.enviam_documentos),
-    modo_entrega: normalizeString(input.modo_entrega),
-    curva_envio: normalizeString(input.curva_envio),
-    ultima_competencia_enviada: normalizeString(input.ultima_competencia_enviada),
-    data_envio_documentos: toIsoDate(input.data_envio_documentos),
-    revisado_coordenador: normalizeString(input.revisado_coordenador),
-    lancamentos_padrao: normalizeString(input.lancamentos_padrao),
-    motivo_atraso: normalizeString(input.motivo_atraso),
-    pendencia_tecnica: normalizeString(input.pendencia_tecnica),
-    cliente_notificado: normalizeString(input.cliente_notificado),
-    data_notificacao_cliente: toIsoDate(input.data_notificacao_cliente),
-    status_retorno_cliente: normalizeString(input.status_retorno_cliente),
-    data_retorno_cliente: toIsoDate(input.data_retorno_cliente),
-    status: normalizeString(input.status) || 'Ativo',
-    atualizado_em: new Date().toISOString(),
-  };
-
-  const sanitized = {};
-  CLIENT_DB_FIELDS.forEach((field) => {
-    sanitized[field] = payload[field] ?? null;
-  });
-  return sanitized;
 }
 
 async function existingCnpjSet(cnpjs) {
@@ -167,7 +35,7 @@ export async function sincronizarClientesRows(rows, sourceLabel = 'sincronizacao
   let ignored = 0;
 
   for (const row of rows) {
-    const prepared = normalizeClienteRow(row);
+    const prepared = normalizeClienteRowForSync(row);
     if (!prepared) {
       ignored += 1;
       continue;
