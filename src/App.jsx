@@ -194,6 +194,13 @@ const FILTER_FIELDS = [
   'dificuldade',
 ];
 
+const PRESET_ONLY_FILTER_FIELDS = [
+  'ecd',
+  'ecf',
+  'envio_reinf',
+  'distribuicao_lucros',
+];
+
 const ALERT_FILTER_LABELS = {
   atraso: 'Clientes em atraso',
   critico: 'Situação crítica',
@@ -285,7 +292,7 @@ async function loginSupabase(email, senha) {
       message: error?.message || 'Falha ao autenticar. Verifique e-mail e senha.',
     };
   }
-  return { ok: true, authUser: data.user };
+  return { ok: true, authUser: data.user, authSession: data.session ?? null };
 }
 
 async function logoutSupabase() {
@@ -306,6 +313,37 @@ async function getAuthSessionSupabase() {
 
 async function getPerfilByAuthUserId(authUserId) {
   return buscarPerfilPorAuthUserId(authUserId);
+}
+
+async function getPerfilByAuthUserIdWithRetry(authUserId, options = {}) {
+  const attempts = Math.max(1, Number(options.attempts ?? 3) || 3);
+  const delayMs = Math.max(0, Number(options.delayMs ?? 250) || 250);
+
+  for (let index = 0; index < attempts; index += 1) {
+    const perfil = await getPerfilByAuthUserId(authUserId);
+    if (perfil) return perfil;
+    if (index < attempts - 1) {
+      await wait(delayMs);
+    }
+  }
+
+  return null;
+}
+
+async function waitForAuthSessionUser(authUserId, options = {}) {
+  const timeoutMs = Math.max(250, Number(options.timeoutMs ?? 3500) || 3500);
+  const intervalMs = Math.max(50, Number(options.intervalMs ?? 150) || 150);
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const session = await getAuthSessionSupabase();
+    if (session?.user?.id === authUserId) {
+      return session;
+    }
+    await wait(intervalMs);
+  }
+
+  return null;
 }
 
 async function updateUltimoAcessoUsuario(usuarioId) {
@@ -372,6 +410,12 @@ async function withTimeout(promise, timeoutMs, message) {
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+async function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function isAuthTimeoutError(error) {
@@ -1251,7 +1295,15 @@ function filterClients(clients, filters) {
 
     if (!matchesAlert(client, filters.alerta)) return false;
 
-    return FILTER_FIELDS.every((field) => {
+    const matchesBaseFilters = FILTER_FIELDS.every((field) => {
+      const filterValue = filters[field];
+      if (!filterValue) return true;
+      return normalizeText(client[field]) === normalizeText(filterValue);
+    });
+
+    if (!matchesBaseFilters) return false;
+
+    return PRESET_ONLY_FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
       if (!filterValue) return true;
       return normalizeText(client[field]) === normalizeText(filterValue);
@@ -4710,8 +4762,12 @@ export default function App() {
         setAuthRestoring(true);
       }
       try {
+        const authSession = await getAuthSessionSupabase();
         const perfil = await withTimeout(
-          recuperarPerfilSessaoSupabase({ preferredAuthUserId: session?.auth_user_id }),
+          recuperarPerfilSessaoSupabase({
+            preferredAuthUserId: session?.auth_user_id,
+            authSession,
+          }),
           AUTH_BOOTSTRAP_TIMEOUT_MS,
           'A validacao da sessao demorou mais do que o esperado.',
         );
@@ -4720,6 +4776,8 @@ export default function App() {
         if (perfil) {
           startSession(perfil);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
+        } else if (hasStoredSession && authSession?.user?.id) {
+          setAuthRestoring(false);
         } else {
           setAuthRestoring(false);
           setSessionProfile(null);
@@ -4738,27 +4796,25 @@ export default function App() {
               if (perfil) {
                 startSession(perfil);
               } else {
-                setSessionProfile(null);
-                clearSession();
-                setSession(null);
-                if (!shouldOpenResetViewFromUrl()) {
-                  setAuthView('login');
-                }
+                setAuthRestoring(false);
               }
             })
             .catch(() => {
               if (!active) return;
-              setSessionProfile(null);
-              clearSession();
-              setSession(null);
-              if (!shouldOpenResetViewFromUrl()) {
-                setAuthView('login');
-              }
+              setAuthRestoring(false);
             })
             .finally(() => {
               if (active) setAuthRestoring(false);
             });
           return;
+        }
+        if (hasStoredSession) {
+          const authSession = await getAuthSessionSupabase();
+          if (authSession?.user?.id) {
+            setAuthRestoring(false);
+            setAuthReady(true);
+            return;
+          }
         }
         setAuthRestoring(false);
         setSessionProfile(null);
@@ -4780,6 +4836,15 @@ export default function App() {
 
     const { data: subscription } = supabase.auth.onAuthStateChange(async (event, authSession) => {
       if (!active) return;
+
+      const hasKnownPortalSession =
+        Boolean(currentUserFullRef.current?.auth_user_id)
+        || Boolean(hasStoredSessionRef.current)
+        || Boolean(session?.auth_user_id);
+      const hasSupabaseAuthUser = Boolean(authSession?.user?.id);
+      const shouldPreserveSession =
+        event !== 'SIGNED_OUT' && (hasKnownPortalSession || hasSupabaseAuthUser);
+
       if (event === 'SIGNED_OUT') {
         setAuthRestoring(false);
         setSessionProfile(null);
@@ -4789,7 +4854,7 @@ export default function App() {
         return;
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+        if (shouldPreserveSession) {
           setAuthRestoring(true);
         }
         try {
@@ -4805,8 +4870,9 @@ export default function App() {
           if (perfil) {
             startSession(perfil);
           } else {
-            if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+            if (shouldPreserveSession) {
               setAuthRestoring(false);
+              setAuthReady(true);
               return;
             }
             setAuthRestoring(false);
@@ -4817,8 +4883,9 @@ export default function App() {
           }
         } catch {
           if (!active) return;
-          if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+          if (shouldPreserveSession) {
             setAuthRestoring(false);
+            setAuthReady(true);
             return;
           }
           setAuthRestoring(false);
@@ -4933,7 +5000,10 @@ export default function App() {
 
     const uniqueCandidateIds = [...new Set(candidateIds.filter(Boolean))];
     for (const authUserId of uniqueCandidateIds) {
-      const perfil = await getPerfilByAuthUserId(authUserId);
+      const perfil = await getPerfilByAuthUserIdWithRetry(authUserId, {
+        attempts: 3,
+        delayMs: 250,
+      });
       if (!perfil) continue;
       if (perfil.status !== 'Ativo') return null;
       if (perfil.bloqueado_ate && new Date(perfil.bloqueado_ate).getTime() > Date.now()) return null;
@@ -5093,7 +5163,18 @@ export default function App() {
 
     let perfil = null;
     try {
-      perfil = await getPerfilByAuthUserId(auth.authUser.id);
+      const authSession =
+        auth.authSession?.user?.id === auth.authUser.id
+          ? auth.authSession
+          : await waitForAuthSessionUser(auth.authUser.id, {
+            timeoutMs: 3500,
+            intervalMs: 150,
+          });
+
+      perfil = await recuperarPerfilSessaoSupabase({
+        preferredAuthUserId: auth.authUser.id,
+        authSession,
+      });
     } catch (error) {
       await logoutSupabase().catch(() => {});
       return { ok: false, message: `Falha ao validar perfil no banco: ${error.message}` };
