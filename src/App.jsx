@@ -298,6 +298,12 @@ async function getAuthUserSupabase() {
   return data?.user ?? null;
 }
 
+async function getAuthSessionSupabase() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return null;
+  return data?.session ?? null;
+}
+
 async function getPerfilByAuthUserId(authUserId) {
   return buscarPerfilPorAuthUserId(authUserId);
 }
@@ -4586,6 +4592,16 @@ export default function App() {
   }, [currentUserFull?.id]);
 
   useEffect(() => {
+    if (currentUserFull) {
+      setAuthRestoring(false);
+      return;
+    }
+    if (!hasStoredSession) {
+      setAuthRestoring(false);
+    }
+  }, [currentUserFull, hasStoredSession]);
+
+  useEffect(() => {
     let active = true;
 
     async function bootstrapAuth() {
@@ -4594,7 +4610,7 @@ export default function App() {
       }
       try {
         const perfil = await withTimeout(
-          recuperarPerfilSessaoSupabase(),
+          recuperarPerfilSessaoSupabase({ preferredAuthUserId: session?.auth_user_id }),
           AUTH_BOOTSTRAP_TIMEOUT_MS,
           'A validacao da sessao demorou mais do que o esperado.',
         );
@@ -4602,7 +4618,6 @@ export default function App() {
 
         if (perfil) {
           startSession(perfil);
-          setAuthRestoring(false);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
         } else {
           setAuthRestoring(false);
@@ -4615,7 +4630,7 @@ export default function App() {
       } catch (error) {
         if (!active) return;
         if (isAuthTimeoutError(error) && hasStoredSession) {
-          void recuperarPerfilSessaoSupabase()
+          void recuperarPerfilSessaoSupabase({ preferredAuthUserId: session?.auth_user_id })
             .then((perfil) => {
               if (!active) return;
               if (perfil) {
@@ -4658,7 +4673,7 @@ export default function App() {
 
     bootstrapAuth();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, authSession) => {
       if (!active) return;
       if (event === 'SIGNED_OUT') {
         setAuthRestoring(false);
@@ -4670,14 +4685,16 @@ export default function App() {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         try {
           const perfil = await withTimeout(
-            recuperarPerfilSessaoSupabase(),
+            recuperarPerfilSessaoSupabase({
+              preferredAuthUserId: authSession?.user?.id ?? session?.auth_user_id,
+              authSession,
+            }),
             AUTH_BOOTSTRAP_TIMEOUT_MS,
             'A atualizacao da sessao demorou mais do que o esperado.',
           );
           if (!active) return;
           if (perfil) {
             startSession(perfil);
-            setAuthRestoring(false);
           } else {
             setAuthRestoring(false);
             clearSession();
@@ -4698,7 +4715,7 @@ export default function App() {
       active = false;
       subscription?.subscription?.unsubscribe?.();
     };
-  }, [hasStoredSession]);
+  }, [hasStoredSession, session?.auth_user_id]);
 
   useEffect(() => {
     if (authView !== 'reset') return;
@@ -4774,17 +4791,31 @@ export default function App() {
     }));
   }
 
-  async function recuperarPerfilSessaoSupabase() {
-    const authUser = await getAuthUserSupabase();
-    if (!authUser) return null;
+  async function recuperarPerfilSessaoSupabase({ preferredAuthUserId, authSession } = {}) {
+    const candidateIds = [];
+    if (preferredAuthUserId) candidateIds.push(preferredAuthUserId);
 
-    const perfil = await getPerfilByAuthUserId(authUser.id);
-    if (!perfil) return null;
-    if (perfil.status !== 'Ativo') return null;
-    if (perfil.bloqueado_ate && new Date(perfil.bloqueado_ate).getTime() > Date.now()) return null;
+    const sessionAtual = authSession ?? await getAuthSessionSupabase();
+    const sessionAuthUserId = sessionAtual?.user?.id;
+    if (sessionAuthUserId) candidateIds.push(sessionAuthUserId);
 
-    sincronizarPerfilUsuario(perfil);
-    return perfil;
+    if (!candidateIds.length) {
+      const authUser = await getAuthUserSupabase();
+      if (authUser?.id) candidateIds.push(authUser.id);
+    }
+
+    const uniqueCandidateIds = [...new Set(candidateIds.filter(Boolean))];
+    for (const authUserId of uniqueCandidateIds) {
+      const perfil = await getPerfilByAuthUserId(authUserId);
+      if (!perfil) continue;
+      if (perfil.status !== 'Ativo') return null;
+      if (perfil.bloqueado_ate && new Date(perfil.bloqueado_ate).getTime() > Date.now()) return null;
+
+      sincronizarPerfilUsuario(perfil);
+      return perfil;
+    }
+
+    return null;
   }
 
   async function carregarDadosSupabase({ silent = true } = {}) {
