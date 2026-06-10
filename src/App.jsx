@@ -984,6 +984,10 @@ function hasAcompanhamentoPendente(client) {
   return fallback;
 }
 
+function hasComunicacaoOuRetornoPendente(client) {
+  return getClientAlertSignals(client).some((alert) => ['comunicacao', 'retorno'].includes(alert.key));
+}
+
 function getStatusAcompanhamentoLabel(client) {
   if (hasAcompanhamentoPersistido(client)) {
     return getAcompanhamentoText(client, 'status_acompanhamento_label', 'Sem notificacao') || 'Sem notificacao';
@@ -1805,7 +1809,7 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
 }
 
-function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh, loading = false }) {
+function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, metadata, onRefresh, loading = false }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
@@ -1914,7 +1918,7 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
         />
         <MetricCard title="Clientes em dia" value={emDia} icon={CheckCircle2} tone="success" onClick={() => onPreset({ competencia_em_dia: 'Sim' }, 'Clientes em dia')} />
         <MetricCard title="Clientes em atraso" value={emAtraso} icon={FolderClock} tone="warning" onClick={() => onPreset({ alerta: 'atraso' }, 'Clientes em atraso')} />
-        <MetricCard title="Pendências ativas" value={pendencias} icon={ShieldAlert} tone="danger" onClick={() => onPreset({ alerta: 'comunicacao' }, 'Pendências ativas')} />
+        <MetricCard title="Pendencias ativas" value={pendencias} detail="Abre a central operacional para triagem" icon={ShieldAlert} tone="danger" onClick={() => onOpenPendencias?.()} />
         <MetricCard title="Média de dias em atraso" value={diasAtrasoMedio} detail="Média simples da carteira" icon={AlertTriangle} tone={criticos > 0 ? 'warning' : 'neutral'} onClick={() => onPreset({ alerta: 'atraso' }, 'Média atraso')} />
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -2648,8 +2652,8 @@ function PendenciasPage({
     },
     {
       key: 'comunicacao',
-      label: 'Acompanhamento do cliente',
-      value: countWhere(clients, (client) => hasAcompanhamentoPendente(client)),
+      label: 'Comunicacao e retorno',
+      value: countWhere(clients, (client) => hasComunicacaoOuRetornoPendente(client)),
       tone: 'info',
     },
     {
@@ -2756,7 +2760,7 @@ function PendenciasPage({
     },
     {
       key: 'comunicacao',
-      label: 'Acompanhamento',
+      label: 'Comunicacao e retorno',
       value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length,
       tone: 'info',
     },
@@ -2853,7 +2857,7 @@ function PendenciasPage({
     },
     {
       key: 'notificacao',
-      title: 'Acompanhamento',
+      title: 'Comunicacao e retorno',
       value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
       tone: 'info',
       detail: 'Clientes que ainda precisam de notificacao ou retorno registrado.',
@@ -2950,7 +2954,7 @@ function PendenciasPage({
                       {bucket.key === 'critico'
                         ? 'Casos com impacto operacional imediato'
                         : bucket.key === 'comunicacao'
-                          ? 'Clientes com notificacao, retorno ou prazo para acompanhar'
+                          ? 'Clientes que ainda precisam de notificacao ou retorno registrado'
                           : 'Pendências que pedem ação nesta frente'}
                     </p>
                   </div>
@@ -5868,6 +5872,10 @@ export default function App() {
         <DashboardPage
           clients={enrichedClients}
           onPreset={applyPreset}
+          onOpenPendencias={() => {
+            setPendenciasSearchContext(null);
+            setPage('pendencias');
+          }}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
@@ -6128,6 +6136,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
