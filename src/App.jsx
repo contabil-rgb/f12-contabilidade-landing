@@ -1810,7 +1810,7 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
   const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
-  const acompanhamentoPendente = countWhere(clients, (client) => hasAcompanhamentoPendente(client));
+  const comunicacaoPendente = countWhere(clients, (client) => isComunicacaoPendente(client));
   const retornoPendente = countWhere(clients, (client) => isAguardandoRetorno(client));
   const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
   const diasAtrasoMedio = total
@@ -1871,8 +1871,8 @@ function DashboardPage({ clients, onPreset, supabaseStatus, metadata, onRefresh,
       filter: { alerta: 'retorno' },
     },
     {
-      title: 'Acompanhamento pendente',
-      value: acompanhamentoPendente,
+      title: 'Comunicacao pendente',
+      value: comunicacaoPendente,
       icon: Mail,
       tone: 'info',
       filter: { alerta: 'comunicacao' },
@@ -2369,10 +2369,10 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
 function BaseClientesPage(props) {
   const acompanhamentoMetrics = [
     {
-      key: 'acompanhamento',
-      title: 'Acompanhamento pendente',
-      value: countWhere(props.clients, (client) => hasAcompanhamentoPendente(client)),
-      detail: 'Clientes com retorno ou prazo para acompanhar',
+      key: 'comunicacao',
+      title: 'Comunicacao pendente',
+      value: countWhere(props.clients, (client) => isComunicacaoPendente(client)),
+      detail: 'Clientes com comunicacao pendente registrada',
       icon: Mail,
       tone: 'info',
       patch: { alerta: 'comunicacao' },
