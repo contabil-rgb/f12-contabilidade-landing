@@ -440,6 +440,27 @@ function loadSecurityState() {
   };
 }
 
+function normalizeSessionProfileSnapshot(profile) {
+  if (!profile || typeof profile !== 'object') return null;
+  if (!profile.id || !profile.auth_user_id) return null;
+  return {
+    id: profile.id,
+    auth_user_id: profile.auth_user_id,
+    nome: String(profile.nome ?? '').trim(),
+    email: String(profile.email ?? '').trim().toLowerCase(),
+    cargo: String(profile.cargo ?? '').trim(),
+    setor: String(profile.setor ?? '').trim(),
+    perfil_acesso: String(profile.perfil_acesso ?? '').trim(),
+    status: String(profile.status ?? 'Ativo').trim() || 'Ativo',
+    ultimo_acesso: String(profile.ultimo_acesso ?? '').trim(),
+    precisa_trocar_senha: Boolean(profile.precisa_trocar_senha),
+    tentativas_invalidas: Number(profile.tentativas_invalidas ?? 0) || 0,
+    bloqueado_ate: String(profile.bloqueado_ate ?? '').trim(),
+    criado_em: String(profile.criado_em ?? '').trim(),
+    atualizado_em: String(profile.atualizado_em ?? '').trim(),
+  };
+}
+
 function loadSession() {
   try {
     const raw = window.localStorage.getItem(AUTH_SESSION_KEY);
@@ -447,10 +468,22 @@ function loadSession() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
     if (!parsed.usuario_id || !parsed.auth_user_id) return null;
-    return parsed;
+    return {
+      ...parsed,
+      profile: normalizeSessionProfileSnapshot(parsed.profile),
+    };
   } catch {
     return null;
   }
+}
+
+function loadInitialSessionState() {
+  const session = loadSession();
+  return {
+    session,
+    sessionProfile: normalizeSessionProfileSnapshot(session?.profile),
+    authReady: Boolean(session?.auth_user_id),
+  };
 }
 
 function saveSession(session) {
@@ -755,6 +788,18 @@ function getAcompanhamentoPersistido(client) {
   return client?._db_acompanhamento_operacional ?? {};
 }
 
+function hasObrigacoesPersistidas(client) {
+  return Boolean(client?._db_obrigacoes);
+}
+
+function hasRiscoPersistido(client) {
+  return Boolean(client?._db_risco_operacional);
+}
+
+function hasAcompanhamentoPersistido(client) {
+  return Boolean(client?._db_acompanhamento_operacional);
+}
+
 function getObrigacaoFlag(client, key, fallback = false) {
   const value = getObrigacoesPersistidas(client)?.[key];
   return typeof value === 'boolean' ? value : fallback;
@@ -792,26 +837,32 @@ function getDiasAtrasoValue(client) {
 }
 
 function isEmAtraso(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'em_atraso', false);
   return getRiscoFlag(client, 'em_atraso', getClientAnalysis(client).emAtraso);
 }
 
 function isSituacaoCritica(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'situacao_critica', false);
   return getRiscoFlag(client, 'situacao_critica', getClientAnalysis(client).situacaoCritica);
 }
 
 function isPendenciaTecnica(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'pendencia_tecnica', false);
   return getRiscoFlag(client, 'pendencia_tecnica', getClientAnalysis(client).pendenciaTecnica);
 }
 
 function isDocumentoAtrasado(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'documentos_atrasados', false);
   return getRiscoFlag(client, 'documentos_atrasados', getClientAnalysis(client).documentosAtrasados);
 }
 
 function isAtaPendente(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'ata_pendente', false);
   return getRiscoFlag(client, 'ata_pendente', getClientAnalysis(client).ataPendente);
 }
 
 function hasPendenciaOperacional(client) {
+  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'has_pendencia', false);
   return getRiscoFlag(client, 'has_pendencia', getClientAnalysis(client).hasPendencia);
 }
 
@@ -838,42 +889,34 @@ function getStatusRetornoClienteValue(client) {
 }
 
 function hasRetornoConcluido(client) {
+  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'retorno_recebido', false);
   if (getAcompanhamentoFlag(client, 'retorno_recebido', false)) return true;
   const status = getStatusRetornoClienteValue(client);
   return status === normalizeText('Retorno recebido') || status === normalizeText('Concluido');
 }
 
 function isAguardandoRetorno(client) {
+  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'aguardando_retorno', false);
   const fallback = (() => {
     if (!isYes(client?.cliente_notificado)) return false;
     if (hasRetornoConcluido(client)) return false;
     const status = getStatusRetornoClienteValue(client);
     return !status || status === normalizeText('Aguardando retorno') || status === normalizeText('Sem retorno');
   })();
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'aguardando_retorno')) {
-    return getAcompanhamentoFlag(client, 'aguardando_retorno', fallback);
-  }
   return fallback;
 }
 
 function isSemRetorno(client) {
+  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'sem_retorno', false);
   const fallback = isYes(client?.cliente_notificado)
     && !hasRetornoConcluido(client)
     && getStatusRetornoClienteValue(client) === normalizeText('Sem retorno');
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'sem_retorno')) {
-    return getAcompanhamentoFlag(client, 'sem_retorno', fallback);
-  }
   return fallback;
 }
 
 function isClienteNotificado(client) {
+  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'cliente_notificado_bool', false);
   const fallback = isYes(client?.cliente_notificado);
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'cliente_notificado_bool')) {
-    return getAcompanhamentoFlag(client, 'cliente_notificado_bool', fallback);
-  }
   return fallback;
 }
 
@@ -890,17 +933,17 @@ function getDiasSemRetorno(client) {
 }
 
 function hasAcompanhamentoPendente(client) {
+  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'acompanhamento_pendente', false);
   const fallback =
     isComunicacaoPendente(client)
     || isAguardandoRetorno(client);
-  const persisted = getAcompanhamentoPersistido(client);
-  if (persisted && Object.prototype.hasOwnProperty.call(persisted, 'acompanhamento_pendente')) {
-    return getAcompanhamentoFlag(client, 'acompanhamento_pendente', fallback);
-  }
   return fallback;
 }
 
 function getStatusAcompanhamentoLabel(client) {
+  if (hasAcompanhamentoPersistido(client)) {
+    return getAcompanhamentoText(client, 'status_acompanhamento_label', 'Sem notificacao') || 'Sem notificacao';
+  }
   const fallback = (() => {
     if (isSemRetorno(client)) return 'Sem retorno';
     if (isAguardandoRetorno(client)) return 'Aguardando retorno';
@@ -912,6 +955,9 @@ function getStatusAcompanhamentoLabel(client) {
 }
 
 function getStatusAcompanhamentoCodigo(client) {
+  if (hasAcompanhamentoPersistido(client)) {
+    return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', 'sem_notificacao') || 'sem_notificacao');
+  }
   const fallback = (() => {
     if (isSemRetorno(client)) return 'sem_retorno';
     if (isAguardandoRetorno(client)) return 'aguardando_retorno';
@@ -939,42 +985,52 @@ function hasObrigacaoComprovante(client, key, fallbackField) {
 }
 
 function isReinfPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'reinf_pendente', false);
   return getObrigacaoFlag(client, 'reinf_pendente', getClientAnalysis(client).reinfPendente);
 }
 
 function isReciboReinfPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_reinf_pendente', false);
   return getObrigacaoFlag(client, 'recibo_reinf_pendente', getClientAnalysis(client).reciboReinfPendente);
 }
 
 function isEcdPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_pendente', false);
   return getObrigacaoFlag(client, 'ecd_pendente', getClientAnalysis(client).ecdPendente);
 }
 
 function isEcdAguardandoEnvio(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_aguardando_envio', false);
   return getObrigacaoFlag(client, 'ecd_aguardando_envio', getClientAnalysis(client).ecdAguardandoEnvio);
 }
 
 function isEcdResponsavelPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_responsavel_pendente', false);
   return getObrigacaoFlag(client, 'ecd_responsavel_pendente', getClientAnalysis(client).ecdResponsavelPendente);
 }
 
 function isReciboEcdPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_ecd_pendente', false);
   return getObrigacaoFlag(client, 'recibo_ecd_pendente', getClientAnalysis(client).reciboEcdPendente);
 }
 
 function isEcfPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecf_pendente', false);
   return getObrigacaoFlag(client, 'ecf_pendente', getClientAnalysis(client).ecfPendente);
 }
 
 function isReciboEcfPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_ecf_pendente', false);
   return getObrigacaoFlag(client, 'recibo_ecf_pendente', getClientAnalysis(client).reciboEcfPendente);
 }
 
 function isComunicacaoPendente(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'comunicacao_pendente', false);
   return getObrigacaoFlag(client, 'comunicacao_pendente', getClientAnalysis(client).comunicacaoPendente);
 }
 
 function isPendenciaCritica(client) {
+  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'pendencia_critica', false);
   return getObrigacaoFlag(client, 'pendencia_critica', isSituacaoCritica(client) || isPendenciaTecnica(client));
 }
 
@@ -4527,11 +4583,12 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
 export default function App() {
   const initialState = useMemo(loadInitialState, []);
   const initialSecurityState = useMemo(loadSecurityState, []);
+  const initialSessionState = useMemo(loadInitialSessionState, []);
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
   const [metadata, setMetadata] = useState({ ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
-  const [session, setSession] = useState(loadSession);
+  const [session, setSession] = useState(initialSessionState.session);
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
   const [page, setPage] = useState('dashboard');
   const [pendenciasSearchContext, setPendenciasSearchContext] = useState(null);
@@ -4550,18 +4607,23 @@ export default function App() {
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
+  const [sessionProfile, setSessionProfile] = useState(initialSessionState.sessionProfile);
+  const [authReady, setAuthReady] = useState(initialSessionState.authReady);
   const [authRestoring, setAuthRestoring] = useState(false);
   const importInputRef = useRef(null);
+  const currentUserFullRef = useRef(null);
+  const hasStoredSessionRef = useRef(false);
   const hasStoredSession = Boolean(session?.usuario_id && session?.auth_user_id);
 
   const currentUserFull = useMemo(() => {
     if (!session?.usuario_id) return null;
-    const user = security.usuarios.find((item) => item.id === session.usuario_id);
+    const user = security.usuarios.find((item) => item.id === session.usuario_id)
+      || (sessionProfile?.id === session.usuario_id ? sessionProfile : null);
     if (!user || user.status !== 'Ativo') return null;
     if (session?.auth_user_id && user?.auth_user_id && session.auth_user_id !== user.auth_user_id) return null;
     return user;
-  }, [security.usuarios, session]);
+  }, [security.usuarios, session, sessionProfile]);
+  const shouldHoldAuthenticatedEntry = hasStoredSession && !currentUserFull;
 
   const currentUser = useMemo(() => sanitizeUser(currentUserFull), [currentUserFull]);
 
@@ -4585,6 +4647,11 @@ export default function App() {
     if (page !== 'detalhe') return;
     carregarHistoricoCliente(selectedClientId);
   }, [page, selectedClientId]);
+
+  useEffect(() => {
+    currentUserFullRef.current = currentUserFull;
+    hasStoredSessionRef.current = hasStoredSession;
+  }, [currentUserFull, hasStoredSession]);
 
   useEffect(() => {
     if (!currentUserFull || currentUserFull.precisa_trocar_senha) return;
@@ -4621,6 +4688,7 @@ export default function App() {
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
         } else {
           setAuthRestoring(false);
+          setSessionProfile(null);
           clearSession();
           setSession(null);
           if (!shouldOpenResetViewFromUrl()) {
@@ -4636,6 +4704,7 @@ export default function App() {
               if (perfil) {
                 startSession(perfil);
               } else {
+                setSessionProfile(null);
                 clearSession();
                 setSession(null);
                 if (!shouldOpenResetViewFromUrl()) {
@@ -4645,6 +4714,7 @@ export default function App() {
             })
             .catch(() => {
               if (!active) return;
+              setSessionProfile(null);
               clearSession();
               setSession(null);
               if (!shouldOpenResetViewFromUrl()) {
@@ -4657,6 +4727,7 @@ export default function App() {
           return;
         }
         setAuthRestoring(false);
+        setSessionProfile(null);
         clearSession();
         setSession(null);
         setAuthView('login');
@@ -4677,12 +4748,16 @@ export default function App() {
       if (!active) return;
       if (event === 'SIGNED_OUT') {
         setAuthRestoring(false);
+        setSessionProfile(null);
         clearSession();
         setSession(null);
         setAuthView('login');
         return;
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+          setAuthRestoring(true);
+        }
         try {
           const perfil = await withTimeout(
             recuperarPerfilSessaoSupabase({
@@ -4696,14 +4771,24 @@ export default function App() {
           if (perfil) {
             startSession(perfil);
           } else {
+            if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+              setAuthRestoring(false);
+              return;
+            }
             setAuthRestoring(false);
+            setSessionProfile(null);
             clearSession();
             setSession(null);
             setAuthView('login');
           }
         } catch {
           if (!active) return;
+          if (event !== 'SIGNED_IN' && (currentUserFullRef.current || hasStoredSessionRef.current)) {
+            setAuthRestoring(false);
+            return;
+          }
           setAuthRestoring(false);
+          setSessionProfile(null);
           clearSession();
           setSession(null);
           setAuthView('login');
@@ -4754,6 +4839,10 @@ export default function App() {
 
   function sincronizarPerfilUsuario(perfil) {
     if (!perfil?.id) return;
+    setSessionProfile((current) => ({
+      ...current,
+      ...perfil,
+    }));
     persistSecurity((current) => {
       const existentes = current.usuarios ?? [];
       const idx = existentes.findIndex((item) => item.id === perfil.id);
@@ -4785,6 +4874,10 @@ export default function App() {
 
   function sincronizarUsuariosSupabase(usuariosSupabase) {
     if (!Array.isArray(usuariosSupabase) || !usuariosSupabase.length) return;
+    const usuarioSessao = usuariosSupabase.find((item) => item.id === session?.usuario_id);
+    if (usuarioSessao) {
+      setSessionProfile(usuarioSessao);
+    }
     persistSecurity((current) => ({
       ...current,
       usuarios: usuariosSupabase,
@@ -4923,10 +5016,13 @@ export default function App() {
 
   function startSession(perfil) {
     if (!perfil?.id || !perfil?.auth_user_id) return;
+    const profileSnapshot = normalizeSessionProfileSnapshot(perfil);
+    setSessionProfile(profileSnapshot);
     const nextSession = {
       usuario_id: perfil.id,
       auth_user_id: perfil.auth_user_id,
       email: perfil.email ?? '',
+      profile: profileSnapshot,
       inicio: Date.now(),
       ultima_atividade: Date.now(),
     };
@@ -4936,6 +5032,7 @@ export default function App() {
 
   function logout(message) {
     logoutSupabase().catch(() => {});
+    setSessionProfile(null);
     clearSession();
     setSession(null);
     setAuthView('login');
@@ -5599,7 +5696,7 @@ export default function App() {
   }
 
   if (!currentUserFull) {
-    if (authRestoring && hasStoredSession) {
+    if (shouldHoldAuthenticatedEntry || (authRestoring && hasStoredSession)) {
       return (
         <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
           <p className="text-sm font-semibold">Restaurando sessao...</p>
