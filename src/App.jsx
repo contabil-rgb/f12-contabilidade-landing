@@ -1281,7 +1281,10 @@ function AppShell({
   currentUser,
   onLogout,
   canImport,
+  canImportEnabled = true,
+  importDisabledReason = '',
   supabaseStatus,
+  writeBlockedMessage = '',
   searchClients = [],
   searchHistory = [],
   onOpenClient,
@@ -1585,7 +1588,9 @@ function AppShell({
                 <button
                   type="button"
                   onClick={onImportClick}
-                  className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-navy-700"
+                  disabled={!canImportEnabled}
+                  title={!canImportEnabled ? importDisabledReason : ''}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Upload size={17} aria-hidden="true" />
                   Importar Excel
@@ -1603,6 +1608,12 @@ function AppShell({
               <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{supabaseStatus?.message ?? 'Dados locais'}</div>
             </div>
           </div>
+
+          {writeBlockedMessage ? (
+            <div className="border-t border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 sm:px-6">
+              {writeBlockedMessage}
+            </div>
+          ) : null}
 
           <div className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-3 sm:px-6 lg:hidden">
             {visibleNavItems.map(({ key, label, icon: Icon }) => (
@@ -1933,6 +1944,8 @@ function SearchAndFilters({
   visibleCount,
   totalCount,
   canCreateClient,
+  canCreateClientEnabled = true,
+  createDisabledReason = '',
   clientsForOptions = [],
 }) {
   function updateFilter(patch) {
@@ -1972,7 +1985,9 @@ function SearchAndFilters({
             <button
               type="button"
               onClick={onNewClient}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-navy-700"
+              disabled={!canCreateClientEnabled}
+              title={!canCreateClientEnabled ? createDisabledReason : ''}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={16} aria-hidden="true" />
               Novo cliente
@@ -3668,6 +3683,8 @@ function ReportsPage({
   onResetBase,
   canExport,
   canResetBase,
+  canResetBaseEnabled = true,
+  resetBaseDisabledReason = '',
   supabaseStatus,
   metadata,
   onRefresh,
@@ -3764,7 +3781,9 @@ function ReportsPage({
               <button
                 type="button"
                 onClick={onResetBase}
-                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-black text-red-600"
+                disabled={!canResetBaseEnabled}
+                title={!canResetBaseEnabled ? resetBaseDisabledReason : ''}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCcw size={16} aria-hidden="true" />
                 Reaplicar snapshot local
@@ -4626,6 +4645,12 @@ export default function App() {
   const shouldHoldAuthenticatedEntry = hasStoredSession && !currentUserFull;
 
   const currentUser = useMemo(() => sanitizeUser(currentUserFull), [currentUserFull]);
+  const canWritePortalData = supabaseStatus.connected && !authRestoring;
+  const writeBlockedMessage = authRestoring
+    ? 'Sessao em restauracao. As consultas continuam disponiveis, mas gravacoes ficam bloqueadas ate a reconexao completa.'
+    : !supabaseStatus.connected
+      ? 'Supabase indisponivel no momento. O portal esta em modo protegido: consultas liberadas e gravacoes bloqueadas ate a reconexao.'
+      : '';
 
   const enrichedClients = useMemo(() => {
     const allClients = enrichClients(clients);
@@ -4657,6 +4682,15 @@ export default function App() {
     if (!currentUserFull || currentUserFull.precisa_trocar_senha) return;
     carregarDadosSupabase({ silent: true });
   }, [currentUserFull?.id]);
+
+  function ensureSupabaseWriteReady(actionLabel = 'realizar esta gravacao') {
+    if (canWritePortalData) return true;
+    setToast({
+      title: 'Gravacao bloqueada',
+      message: writeBlockedMessage || `Nao foi possivel ${actionLabel} porque o portal ainda nao esta pronto para gravar no Supabase.`,
+    });
+    return false;
+  }
 
   useEffect(() => {
     if (currentUserFull) {
@@ -5203,6 +5237,7 @@ export default function App() {
 
   async function saveClient(client) {
     if (!currentUserFull) return;
+    if (!ensureSupabaseWriteReady(client?.id ? 'salvar o cliente' : 'criar o cliente')) return;
     client = { ...client, ...applyResponsavelEcdFallback(client, client) };
     const key = normalizeCnpj(client.cnpj) || client.id;
     const nextClients = [...clients];
@@ -5299,6 +5334,7 @@ export default function App() {
 
   async function quickUpdateClient(id, patch) {
     if (!currentUserFull) return;
+    if (!ensureSupabaseWriteReady('salvar a atualizacao rapida')) return;
     const previous = clients.find((client) => client.id === id);
     if (!previous || !canViewClient(currentUserFull, previous)) return;
     patch = applyResponsavelEcdFallback(previous, patch);
@@ -5427,6 +5463,7 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode inativar clientes.' });
       return;
     }
+    if (!ensureSupabaseWriteReady('inativar o cliente')) return;
     if (!confirm(`Inativar ${client.nome_identificacao || client.razao_social}?`)) return;
     let previousForHistory = client;
     if (isUuid(client.id)) {
@@ -5478,6 +5515,7 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode importar planilhas.' });
       return;
     }
+    if (!ensureSupabaseWriteReady('importar clientes')) return;
 
     try {
       const buffer = await file.arrayBuffer();
@@ -5502,6 +5540,7 @@ export default function App() {
 
   async function confirmarImportacaoExcel() {
     if (!importPreview?.buffer || !importPreview?.fileName) return;
+    if (!ensureSupabaseWriteReady('confirmar a importacao')) return;
     setImportBusy(true);
     try {
       const clientesAntesImportacao = [...clients];
@@ -5585,6 +5624,8 @@ export default function App() {
     }
     if (!confirm('Reaplicar os clientes do snapshot administrativo local no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
 
+    if (!ensureSupabaseWriteReady('reaplicar o snapshot local')) return;
+
     let sync;
     try {
       sync = await reaplicarSnapshotClientesLocal({ transformRow: withClientDefaults });
@@ -5623,6 +5664,7 @@ export default function App() {
 
   async function saveUser(userValues) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) return;
+    if (!ensureSupabaseWriteReady('salvar o usuario')) return;
     if (!security.usuarios.some((user) => user.id === userValues.id)) {
       setToast({ title: 'Acao bloqueada', message: 'Usuario nao encontrado na base local.' });
       return;
@@ -5662,6 +5704,7 @@ export default function App() {
   }
 
   async function toggleUserStatus(user) {
+    if (!ensureSupabaseWriteReady('alterar o status do usuario')) return;
     if (user.id === currentUserFull?.id) {
       setToast({ title: 'Acao bloqueada', message: 'Voce nao pode inativar seu proprio usuario.' });
       return;
@@ -5758,7 +5801,10 @@ export default function App() {
         listagens={listagens}
         quickFilterLabel={quickFilterLabel}
         onClear={clearFilters}
-        onNewClient={() => setEditingClient({})}
+        onNewClient={() => {
+          if (!ensureSupabaseWriteReady('abrir o cadastro de cliente')) return;
+          setEditingClient({});
+        }}
         onManualFilter={() => setQuickFilterLabel('')}
         visibleCount={filteredClients.length}
         totalCount={enrichedClients.length}
@@ -5766,12 +5812,17 @@ export default function App() {
         sort={sort}
         setSort={setSort}
         onView={openClient}
-        onEdit={setEditingClient}
+        onEdit={(client) => {
+          if (!ensureSupabaseWriteReady('editar o cliente')) return;
+          setEditingClient(client);
+        }}
         onInactivate={inactivateClient}
         canCreateClient={canCreateClient}
+        canCreateClientEnabled={canCreateClient && canWritePortalData}
+        createDisabledReason={writeBlockedMessage}
         allClients={enrichedClients}
-        canEditRow={(client) => canEditClient(currentUserFull, client)}
-        canInactivateRow={(client) => can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
+        canEditRow={(client) => canWritePortalData && canEditClient(currentUserFull, client)}
+        canInactivateRow={(client) => canWritePortalData && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         renderClientCell={(client, fieldKey) => {
           if (fieldKey === 'responsavel') {
             return renderFieldValue(getResponsavelOperacional(client));
@@ -5795,8 +5846,11 @@ export default function App() {
       <DetailPage
         client={selectedClient}
         onBack={() => setPage('clientes')}
-        onEdit={setEditingClient}
-        canEditCurrent={selectedClient ? canEditClient(currentUserFull, selectedClient) : false}
+        onEdit={(client) => {
+          if (!ensureSupabaseWriteReady('editar o cliente')) return;
+          setEditingClient(client);
+        }}
+        canEditCurrent={selectedClient ? canWritePortalData && canEditClient(currentUserFull, selectedClient) : false}
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoError={handleAnexoError}
@@ -5837,7 +5891,7 @@ export default function App() {
         clients={enrichedClients}
         onView={openClient}
         canManageAttachments={canManageAttachment}
-        canEditReinfDate={(client) => isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'data_enviada_reinf')}
+        canEditReinfDate={(client) => canWritePortalData && isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'data_enviada_reinf')}
         onQuickUpdate={quickUpdateClient}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoError={handleAnexoError}
@@ -5874,6 +5928,8 @@ export default function App() {
           onResetBase={resetBase}
           canExport={canExportReports}
           canResetBase={isAdmin(currentUserFull)}
+          canResetBaseEnabled={isAdmin(currentUserFull) && canWritePortalData}
+          resetBaseDisabledReason={writeBlockedMessage}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
@@ -5886,7 +5942,10 @@ export default function App() {
         <Suspense fallback={<PageLoadingFallback label="Carregando gestão de usuários..." />}>
           <LazyUsersPage
             users={security.usuarios.map(sanitizeUser)}
-            onEdit={(user) => setEditingUser(security.usuarios.find((item) => item.id === user.id))}
+            onEdit={(user) => {
+              if (!ensureSupabaseWriteReady('editar o usuario')) return;
+              setEditingUser(security.usuarios.find((item) => item.id === user.id));
+            }}
             onToggleStatus={toggleUserStatus}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
@@ -5925,13 +5984,19 @@ export default function App() {
       <AppShell
         page={page}
         setPage={setPage}
-        onImportClick={() => importInputRef.current?.click()}
+        onImportClick={() => {
+          if (!ensureSupabaseWriteReady('abrir a importacao')) return;
+          importInputRef.current?.click();
+        }}
         metadata={metadata}
         totalClientes={enrichedClients.length}
         currentUser={currentUser}
         onLogout={() => logout()}
         canImport={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL)}
+        canImportEnabled={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL) && canWritePortalData}
+        importDisabledReason={writeBlockedMessage}
         supabaseStatus={supabaseStatus}
+        writeBlockedMessage={writeBlockedMessage}
         searchClients={enrichedClients}
         searchHistory={can(currentUserFull, PERMISSIONS.HISTORY_VIEW) ? security.historico_alteracoes : []}
         onOpenClient={openClient}
