@@ -279,6 +279,7 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
   motivo_atraso: 'Motivo do atraso',
 };
 
+const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 
 async function loginSupabase(email, senha) {
@@ -434,10 +435,63 @@ function withClientDefaults(client) {
 }
 
 function loadInitialState() {
-  return {
-    clientes: [],
-    listagens: createDefaultLists(),
-  };
+  try {
+    const raw = window.localStorage.getItem(PORTAL_BOOTSTRAP_CACHE_KEY);
+    if (!raw) {
+      return {
+        clientes: [],
+        listagens: createDefaultLists(),
+        metadata: { ...INITIAL_METADATA },
+        hasBootstrapCache: false,
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    const clientes = Array.isArray(parsed?.clientes)
+      ? parsed.clientes.map(withClientDefaults)
+      : [];
+    const listagens = mergeListagensFromClients(
+      mergeListagensFromSupabase(createDefaultLists(), parsed?.listagens ?? {}),
+      clientes,
+    );
+    const metadata = {
+      ...INITIAL_METADATA,
+      ...(parsed?.metadata && typeof parsed.metadata === 'object' ? parsed.metadata : {}),
+    };
+
+    return {
+      clientes,
+      listagens,
+      metadata: clientes.length
+        ? {
+          ...metadata,
+          source: 'Cache local da ultima sincronizacao',
+        }
+        : metadata,
+      hasBootstrapCache: clientes.length > 0,
+    };
+  } catch {
+    return {
+      clientes: [],
+      listagens: createDefaultLists(),
+      metadata: { ...INITIAL_METADATA },
+      hasBootstrapCache: false,
+    };
+  }
+
+}
+
+function saveBootstrapCache({ clientes, listagens, metadata }) {
+  try {
+    const payload = {
+      clientes: Array.isArray(clientes) ? clientes.map(withClientDefaults) : [],
+      listagens: listagens && typeof listagens === 'object' ? listagens : createDefaultLists(),
+      metadata: metadata && typeof metadata === 'object' ? metadata : { ...INITIAL_METADATA },
+    };
+    window.localStorage.setItem(PORTAL_BOOTSTRAP_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore local storage failures
+  }
 }
 
 // Selects persistidos no cliente que ainda precisam de um fallback tecnico minimo
@@ -1319,6 +1373,48 @@ function countWhere(clients, predicate) {
   return clients.reduce((count, client) => count + (predicate(client) ? 1 : 0), 0);
 }
 
+function countDisplayDiacritics(value) {
+  const normalized = String(value ?? '').normalize('NFD');
+  const matches = normalized.match(/\p{Diacritic}/gu);
+  return matches ? matches.length : 0;
+}
+
+function choosePreferredDisplayLabel(candidate, current) {
+  const candidateDiacritics = countDisplayDiacritics(candidate);
+  const currentDiacritics = countDisplayDiacritics(current);
+  if (candidateDiacritics !== currentDiacritics) {
+    return candidateDiacritics > currentDiacritics ? candidate : current;
+  }
+
+  if (candidate.length !== current.length) {
+    return candidate.length > current.length ? candidate : current;
+  }
+
+  return candidate.localeCompare(current, 'pt-BR', { sensitivity: 'variant' }) < 0 ? candidate : current;
+}
+
+function normalizeBreakdownRows(rows) {
+  const grouped = new Map();
+
+  (rows ?? []).forEach((row) => {
+    const label = String(row?.label ?? '').trim() || 'Nao informado';
+    const key = normalizeText(label) || 'nao informado';
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { label, value: Number(row?.value ?? 0) || 0 });
+      return;
+    }
+
+    grouped.set(key, {
+      label: choosePreferredDisplayLabel(label, current.label),
+      value: current.value + (Number(row?.value ?? 0) || 0),
+    });
+  });
+
+  return Array.from(grouped.values())
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
+}
+
 function getOptions(listagens, field) {
   if (field.type === 'yesno') return YES_NO_OPTIONS;
   if (field.key === 'envio_reinf' || field.key === 'distribuicao_lucros' || field.key === 'ecf') {
@@ -1934,21 +2030,21 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
       <section className="grid gap-5 xl:grid-cols-3">
         <BreakdownPanel
           title="Clientes por regime tributário"
-          rows={toBreakdown(clients, 'regime_tributario')}
+          rows={normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario'))}
           total={total}
           field="regime_tributario"
           onSelect={onPreset}
         />
         <BreakdownPanel
           title="Clientes por tipo"
-          rows={toBreakdown(clients, 'tipo_cliente')}
+          rows={normalizeBreakdownRows(toBreakdown(clients, 'tipo_cliente'))}
           total={total}
           field="tipo_cliente"
           onSelect={onPreset}
         />
         <BreakdownPanel
           title="Clientes por atividade"
-          rows={toBreakdown(clients, 'atividades')}
+          rows={normalizeBreakdownRows(toBreakdown(clients, 'atividades'))}
           total={total}
           field="atividades"
           onSelect={onPreset}
@@ -1958,14 +2054,14 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
       <section className="grid gap-5 xl:grid-cols-2">
         <BreakdownPanel
           title="Clientes por responsável"
-          rows={toBreakdown(clients, 'responsavel')}
+          rows={normalizeBreakdownRows(toBreakdown(clients, 'responsavel'))}
           total={total}
           field="responsavel"
           onSelect={onPreset}
         />
         <BreakdownPanel
           title="Clientes por revisor"
-          rows={toBreakdown(clients, 'revisor')}
+          rows={normalizeBreakdownRows(toBreakdown(clients, 'revisor'))}
           total={total}
           field="revisor"
           onSelect={onPreset}
@@ -3772,8 +3868,8 @@ function ReportsPage({
     },
   ].filter((row) => row.value > 0);
   const reports = [
-    { title: 'Clientes por responsável', rows: toBreakdown(clients, 'responsavel'), icon: UserCheck },
-    { title: 'Clientes por regime tributário', rows: toBreakdown(clients, 'regime_tributario'), icon: Building2 },
+    { title: 'Clientes por responsável', rows: normalizeBreakdownRows(toBreakdown(clients, 'responsavel')), icon: UserCheck },
+    { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2 },
     { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
     { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail },
@@ -3782,7 +3878,7 @@ function ReportsPage({
     { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff },
     { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
     { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
-    { title: 'Clientes por dificuldade', rows: toBreakdown(clients, 'dificuldade'), icon: AlertTriangle },
+    { title: 'Clientes por dificuldade', rows: normalizeBreakdownRows(toBreakdown(clients, 'dificuldade')), icon: AlertTriangle },
   ];
   const reportCount = (rows) =>
     rows.reduce((acc, row) => acc + (typeof row?.value === 'number' ? row.value : 1), 0);
@@ -4661,7 +4757,7 @@ export default function App() {
   const initialSessionState = useMemo(loadInitialSessionState, []);
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
-  const [metadata, setMetadata] = useState({ ...INITIAL_METADATA });
+  const [metadata, setMetadata] = useState(initialState.metadata ?? { ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(initialSessionState.session);
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
@@ -4678,8 +4774,18 @@ export default function App() {
   const [importPreview, setImportPreview] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
   const [toast, setToast] = useState(null);
-  const [supabaseStatus, setSupabaseStatus] = useState({ connected: false, message: 'Aguardando carga do Supabase' });
+  const [supabaseStatus, setSupabaseStatus] = useState(() => (
+    initialState.hasBootstrapCache
+      ? { connected: false, message: 'Restaurando ultima leitura local...' }
+      : { connected: false, message: 'Aguardando carga do Supabase' }
+  ));
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
+  const [supabaseBootstrapping, setSupabaseBootstrapping] = useState(
+    () => Boolean(initialSessionState.session?.auth_user_id),
+  );
+  const [initialPortalReady, setInitialPortalReady] = useState(
+    () => initialState.hasBootstrapCache || !initialSessionState.session?.auth_user_id,
+  );
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
   const [sessionProfile, setSessionProfile] = useState(initialSessionState.sessionProfile);
@@ -4702,11 +4808,12 @@ export default function App() {
 
   const currentUser = useMemo(() => sanitizeUser(currentUserFull), [currentUserFull]);
   const canWritePortalData = supabaseStatus.connected && !authRestoring;
-  const writeBlockedMessage = authRestoring
+  const writeBlockedReason = authRestoring
     ? 'Sessao em restauracao. As consultas continuam disponiveis, mas gravacoes ficam bloqueadas ate a reconexao completa.'
     : !supabaseStatus.connected
       ? 'Supabase indisponivel no momento. O portal esta em modo protegido: consultas liberadas e gravacoes bloqueadas ate a reconexao.'
       : '';
+  const writeBlockedMessage = authRestoring ? '' : writeBlockedReason;
 
   const enrichedClients = useMemo(() => {
     const allClients = enrichClients(clients);
@@ -4735,15 +4842,46 @@ export default function App() {
   }, [currentUserFull, hasStoredSession]);
 
   useEffect(() => {
-    if (!currentUserFull || currentUserFull.precisa_trocar_senha) return;
-    carregarDadosSupabase({ silent: true });
-  }, [currentUserFull?.id]);
+    let cancelled = false;
+
+    if (!currentUserFull || currentUserFull.precisa_trocar_senha || !authReady || authRestoring) {
+      if (!currentUserFull && !hasStoredSession) {
+        setSupabaseBootstrapping(false);
+        setInitialPortalReady(true);
+      }
+      return undefined;
+    }
+
+    if (!clients.length && !metadata?.importedAt && !metadata?.generatedAt) {
+      setInitialPortalReady(false);
+    }
+    setSupabaseBootstrapping(true);
+    void carregarDadosSupabase({ silent: true })
+      .finally(() => {
+        if (cancelled) return;
+        setSupabaseBootstrapping(false);
+        setInitialPortalReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    authRestoring,
+    clients.length,
+    currentUserFull?.id,
+    currentUserFull?.precisa_trocar_senha,
+    hasStoredSession,
+    metadata?.generatedAt,
+    metadata?.importedAt,
+  ]);
 
   function ensureSupabaseWriteReady(actionLabel = 'realizar esta gravacao') {
     if (canWritePortalData) return true;
     setToast({
       title: 'Gravacao bloqueada',
-      message: writeBlockedMessage || `Nao foi possivel ${actionLabel} porque o portal ainda nao esta pronto para gravar no Supabase.`,
+      message: writeBlockedReason || `Nao foi possivel ${actionLabel} porque o portal ainda nao esta pronto para gravar no Supabase.`,
     });
     return false;
   }
@@ -4779,6 +4917,7 @@ export default function App() {
 
         if (perfil) {
           startSession(perfil);
+          setAuthRestoring(false);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
         } else if (hasStoredSession && authSession?.user?.id) {
           setAuthRestoring(false);
@@ -4848,6 +4987,12 @@ export default function App() {
       const hasSupabaseAuthUser = Boolean(authSession?.user?.id);
       const shouldPreserveSession =
         event !== 'SIGNED_OUT' && (hasKnownPortalSession || hasSupabaseAuthUser);
+      const currentAuthUserId = currentUserFullRef.current?.auth_user_id ?? session?.auth_user_id ?? null;
+      const incomingAuthUserId = authSession?.user?.id ?? null;
+      const shouldRunVisibleRestore =
+        event === 'SIGNED_IN'
+        && shouldPreserveSession
+        && (!currentUserFullRef.current || !currentAuthUserId || currentAuthUserId !== incomingAuthUserId);
 
       if (event === 'SIGNED_OUT') {
         setAuthRestoring(false);
@@ -4858,7 +5003,7 @@ export default function App() {
         return;
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (shouldPreserveSession) {
+        if (shouldRunVisibleRestore) {
           setAuthRestoring(true);
         }
         try {
@@ -4873,6 +5018,7 @@ export default function App() {
           if (!active) return;
           if (perfil) {
             startSession(perfil);
+            setAuthRestoring(false);
           } else {
             if (shouldPreserveSession) {
               setAuthRestoring(false);
@@ -4932,6 +5078,11 @@ export default function App() {
     setClients(normalizedClients);
     setListagens(normalizedListagens);
     setMetadata(nextMetadata);
+    saveBootstrapCache({
+      clientes: normalizedClients,
+      listagens: normalizedListagens,
+      metadata: nextMetadata,
+    });
   }
 
   function persistSecurity(nextSecurityOrUpdater) {
@@ -5863,6 +6014,14 @@ export default function App() {
     );
   }
 
+  if (!initialPortalReady) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
+        <p className="text-sm font-semibold">Carregando dados do portal...</p>
+      </div>
+    );
+  }
+
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
 
@@ -5879,7 +6038,7 @@ export default function App() {
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
-          loading={supabaseRefreshing}
+          loading={supabaseRefreshing || supabaseBootstrapping}
         />
       )
       : <AccessDeniedPage />,
@@ -5908,7 +6067,7 @@ export default function App() {
         onInactivate={inactivateClient}
         canCreateClient={canCreateClient}
         canCreateClientEnabled={canCreateClient && canWritePortalData}
-        createDisabledReason={writeBlockedMessage}
+        createDisabledReason={writeBlockedReason}
         allClients={enrichedClients}
         canEditRow={(client) => canWritePortalData && canEditClient(currentUserFull, client)}
         canInactivateRow={(client) => canWritePortalData && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
@@ -5971,7 +6130,7 @@ export default function App() {
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
-          loading={supabaseRefreshing}
+          loading={supabaseRefreshing || supabaseBootstrapping}
         />
       )
       : <AccessDeniedPage />,
@@ -5987,7 +6146,7 @@ export default function App() {
         supabaseStatus={supabaseStatus}
         metadata={metadata}
         onRefresh={refreshSupabaseData}
-        loading={supabaseRefreshing}
+        loading={supabaseRefreshing || supabaseBootstrapping}
         searchContext={reinfSearchContext}
         onClearSearchContext={() => setReinfSearchContext(null)}
       />
@@ -6002,7 +6161,7 @@ export default function App() {
         supabaseStatus={supabaseStatus}
         metadata={metadata}
         onRefresh={refreshSupabaseData}
-        loading={supabaseRefreshing}
+        loading={supabaseRefreshing || supabaseBootstrapping}
         searchContext={ecdSearchContext}
         onClearSearchContext={() => setEcdSearchContext(null)}
       />
@@ -6018,11 +6177,11 @@ export default function App() {
           canExport={canExportReports}
           canResetBase={isAdmin(currentUserFull)}
           canResetBaseEnabled={isAdmin(currentUserFull) && canWritePortalData}
-          resetBaseDisabledReason={writeBlockedMessage}
+          resetBaseDisabledReason={writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
-          loading={supabaseRefreshing}
+          loading={supabaseRefreshing || supabaseBootstrapping}
         />
       )
       : <AccessDeniedPage />,
@@ -6083,7 +6242,7 @@ export default function App() {
         onLogout={() => logout()}
         canImport={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL)}
         canImportEnabled={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL) && canWritePortalData}
-        importDisabledReason={writeBlockedMessage}
+        importDisabledReason={writeBlockedReason}
         supabaseStatus={supabaseStatus}
         writeBlockedMessage={writeBlockedMessage}
         searchClients={enrichedClients}
@@ -6136,6 +6295,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 

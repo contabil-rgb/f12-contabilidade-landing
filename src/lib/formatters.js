@@ -73,16 +73,40 @@ export function stableIdFromCnpj(cnpj, fallback) {
 }
 
 export function uniqueValues(values) {
-  const seen = new Set();
-  return values
+  const groups = new Map();
+
+  values
     .map((value) => String(value ?? '').trim())
     .filter(Boolean)
-    .filter((value) => {
+    .forEach((value) => {
       const key = normalizeText(value);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+      const current = groups.get(key);
+      if (!current || isPreferredDisplayValue(value, current)) {
+        groups.set(key, value);
+      }
     });
+
+  return Array.from(groups.values());
+}
+
+function countDiacritics(value) {
+  const normalized = String(value ?? '').normalize('NFD');
+  const matches = normalized.match(/\p{Diacritic}/gu);
+  return matches ? matches.length : 0;
+}
+
+function isPreferredDisplayValue(candidate, current) {
+  const candidateDiacritics = countDiacritics(candidate);
+  const currentDiacritics = countDiacritics(current);
+  if (candidateDiacritics !== currentDiacritics) {
+    return candidateDiacritics > currentDiacritics;
+  }
+
+  if (candidate.length !== current.length) {
+    return candidate.length > current.length;
+  }
+
+  return candidate.localeCompare(current, 'pt-BR', { sensitivity: 'variant' }) < 0;
 }
 
 export function getFieldLabel(fieldDefinitions, key) {
