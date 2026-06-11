@@ -281,6 +281,7 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
 
 const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
+const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
 
 async function loginSupabase(email, senha) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -465,7 +466,7 @@ function loadInitialState() {
       metadata: clientes.length
         ? {
           ...metadata,
-          source: 'Cache local da ultima sincronizacao',
+          source: 'Ultima leitura local',
         }
         : metadata,
       hasBootstrapCache: clientes.length > 0,
@@ -479,6 +480,10 @@ function loadInitialState() {
     };
   }
 
+}
+
+function getAuthBootstrapTimeoutMs(hasCachedSession) {
+  return hasCachedSession ? AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS : AUTH_BOOTSTRAP_TIMEOUT_MS;
 }
 
 function saveBootstrapCache({ clientes, listagens, metadata }) {
@@ -4776,7 +4781,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [supabaseStatus, setSupabaseStatus] = useState(() => (
     initialState.hasBootstrapCache
-      ? { connected: false, message: 'Restaurando ultima leitura local...' }
+      ? { connected: false, message: 'Sincronizando dados...' }
       : { connected: false, message: 'Aguardando carga do Supabase' }
   ));
   const [supabaseRefreshing, setSupabaseRefreshing] = useState(false);
@@ -4790,7 +4795,9 @@ export default function App() {
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
   const [sessionProfile, setSessionProfile] = useState(initialSessionState.sessionProfile);
   const [authReady, setAuthReady] = useState(initialSessionState.authReady);
-  const [authRestoring, setAuthRestoring] = useState(false);
+  const [authRestoring, setAuthRestoring] = useState(
+    () => Boolean(initialSessionState.session?.auth_user_id),
+  );
   const importInputRef = useRef(null);
   const currentUserFullRef = useRef(null);
   const hasStoredSessionRef = useRef(false);
@@ -4869,12 +4876,10 @@ export default function App() {
   }, [
     authReady,
     authRestoring,
-    clients.length,
+    currentUserFull?.auth_user_id,
     currentUserFull?.id,
     currentUserFull?.precisa_trocar_senha,
     hasStoredSession,
-    metadata?.generatedAt,
-    metadata?.importedAt,
   ]);
 
   function ensureSupabaseWriteReady(actionLabel = 'realizar esta gravacao') {
@@ -4910,7 +4915,7 @@ export default function App() {
             preferredAuthUserId: session?.auth_user_id,
             authSession,
           }),
-          AUTH_BOOTSTRAP_TIMEOUT_MS,
+          getAuthBootstrapTimeoutMs(hasStoredSession),
           'A validacao da sessao demorou mais do que o esperado.',
         );
         if (!active) return;
@@ -5012,7 +5017,7 @@ export default function App() {
               preferredAuthUserId: authSession?.user?.id ?? session?.auth_user_id,
               authSession,
             }),
-            AUTH_BOOTSTRAP_TIMEOUT_MS,
+            getAuthBootstrapTimeoutMs(hasStoredSessionRef.current),
             'A atualizacao da sessao demorou mais do que o esperado.',
           );
           if (!active) return;
@@ -5172,6 +5177,10 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
+      const shouldLoadUsuariosPortal =
+        can(currentUserFull, PERMISSIONS.USERS_MANAGE)
+        || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
+
       const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
@@ -5184,9 +5193,11 @@ export default function App() {
         listarAcompanhamentoOperacionalClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
-        listarUsuariosPortal()
-          .then((rows) => ({ ok: true, rows }))
-          .catch((error) => ({ ok: false, error })),
+        shouldLoadUsuariosPortal
+          ? listarUsuariosPortal()
+            .then((rows) => ({ ok: true, rows, skipped: false }))
+            .catch((error) => ({ ok: false, error, skipped: false }))
+          : Promise.resolve({ ok: true, rows: [], skipped: true }),
       ]);
       const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
@@ -5206,9 +5217,9 @@ export default function App() {
         source: 'Supabase',
         importedAt: latestUpdatedAt ? formatDateTime(latestUpdatedAt) : (metadata?.importedAt || todayBr()),
       });
-      if (usuariosResult.ok) {
+      if (usuariosResult.ok && !usuariosResult.skipped) {
         sincronizarUsuariosSupabase(usuariosResult.rows);
-      } else {
+      } else if (!usuariosResult.ok) {
         console.warn('[usuarios] Falha ao carregar usuarios do Supabase:', usuariosResult.error);
       }
       setSupabaseStatus({
