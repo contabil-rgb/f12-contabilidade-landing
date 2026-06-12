@@ -95,6 +95,7 @@ import {
 } from './services/clientes.service';
 import { listarListagensAgrupadas } from './services/listagens.service';
 import {
+  listarHistoricoPortal as listarHistoricoPortalSupabase,
   listarHistoricoPorCliente as listarHistoricoPorClienteSupabase,
   registrarEventoHistorico as registrarEventoHistoricoSupabase,
   registrarHistoricoAlteracoes as registrarHistoricoAlteracoesSupabase,
@@ -5145,6 +5146,14 @@ export default function App() {
     }));
   }
 
+  function sincronizarHistoricoSupabase(historicoSupabase) {
+    if (!Array.isArray(historicoSupabase)) return;
+    persistSecurity((current) => ({
+      ...current,
+      historico_alteracoes: historicoSupabase,
+    }));
+  }
+
   async function recuperarPerfilSessaoSupabase({ preferredAuthUserId, authSession } = {}) {
     const candidateIds = [];
     if (preferredAuthUserId) candidateIds.push(preferredAuthUserId);
@@ -5180,8 +5189,9 @@ export default function App() {
       const shouldLoadUsuariosPortal =
         can(currentUserFull, PERMISSIONS.USERS_MANAGE)
         || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
+      const shouldLoadHistoricoPortal = can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
 
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarStatusObrigacoesClientes()
@@ -5195,6 +5205,11 @@ export default function App() {
           .catch((error) => ({ ok: false, error })),
         shouldLoadUsuariosPortal
           ? listarUsuariosPortal()
+            .then((rows) => ({ ok: true, rows, skipped: false }))
+            .catch((error) => ({ ok: false, error, skipped: false }))
+          : Promise.resolve({ ok: true, rows: [], skipped: true }),
+        shouldLoadHistoricoPortal
+          ? listarHistoricoPortalSupabase()
             .then((rows) => ({ ok: true, rows, skipped: false }))
             .catch((error) => ({ ok: false, error, skipped: false }))
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
@@ -5221,6 +5236,11 @@ export default function App() {
         sincronizarUsuariosSupabase(usuariosResult.rows);
       } else if (!usuariosResult.ok) {
         console.warn('[usuarios] Falha ao carregar usuarios do Supabase:', usuariosResult.error);
+      }
+      if (historicoResult.ok && !historicoResult.skipped) {
+        sincronizarHistoricoSupabase(historicoResult.rows);
+      } else if (!historicoResult.ok) {
+        console.warn('[historico] Falha ao carregar historico geral do Supabase:', historicoResult.error);
       }
       setSupabaseStatus({
         connected: true,

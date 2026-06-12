@@ -82,6 +82,19 @@ type RegistroEventoHistorico = {
   origem?: string;
 };
 
+function normalizeHistoricoRow(row: Record<string, unknown>) {
+  const clienteRelacionamento = row.cliente as Record<string, unknown> | null | undefined;
+  const clienteNome =
+    String(row.cliente_nome ?? '').trim()
+    || String(clienteRelacionamento?.nome_identificacao ?? '').trim()
+    || String(clienteRelacionamento?.razao_social ?? '').trim();
+
+  return {
+    ...row,
+    cliente_nome: clienteNome,
+  };
+}
+
 export async function registrarHistoricoAlteracoes(
   clienteId: string,
   valoresAntigos: Record<string, unknown>,
@@ -128,7 +141,14 @@ export async function registrarHistoricoAlteracoes(
 export async function listarHistoricoPorCliente(clienteId: string) {
   const { data, error } = await supabase
     .from('historico_alteracoes')
-    .select('*')
+    .select(`
+      *,
+      cliente:clientes!historico_alteracoes_cliente_id_fkey (
+        id,
+        nome_identificacao,
+        razao_social
+      )
+    `)
     .eq('cliente_id', clienteId)
     .order('data_alteracao', { ascending: false })
     .limit(50);
@@ -137,7 +157,28 @@ export async function listarHistoricoPorCliente(clienteId: string) {
     throw new Error(`Não foi possível carregar histórico do cliente: ${error.message}`);
   }
 
-  return data ?? [];
+  return (data ?? []).map((row) => normalizeHistoricoRow(row as Record<string, unknown>));
+}
+
+export async function listarHistoricoPortal(limit = 200) {
+  const { data, error } = await supabase
+    .from('historico_alteracoes')
+    .select(`
+      *,
+      cliente:clientes!historico_alteracoes_cliente_id_fkey (
+        id,
+        nome_identificacao,
+        razao_social
+      )
+    `)
+    .order('data_alteracao', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`NÃ£o foi possÃ­vel carregar histÃ³rico geral do portal: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => normalizeHistoricoRow(row as Record<string, unknown>));
 }
 
 export async function registrarEventoHistorico({
