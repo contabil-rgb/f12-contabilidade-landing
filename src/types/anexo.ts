@@ -1,4 +1,5 @@
 export const TIPOS_ANEXO = {
+  CARTAO_CNPJ: 'cartao_cnpj',
   RECIBO_REINF: 'recibo_reinf',
   RECIBO_LUCROS: 'recibo_lucros',
   RECIBO_ECD: 'recibo_ecd',
@@ -10,6 +11,7 @@ export const TIPOS_ANEXO = {
 export type TipoAnexo = typeof TIPOS_ANEXO[keyof typeof TIPOS_ANEXO];
 
 export const TIPO_ANEXO_LABELS: Record<TipoAnexo, string> = {
+  cartao_cnpj: 'Cartao CNPJ',
   recibo_reinf: 'Recibo REINF',
   recibo_lucros: 'Recibo/Comprovante de Lucros',
   recibo_ecd: 'Recibo ECD',

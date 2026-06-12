@@ -220,6 +220,7 @@ const ALERT_FILTER_LABELS = {
 };
 
 const CLIENT_FIELD_DEFAULTS = {
+  anexo_cartao_cnpj: '',
   anexo_recibo_reinf: '',
   anexo_recibo_lucros: '',
   anexo_recibo_ecd: '',
@@ -232,6 +233,7 @@ const CLIENT_FIELD_DEFAULTS = {
 };
 
 const ATTACHMENT_FIELD_BY_TYPE = {
+  [TIPOS_ANEXO.CARTAO_CNPJ]: 'anexo_cartao_cnpj',
   [TIPOS_ANEXO.RECIBO_REINF]: 'anexo_recibo_reinf',
   [TIPOS_ANEXO.RECIBO_LUCROS]: 'anexo_recibo_lucros',
   [TIPOS_ANEXO.RECIBO_ECD]: 'anexo_recibo_ecd',
@@ -251,6 +253,7 @@ const ATTACHMENT_FILTERS = {
 };
 
 const BASE_CLIENTS_VISIBLE_KEYS = new Set([
+  'anexo_cartao_cnpj',
   'tipo_cliente',
   'regime_tributario',
   'atividades',

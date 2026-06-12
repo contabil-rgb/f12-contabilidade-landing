@@ -122,6 +122,7 @@ export const RECOVERY_TOKEN_FIELDS = [
 ];
 
 export const HISTORY_FIELDS = [
+  'anexo_cartao_cnpj',
   'regime_tributario',
   'responsavel',
   'revisor',
@@ -176,6 +177,7 @@ export const STATUS_CLIENT_FIELDS = [
 
 export const OPERATIONAL_CLIENT_FIELDS = [
   'cnpj',
+  'anexo_cartao_cnpj',
   'razao_social',
   'nome_identificacao',
   'tipo_cliente',
