@@ -1623,12 +1623,12 @@ function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-[#0b1427] text-white lg:block">
+    <div className="min-h-screen bg-transparent text-slate-900">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-900/10 bg-[#0c1528] text-white lg:block">
         <div className="flex h-full flex-col">
           <div className="border-b border-white/10 px-6 py-6">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-lg font-black text-slate-950">F12</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950 shadow-sm">F12</span>
               <div>
                 <p className="text-base font-black">Portal Contábil</p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gestão interna</p>
@@ -1636,7 +1636,7 @@ function AppShell({
             </div>
           </div>
 
-          <nav className="flex-1 space-y-4 overflow-auto px-3 py-5" aria-label="Navegação principal">
+          <nav className="flex-1 space-y-5 overflow-auto px-4 py-5" aria-label="Navegação principal">
             {groupedNav.map((group) => (
               <div key={group.title} className="space-y-1.5">
                 <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{group.title}</p>
@@ -1645,8 +1645,8 @@ function AppShell({
                     key={key}
                     type="button"
                     onClick={() => setPage(key)}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${
-                      page === key ? 'bg-brand-blue text-white shadow-soft' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition ${
+                      page === key ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <Icon size={18} aria-hidden="true" />
@@ -1658,7 +1658,7 @@ function AppShell({
           </nav>
 
           <div className="border-t border-white/10 p-5">
-            <div className="mb-3 rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Usuário conectado</p>
               <p className="mt-2 truncate text-sm font-black">{currentUser?.nome ?? 'Sessão em validação'}</p>
               <p className="mt-1 truncate text-xs text-slate-400">{profile.label}</p>
@@ -1671,7 +1671,7 @@ function AppShell({
                 Sair
               </button>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Base carregada</p>
               <p className="mt-2 text-2xl font-black">{formatNumber(totalClientes)}</p>
               <p className="mt-1 text-xs text-slate-400">{metadata.source}</p>
@@ -1684,20 +1684,20 @@ function AppShell({
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="flex min-h-20 flex-col gap-3 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Escritório contábil | Carteira de clientes</p>
-              <h1 className="text-2xl font-black text-slate-950 sm:text-3xl">{currentTitle}</h1>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{pageDescription}</p>
+              <h1 className="mt-1 text-[2rem] font-black tracking-tight text-slate-950 sm:text-[2.15rem]">{currentTitle}</h1>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{pageDescription}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               <div className="hidden xl:block">
                 <div ref={searchRef} className="relative">
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="h-10 w-72 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                    className="h-11 w-80 rounded-lg border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
                     value={globalQuery}
                     onFocus={() => setGlobalOpen(true)}
                     onChange={(event) => {
@@ -1766,7 +1766,7 @@ function AppShell({
                 Sair
               </button>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
-              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{supabaseStatus?.message ?? 'Dados locais'}</div>
+              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{supabaseStatus?.message ?? 'Dados locais'}</div>
             </div>
           </div>
 
@@ -1783,7 +1783,7 @@ function AppShell({
                 type="button"
                 onClick={() => setPage(key)}
                 className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${
-                  page === key ? 'bg-brand-blue text-white' : 'bg-slate-100 text-slate-700'
+                  page === key ? 'bg-brand-blue text-white' : 'bg-white text-slate-700 shadow-sm'
                 }`}
               >
                 <Icon size={16} aria-hidden="true" />
@@ -1846,17 +1846,17 @@ function MetricCard({ title, value, detail, icon: Icon, tone = 'neutral', onClic
     <Component
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`group surface-card p-5 text-left transition ${
+      className={`group surface-card min-h-[156px] p-5 text-left transition ${
         onClick ? 'hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-soft' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-slate-500">{title}</p>
-          <p className="mt-3 text-3xl font-black text-slate-950">{formatNumber(value)}</p>
-          {detail ? <p className="mt-2 text-sm font-semibold text-slate-500">{detail}</p> : null}
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
+          <p className="mt-3 text-3xl font-black leading-none text-slate-950 sm:text-[2.2rem]">{formatNumber(value)}</p>
+          {detail ? <p className="mt-3 max-w-[28ch] text-sm font-semibold leading-6 text-slate-500">{detail}</p> : null}
         </div>
-        <span className={`flex h-11 w-11 items-center justify-center rounded-lg border ${chipClass(tone)}`}>
+        <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white/90 shadow-sm ${chipClass(tone)}`}>
           <Icon size={21} aria-hidden="true" />
         </span>
       </div>
@@ -1867,18 +1867,20 @@ function MetricCard({ title, value, detail, icon: Icon, tone = 'neutral', onClic
 function BreakdownPanel({ title, rows, total, onSelect, field }) {
   const max = Math.max(...rows.map((row) => row.value), 1);
   return (
-    <section className="surface-card p-5">
+    <section className="surface-card p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-black text-slate-950">{title}</h2>
-        <BarChart3 className="text-brand-blue" size={19} aria-hidden="true" />
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-brand-blue">
+          <BarChart3 size={18} aria-hidden="true" />
+        </span>
       </div>
-      <div className="mt-4 space-y-3">
+      <div className="mt-5 space-y-3">
         {rows.slice(0, 9).map((row) => (
           <button
             key={row.label}
             type="button"
             onClick={() => onSelect({ [field]: row.label }, `${title}: ${row.label}`)}
-            className="w-full rounded-lg p-2 text-left transition hover:bg-slate-50"
+            className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-slate-200 hover:bg-slate-50"
           >
             <div className="mb-2 flex items-center justify-between gap-3 text-sm">
               <span className="font-bold text-slate-700">{row.label}</span>
@@ -2082,13 +2084,13 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
 
 function PageHeader({ title, description, right }) {
   return (
-    <section className="surface-card p-5">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+    <section className="surface-card p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h2 className="text-xl font-black text-slate-950">{title}</h2>
-          {description ? <p className="mt-1 text-sm font-semibold text-slate-500">{description}</p> : null}
+          <h2 className="text-[1.65rem] font-black tracking-tight text-slate-950">{title}</h2>
+          {description ? <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{description}</p> : null}
         </div>
-        {right ? <div className="flex flex-wrap items-center gap-2">{right}</div> : null}
+        {right ? <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">{right}</div> : null}
       </div>
     </section>
   );
@@ -2119,19 +2121,19 @@ function SearchAndFilters({
     label,
   }));
   return (
-    <section className="surface-card p-5">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <section className="surface-card p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             value={filters.search}
             onChange={(event) => updateFilter({ search: event.target.value })}
-            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
+            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50/80 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
             placeholder="Pesquisar cliente, CNPJ ou razão social"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
             {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
           </span>
           <button
@@ -2158,7 +2160,7 @@ function SearchAndFilters({
       </div>
 
       {quickFilterLabel ? (
-        <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700">
           <Filter size={16} aria-hidden="true" />
           {quickFilterLabel}
           <button type="button" onClick={onClear} className="rounded-md p-1 hover:bg-sky-100">
@@ -2167,7 +2169,7 @@ function SearchAndFilters({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+      <div className="mt-5 grid gap-3 border-t border-slate-100 pt-5 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
         <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
           Alertas e acompanhamento
           <select
@@ -2239,18 +2241,18 @@ function AlertsList({ alerts }) {
 
 function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }) {
   return (
-    <article className="surface-card p-5">
+    <article className="surface-card min-h-[176px] p-5">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-slate-500">{title}</p>
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
           <div className="mt-3">
             <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(tone)}`}>
               {label}
             </span>
           </div>
-          {detail ? <p className="mt-3 text-sm font-semibold text-slate-600">{detail}</p> : null}
+          {detail ? <p className="mt-3 max-w-[28ch] text-sm font-semibold leading-6 text-slate-600">{detail}</p> : null}
         </div>
-        <span className={`flex h-11 w-11 items-center justify-center rounded-lg border ${chipClass(tone)}`}>
+        <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white/90 shadow-sm ${chipClass(tone)}`}>
           <Icon size={21} aria-hidden="true" />
         </span>
       </div>
@@ -2372,18 +2374,18 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
         <table className="min-w-[1700px] border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
             <tr>
-              <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+              <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
                 Cliente
               </th>
-              <th className="w-48 border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+              <th className="w-48 border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
                 Alertas
               </th>
               {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                <th key={field.key} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+                <th key={field.key} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
                   <button
                     type="button"
                     onClick={() => sortColumn(field.key)}
-                    className="inline-flex items-center gap-1 hover:text-brand-blue"
+                    className="inline-flex items-center gap-1.5 transition hover:text-brand-blue"
                   >
                     {field.label}
                     <ArrowDownUp size={13} aria-hidden="true" />
@@ -2403,20 +2405,20 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
-                  className="cursor-pointer transition even:bg-slate-50/50 hover:bg-sky-50/70"
+                  className="cursor-pointer transition even:bg-slate-50/40 hover:bg-sky-50/70"
                 >
-                <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top hover:bg-slate-50">
+                <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top">
                   <div className="max-w-72">
                     <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj}</p>
                     <p className="mt-1 truncate text-xs text-slate-500">{client.razao_social}</p>
                   </div>
                 </td>
-                <td className="border-b border-slate-100 px-4 py-3 align-top">
+                <td className="border-b border-slate-100 px-4 py-4 align-top">
                   <AlertsList alerts={alerts} />
                 </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                  <td key={field.key} className="border-b border-slate-100 px-4 py-3 align-top text-slate-700">
+                  <td key={field.key} className="border-b border-slate-100 px-4 py-4 align-top text-sm font-semibold text-slate-700">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(client[field.key], client))}`}>
                         {valueOrDash(client[field.key])}
@@ -2426,7 +2428,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                     ))}
                   </td>
                 ))}
-                <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
+                <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-4 align-top">
                   <div className="flex items-center gap-2">
                     {canEditRow(client) ? (
                       <button
@@ -2511,7 +2513,7 @@ function BaseClientesPage(props) {
         title="Base de Clientes"
         description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
       />
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2">
         {acompanhamentoMetrics.map((metric) => (
           <MetricCard
             key={metric.key}
@@ -3083,7 +3085,7 @@ function PendenciasPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">Resumo do dia</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
               Um retrato rápido do que pede ação agora, sem precisar percorrer toda a lista.
             </p>
           </div>
@@ -3154,11 +3156,11 @@ function PendenciasPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-black text-slate-950">Pendências por obrigação</h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
                 Mostramos a pendência mais urgente de cada cliente para facilitar a triagem e a próxima ação.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               {attachmentBuckets.map((bucket) => (
                 <button
                   key={bucket.key}
@@ -3465,7 +3467,7 @@ function ReinfPage({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h2 className="text-lg font-black text-slate-950">Controle de REINF</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
             <p className="mt-1 text-xs font-semibold text-slate-400">Use os filtros para separar envio, comprovante e pendências da REINF.</p>
           </div>
           <button
@@ -3664,7 +3666,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h2 className="text-lg font-black text-slate-950">Controle de ECD / ECF</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
             <p className="mt-1 text-xs font-semibold text-slate-400">Separe rapidamente por situação, responsável e comprovantes pendentes.</p>
           </div>
           <button
@@ -3898,7 +3900,7 @@ function ReportsPage({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-lg font-black text-slate-950">Exportação da base</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
               {formatNumber(filteredClients.length)} registros filtrados, {formatNumber(clients.length)} registros na base.
             </p>
           </div>
@@ -4704,7 +4706,7 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-panel">
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-lg font-black text-slate-950">Pré-visualização da importação</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
             Arquivo: {preview.fileName} | Linhas lidas: {formatNumber(summary.totalLinhasLidas ?? 0)}
           </p>
         </div>

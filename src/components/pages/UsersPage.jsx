@@ -10,11 +10,11 @@ export default function UsersPage({
 }) {
   return (
     <div className="space-y-5">
-      <section className="surface-card p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="surface-card p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Usuarios institucionais</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <h2 className="text-[1.65rem] font-black tracking-tight text-slate-950">Usuarios institucionais</h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
               Perfis sincronizados com o Supabase para gestao real do acesso ao portal.
             </p>
           </div>
@@ -26,11 +26,11 @@ export default function UsersPage({
 
       <section className="surface-card">
         <div className="overflow-auto overflow-soft">
-          <table className="min-w-[1200px] text-left text-sm">
-            <thead className="bg-slate-50">
+          <table className="min-w-[1200px] border-separate border-spacing-0 text-left text-sm">
+            <thead className="bg-slate-50/95 backdrop-blur">
               <tr>
                 {['Nome', 'E-mail', 'Cargo', 'Setor', 'Perfil', 'Status', 'Ultimo acesso', 'Acoes'].map((header) => (
-                  <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+                  <th key={header} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
                     {header}
                   </th>
                 ))}
@@ -38,19 +38,19 @@ export default function UsersPage({
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-4 py-3 font-black text-slate-950">{user.nome}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">{user.email}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">{user.cargo || 'Nao informado'}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">{user.setor || 'Nao informado'}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">
+                <tr key={user.id} className="transition even:bg-slate-50/40 hover:bg-sky-50/60">
+                  <td className="border-b border-slate-100 px-4 py-4 font-black text-slate-950">{user.nome}</td>
+                  <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700">{user.email}</td>
+                  <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700">{user.cargo || 'Nao informado'}</td>
+                  <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700">{user.setor || 'Nao informado'}</td>
+                  <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
+                  <td className="border-b border-slate-100 px-4 py-4">
                     <span className={"inline-flex rounded-full border px-2.5 py-1 text-xs font-black " + chipClass(user.status === 'Ativo' ? 'success' : 'muted')}>
                       {user.status}
                     </span>
                   </td>
-                  <td className="border-b border-slate-100 px-4 py-3">{formatDateTime(user.ultimo_acesso)}</td>
-                  <td className="border-b border-slate-100 px-4 py-3">
+                  <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-600">{formatDateTime(user.ultimo_acesso)}</td>
+                  <td className="border-b border-slate-100 px-4 py-4">
                     <div className="flex gap-2">
                       <button type="button" onClick={() => onEdit(user)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:border-brand-blue hover:text-brand-blue" aria-label="Editar usuario">
                         <Edit3 size={16} aria-hidden="true" />

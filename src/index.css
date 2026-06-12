@@ -15,9 +15,10 @@
     margin: 0;
     min-width: 320px;
     background:
-      radial-gradient(circle at top right, rgba(220, 234, 255, 0.42), transparent 44%),
-      #f7f9fc;
-    color: #10233f;
+      radial-gradient(circle at top right, rgba(214, 228, 255, 0.44), transparent 36%),
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.82), transparent 28%),
+      #f4f7fb;
+    color: #0f172a;
     font-family:
       Inter,
       ui-sans-serif,
@@ -57,10 +58,19 @@
 
 @layer components {
   .surface-card {
-    border: 1px solid #e2e8f0;
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .surface-card:hover {
+    border-color: rgba(148, 163, 184, 0.32);
   }
 
   .overflow-soft {
