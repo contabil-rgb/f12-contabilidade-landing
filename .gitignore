@@ -2,6 +2,7 @@ node_modules
 dist
 .DS_Store
 vite-dev*.log
+.vite-dev*.log
 
 # Environment files
 .env
