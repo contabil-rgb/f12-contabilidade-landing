@@ -45,7 +45,8 @@ export function AnexosClienteSection({
         }
       } catch (error) {
         if (active) {
-          setLocalWarning(error instanceof Error ? error.message : 'Não foi possível carregar anexos.');
+          console.warn('[anexos] Falha ao atualizar lista de anexos do cliente:', error);
+          setLocalWarning('Nao foi possivel atualizar os anexos agora. Mantivemos a ultima leitura disponivel.');
         }
       } finally {
         if (active) setLoading(false);

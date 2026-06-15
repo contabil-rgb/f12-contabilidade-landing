@@ -808,7 +808,7 @@ function applyResponsavelEcdFallback(base, patch) {
   };
 }
 
-async function hydrateClientesComAnexos(clientesBase) {
+async function hydrateClientesComAnexos(clientesBase, fallbackClients = []) {
   const normalized = (clientesBase ?? []).map(withClientDefaults);
   const ids = normalized
     .map((client) => String(client.id ?? '').trim())
@@ -831,7 +831,22 @@ async function hydrateClientesComAnexos(clientesBase) {
     });
   } catch (error) {
     console.warn('[anexos] Falha ao hidratar anexos por cliente:', error);
-    return normalized;
+    const fallbackByClientId = new Map(
+      (fallbackClients ?? [])
+        .map((client) => [String(client?.id ?? '').trim(), withClientDefaults(client)])
+        .filter(([id]) => id),
+    );
+
+    return normalized.map((client) => {
+      const fallbackClient = fallbackByClientId.get(String(client.id ?? '').trim());
+      if (!fallbackClient) return client;
+
+      const next = { ...client };
+      Object.values(ATTACHMENT_FIELD_BY_TYPE).forEach((fieldKey) => {
+        next[fieldKey] = fallbackClient[fieldKey] ?? client[fieldKey] ?? '';
+      });
+      return next;
+    });
   }
 }
 
@@ -5306,7 +5321,7 @@ export default function App() {
             .catch((error) => ({ ok: false, error, skipped: false }))
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
       ]);
-      const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase);
+      const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase, clients);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
       const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesHydrated, obrigacoesIndex);
       const riscoIndex = riscoResult.ok ? indexarRiscoOperacional(riscoResult.rows) : {};
@@ -5362,11 +5377,17 @@ export default function App() {
           source: 'Supabase indisponivel',
           importedAt: metadata?.importedAt || '',
         });
+      } else {
+        persist(clients, listagens, {
+          ...metadata,
+          source: 'Cache local da ultima sincronizacao',
+          importedAt: metadata?.importedAt || metadata?.generatedAt || '',
+        });
       }
       setSupabaseStatus({
         connected: false,
         message: hasCurrentClients
-          ? 'Erro ao atualizar dados do Supabase'
+          ? 'Sem conexao com o Supabase | leitura da ultima sincronizacao'
           : 'Erro ao carregar dados do Supabase',
       });
       if (!silent) {
