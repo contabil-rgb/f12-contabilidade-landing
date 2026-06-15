@@ -470,7 +470,7 @@ function loadInitialState() {
       metadata: clientes.length
         ? {
           ...metadata,
-          source: 'Ultima leitura local',
+          source: 'Cache local da ultima sincronizacao',
         }
         : metadata,
       hasBootstrapCache: clientes.length > 0,
@@ -5096,6 +5096,14 @@ export default function App() {
     });
   }
 
+  function updateClientsPersisted(updater, nextMetadata = metadata) {
+    const nextClients =
+      typeof updater === 'function'
+        ? updater(clients)
+        : updater;
+    persist(nextClients, listagens, nextMetadata);
+  }
+
   function persistSecurity(nextSecurityOrUpdater) {
     setSecurity((current) =>
       typeof nextSecurityOrUpdater === 'function'
@@ -5679,7 +5687,7 @@ export default function App() {
     }
 
     if (fieldKey && fieldIsTrackedInClientBase) {
-      setClients((current) =>
+      updateClientsPersisted((current) =>
         current.map((client) =>
           client.id === clientId
             ? clearPersistedObrigacoes({
@@ -5716,6 +5724,9 @@ export default function App() {
       title: tinhaAnexoAntes ? 'Arquivo substituído com sucesso' : 'Arquivo anexado com sucesso',
       message: `${nomeCampo}: ${anexo?.nome_arquivo ?? 'registro atualizado'}.`,
     });
+    if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId)) {
+      void resyncSupabaseAfterMutation('atualizacao de anexo');
+    }
   }
 
   function handleAnexoError(message) {
@@ -5772,11 +5783,14 @@ export default function App() {
       fields: ['situacao', 'status'],
       tipoAcao: 'inativacao',
     }));
-    setClients((current) => current.filter((item) => item.id !== client.id));
+    updateClientsPersisted((current) => current.filter((item) => item.id !== client.id));
     setToast({
       title: 'Cliente inativado',
       message: client.nome_identificacao || client.razao_social,
     });
+    if (isUuid(client.id)) {
+      void resyncSupabaseAfterMutation('inativacao de cliente');
+    }
   }
 
   async function handleImport(event) {
