@@ -352,6 +352,17 @@ async function waitForAuthSessionUser(authUserId, options = {}) {
   return null;
 }
 
+async function resolveBootstrapAuthSession(preferredAuthUserId) {
+  const session = await getAuthSessionSupabase();
+  if (!preferredAuthUserId) return session;
+  if (session?.user?.id === preferredAuthUserId) return session;
+
+  return await waitForAuthSessionUser(preferredAuthUserId, {
+    timeoutMs: 3500,
+    intervalMs: 150,
+  }) ?? session;
+}
+
 async function updateUltimoAcessoUsuario(usuarioId) {
   try {
     await atualizarUltimoAcessoUsuarioPortal(usuarioId);
@@ -4808,6 +4819,12 @@ export default function App() {
   const currentUserFullRef = useRef(null);
   const hasStoredSessionRef = useRef(false);
   const hasStoredSession = Boolean(session?.usuario_id && session?.auth_user_id);
+  const hasCachedSessionProfile = Boolean(
+    session?.usuario_id
+    && session?.auth_user_id
+    && sessionProfile?.id === session.usuario_id
+    && sessionProfile?.auth_user_id === session.auth_user_id,
+  );
 
   const currentUserFull = useMemo(() => {
     if (!session?.usuario_id) return null;
@@ -4915,7 +4932,9 @@ export default function App() {
         setAuthRestoring(true);
       }
       try {
-        const authSession = await getAuthSessionSupabase();
+        const authSession = hasStoredSession
+          ? await resolveBootstrapAuthSession(session?.auth_user_id)
+          : await getAuthSessionSupabase();
         const perfil = await withTimeout(
           recuperarPerfilSessaoSupabase({
             preferredAuthUserId: session?.auth_user_id,
@@ -4930,8 +4949,9 @@ export default function App() {
           startSession(perfil);
           setAuthRestoring(false);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
-        } else if (hasStoredSession && authSession?.user?.id) {
+        } else if (hasStoredSession && (authSession?.user?.id || hasCachedSessionProfile)) {
           setAuthRestoring(false);
+          setAuthReady(true);
         } else {
           setAuthRestoring(false);
           setSessionProfile(null);
@@ -4963,8 +4983,8 @@ export default function App() {
           return;
         }
         if (hasStoredSession) {
-          const authSession = await getAuthSessionSupabase();
-          if (authSession?.user?.id) {
+          const authSession = await resolveBootstrapAuthSession(session?.auth_user_id);
+          if (authSession?.user?.id || hasCachedSessionProfile) {
             setAuthRestoring(false);
             setAuthReady(true);
             return;
@@ -5062,7 +5082,7 @@ export default function App() {
       active = false;
       subscription?.subscription?.unsubscribe?.();
     };
-  }, [hasStoredSession, session?.auth_user_id]);
+  }, [hasCachedSessionProfile, hasStoredSession, session?.auth_user_id]);
 
   useEffect(() => {
     if (authView !== 'reset') return;
