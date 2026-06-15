@@ -450,6 +450,24 @@ function withClientDefaults(client) {
   };
 }
 
+// Selects persistidos no cliente que ainda precisam de um fallback tecnico minimo
+// caso a carga do Supabase venha incompleta.
+const SELECT_LIST_FALLBACKS = {
+  competencia_em_dia: YES_NO_OPTIONS,
+  cliente_notificado: YES_NO_OPTIONS,
+  ecd: YES_NO_OPTIONS,
+};
+
+const TEAM_MEMBER_DISPLAY_ALIASES = {
+  tiago: 'Thiago',
+};
+
+function createRuntimeListBase() {
+  return Object.fromEntries(
+    Object.entries(SELECT_LIST_FALLBACKS).map(([key, values]) => [key, [...values]]),
+  );
+}
+
 function loadInitialState() {
   try {
     const raw = window.localStorage.getItem(PORTAL_BOOTSTRAP_CACHE_KEY);
@@ -514,20 +532,6 @@ function saveBootstrapCache({ clientes, listagens, metadata }) {
   }
 }
 
-// Selects persistidos no cliente que ainda precisam de um fallback tecnico minimo
-// caso a carga do Supabase venha incompleta.
-const SELECT_LIST_FALLBACKS = {
-  competencia_em_dia: YES_NO_OPTIONS,
-  cliente_notificado: YES_NO_OPTIONS,
-  ecd: YES_NO_OPTIONS,
-};
-
-function createRuntimeListBase() {
-  return Object.fromEntries(
-    Object.entries(SELECT_LIST_FALLBACKS).map(([key, values]) => [key, [...values]]),
-  );
-}
-
 function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
   const merged = { ...baseListagens };
   Object.entries(listagensSupabase ?? {}).forEach(([categoria, valores]) => {
@@ -548,7 +552,7 @@ function mergeListagensFromClients(baseListagens, clients) {
   listFields.forEach((field) => {
     const values = uniqueValues([
       ...(merged[field.listKey] ?? []),
-      ...clients.map((client) => client?.[field.key]),
+      ...clients.map((client) => normalizeFieldDisplayValue(field.key, client?.[field.key])),
     ]);
     if (values.length) {
       merged[field.listKey] = values;
@@ -562,6 +566,19 @@ function loadSecurityState() {
     ...createEmptySecurityState(),
     usuarios: [],
   };
+}
+
+function normalizeTeamMemberDisplayName(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return TEAM_MEMBER_DISPLAY_ALIASES[normalizeText(raw)] || raw;
+}
+
+function normalizeFieldDisplayValue(fieldKey, value) {
+  if (fieldKey === 'responsavel' || fieldKey === 'revisor') {
+    return normalizeTeamMemberDisplayName(value);
+  }
+  return String(value ?? '').trim();
 }
 
 function normalizeSessionProfileSnapshot(profile) {
@@ -1102,11 +1119,13 @@ function getStatusAcompanhamentoCodigo(client) {
 }
 
 function getResponsavelOperacional(client) {
-  return getObrigacaoResponsavel(client) || client?.responsavel || '';
+  return getObrigacaoResponsavel(client) || normalizeTeamMemberDisplayName(client?.responsavel) || '';
 }
 
 function getObrigacaoResponsavel(client) {
-  return getObrigacoesPersistidas(client)?.responsavel_exibicao || client?.responsavel_ecd || client?.responsavel || '';
+  return normalizeTeamMemberDisplayName(
+    getObrigacoesPersistidas(client)?.responsavel_exibicao || client?.responsavel_ecd || client?.responsavel || '',
+  );
 }
 
 function getReinfDataEntregaValue(client) {
@@ -1115,6 +1134,14 @@ function getReinfDataEntregaValue(client) {
 
 function hasObrigacaoComprovante(client, key, fallbackField) {
   return getObrigacaoFlag(client, key, hasAttachment(client?.[fallbackField]));
+}
+
+function isReinfEnviada(client) {
+  if (hasObrigacoesPersistidas(client)) {
+    return getObrigacoesPersistidas(client)?.reinf_status_codigo === 'concluido'
+      || hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf');
+  }
+  return isYes(client?.envio_reinf) || hasAttachment(client?.anexo_recibo_reinf);
 }
 
 function isReinfPendente(client) {
@@ -1387,7 +1414,7 @@ function filterClients(clients, filters) {
     const matchesBaseFilters = FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
       if (!filterValue) return true;
-      return normalizeText(client[field]) === normalizeText(filterValue);
+      return normalizeText(normalizeFieldDisplayValue(field, client[field])) === normalizeText(normalizeFieldDisplayValue(field, filterValue));
     });
 
     if (!matchesBaseFilters) return false;
@@ -1395,6 +1422,9 @@ function filterClients(clients, filters) {
     return PRESET_ONLY_FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
       if (!filterValue) return true;
+      if (field === 'envio_reinf') {
+        return normalizeText(isReinfEnviada(client) ? 'Sim' : 'Nao') === normalizeText(filterValue);
+      }
       return normalizeText(client[field]) === normalizeText(filterValue);
     });
   });
@@ -1444,6 +1474,22 @@ function normalizeBreakdownRows(rows) {
 
   return Array.from(grouped.values())
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
+}
+
+function getNormalizedBreakdownRows(clients, fieldKey) {
+  return normalizeBreakdownRows(
+    toBreakdown(clients, fieldKey).map((row) => ({
+      ...row,
+      label: normalizeFieldDisplayValue(fieldKey, row?.label),
+    })),
+  );
+}
+
+function getFilterOptionsForField(listagens, field, currentValue = '') {
+  return uniqueValues([
+    ...(getOptions(listagens, field) ?? []),
+    currentValue,
+  ].map((value) => normalizeFieldDisplayValue(field?.key, value)));
 }
 
 function getOptions(listagens, field) {
@@ -1970,7 +2016,7 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
     },
     {
       title: 'REINF enviada',
-      value: countWhere(clients, (client) => isYes(client.envio_reinf)),
+      value: countWhere(clients, (client) => isReinfEnviada(client)),
       icon: CheckCircle2,
       tone: 'success',
       filter: { envio_reinf: 'Sim' },
@@ -2087,14 +2133,14 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
       <section className="grid gap-5 xl:grid-cols-2">
         <BreakdownPanel
           title="Clientes por responsável"
-          rows={normalizeBreakdownRows(toBreakdown(clients, 'responsavel'))}
+          rows={getNormalizedBreakdownRows(clients, 'responsavel')}
           total={total}
           field="responsavel"
           onSelect={onPreset}
         />
         <BreakdownPanel
           title="Clientes por revisor"
-          rows={normalizeBreakdownRows(toBreakdown(clients, 'revisor'))}
+          rows={getNormalizedBreakdownRows(clients, 'revisor')}
           total={total}
           field="revisor"
           onSelect={onPreset}
@@ -2209,7 +2255,7 @@ function SearchAndFilters({
         </label>
         {FILTER_FIELDS.map((fieldKey) => {
           const field = FIELD_DEFINITIONS.find((item) => item.key === fieldKey);
-          const options = uniqueValues([...(getOptions(listagens, field) ?? []), filters[fieldKey]]);
+          const options = getFilterOptionsForField(listagens, field, filters[fieldKey]);
           return (
             <label key={fieldKey} className="text-xs font-bold uppercase tracking-normal text-slate-500">
               {field?.label ?? fieldKey}
@@ -2856,11 +2902,13 @@ function PendenciasPage({
     });
   }
 
-  const actionRows = prioritizeRows(allActionRows.filter(({ client, item }) => {
+  const visibleActionRows = allActionRows.filter(({ client, item }) => {
     if (!matchesSearchContext(client)) return false;
     if (!matchesAttachmentFilter({ client, item }, attachmentFilter)) return false;
     return true;
-  }));
+  });
+
+  const actionRows = prioritizeRows(visibleActionRows);
 
   const attachmentBuckets = [
     {
@@ -2979,18 +3027,18 @@ function PendenciasPage({
     {
       key: 'comprovantes',
       title: 'Sem comprovante',
-      value: uniqueClientCount(actionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
+      value: uniqueClientCount(visibleActionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
       tone: 'warning',
       detail: 'Clientes aguardando recibo ou comprovante para fechar a obrigação.',
-      highlights: topClientNames(actionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
+      highlights: topClientNames(visibleActionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
     },
     {
       key: 'notificacao',
       title: 'Comunicacao e retorno',
-      value: uniqueClientCount(actionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
+      value: uniqueClientCount(visibleActionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
       tone: 'info',
       detail: 'Clientes que ainda precisam de notificacao ou retorno registrado.',
-      highlights: topClientNames(actionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
+      highlights: topClientNames(visibleActionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)),
     },
   ];
 
@@ -3396,7 +3444,7 @@ function ReinfPage({
   const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
   const quickFilters = [
     { key: 'todos', label: 'Todos', predicate: () => true, tone: 'neutral' },
-    { key: 'reinf-enviada', label: 'REINF enviada', predicate: (client) => getObrigacoesPersistidas(client)?.reinf_status_codigo === 'concluido' || hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf'), tone: 'success' },
+    { key: 'reinf-enviada', label: 'REINF enviada', predicate: (client) => isReinfEnviada(client), tone: 'success' },
     { key: 'reinf-pendente', label: 'REINF pendente', predicate: (client) => isReinfPendente(client), tone: 'warning' },
     { key: 'com-anexo-reinf', label: 'Com anexo REINF', predicate: (client) => hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf'), tone: 'success' },
     { key: 'sem-anexo-reinf', label: 'Sem anexo REINF', predicate: (client) => !hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf'), tone: 'warning' },
@@ -3419,7 +3467,7 @@ function ReinfPage({
     const reinfStatus = getObrigacoesPersistidas(client)?.reinf_status_codigo;
     const dataEntregaReinf = normalizeDateInputValue(getReinfDataEntregaValue(client));
     const reinfComprovante = hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf');
-    const envioReinfConcluido = reinfStatus ? reinfStatus === 'concluido' : isYes(client.envio_reinf);
+    const envioReinfConcluido = reinfStatus ? reinfStatus === 'concluido' : isReinfEnviada(client);
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
     if (filters.regime_tributario && normalizeText(client.regime_tributario) !== normalizeText(filters.regime_tributario)) return false;
@@ -3901,7 +3949,7 @@ function ReportsPage({
     },
   ].filter((row) => row.value > 0);
   const reports = [
-    { title: 'Clientes por responsável', rows: normalizeBreakdownRows(toBreakdown(clients, 'responsavel')), icon: UserCheck },
+    { title: 'Clientes por responsável', rows: getNormalizedBreakdownRows(clients, 'responsavel'), icon: UserCheck },
     { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2 },
     { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
@@ -6163,6 +6211,9 @@ export default function App() {
         renderClientCell={(client, fieldKey) => {
           if (fieldKey === 'responsavel') {
             return renderFieldValue(getResponsavelOperacional(client));
+          }
+          if (fieldKey === 'revisor') {
+            return renderFieldValue(normalizeTeamMemberDisplayName(client?.revisor));
           }
           const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[fieldKey];
           if (!tipoAnexo) return undefined;
