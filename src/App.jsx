@@ -456,7 +456,7 @@ function loadInitialState() {
     if (!raw) {
       return {
         clientes: [],
-        listagens: createDefaultLists(),
+        listagens: createRuntimeListBase(),
         metadata: { ...INITIAL_METADATA },
         hasBootstrapCache: false,
       };
@@ -467,7 +467,7 @@ function loadInitialState() {
       ? parsed.clientes.map(withClientDefaults)
       : [];
     const listagens = mergeListagensFromClients(
-      mergeListagensFromSupabase(createDefaultLists(), parsed?.listagens ?? {}),
+      mergeListagensFromSupabase(createRuntimeListBase(), parsed?.listagens ?? {}),
       clientes,
     );
     const metadata = {
@@ -489,7 +489,7 @@ function loadInitialState() {
   } catch {
     return {
       clientes: [],
-      listagens: createDefaultLists(),
+      listagens: createRuntimeListBase(),
       metadata: { ...INITIAL_METADATA },
       hasBootstrapCache: false,
     };
@@ -505,7 +505,7 @@ function saveBootstrapCache({ clientes, listagens, metadata }) {
   try {
     const payload = {
       clientes: Array.isArray(clientes) ? clientes.map(withClientDefaults) : [],
-      listagens: listagens && typeof listagens === 'object' ? listagens : createDefaultLists(),
+      listagens: listagens && typeof listagens === 'object' ? listagens : createRuntimeListBase(),
       metadata: metadata && typeof metadata === 'object' ? metadata : { ...INITIAL_METADATA },
     };
     window.localStorage.setItem(PORTAL_BOOTSTRAP_CACHE_KEY, JSON.stringify(payload));
@@ -521,6 +521,12 @@ const SELECT_LIST_FALLBACKS = {
   cliente_notificado: YES_NO_OPTIONS,
   ecd: YES_NO_OPTIONS,
 };
+
+function createRuntimeListBase() {
+  return Object.fromEntries(
+    Object.entries(SELECT_LIST_FALLBACKS).map(([key, values]) => [key, [...values]]),
+  );
+}
 
 function mergeListagensFromSupabase(baseListagens, listagensSupabase) {
   const merged = { ...baseListagens };
@@ -634,6 +640,11 @@ function shouldOpenResetViewFromUrl() {
     hash.includes('type=recovery') ||
     hash.startsWith('#reset')
   );
+}
+
+function isLocalPortalHost() {
+  const hostname = String(window.location.hostname ?? '').trim().toLowerCase();
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 }
 
 function formatDateTime(value) {
@@ -5257,7 +5268,7 @@ export default function App() {
       const latestUpdatedAt = getLatestClienteAtualizadoEm(clientesComAcompanhamento);
 
       const nextListagens = mergeListagensFromClients(
-        mergeListagensFromSupabase(createDefaultLists(), listagensSupabase),
+        mergeListagensFromSupabase(createRuntimeListBase(), listagensSupabase),
         clientesComAcompanhamento,
       );
       persist(clientesComAcompanhamento, nextListagens, {
@@ -5298,7 +5309,7 @@ export default function App() {
     } catch (error) {
       const hasCurrentClients = Array.isArray(clients) && clients.length > 0;
       if (!hasCurrentClients) {
-        persist([], createDefaultLists(), {
+        persist([], createRuntimeListBase(), {
           ...metadata,
           source: 'Supabase indisponivel',
           importedAt: metadata?.importedAt || '',
@@ -5928,6 +5939,13 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode reaplicar o snapshot local de clientes.' });
       return;
     }
+    if (!isLocalPortalHost()) {
+      setToast({
+        title: 'Ferramenta local apenas',
+        message: 'A reaplicacao de snapshot local fica disponivel somente no ambiente local de manutencao.',
+      });
+      return;
+    }
     if (!confirm('Reaplicar os clientes do snapshot administrativo local no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
 
     if (!ensureSupabaseWriteReady('reaplicar o snapshot local')) return;
@@ -6094,6 +6112,7 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
+  const canUseLocalSnapshot = isLocalPortalHost();
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -6245,9 +6264,9 @@ export default function App() {
           onExportCsv={exportCsv}
           onResetBase={resetBase}
           canExport={canExportReports}
-          canResetBase={isAdmin(currentUserFull)}
-          canResetBaseEnabled={isAdmin(currentUserFull) && canWritePortalData}
-          resetBaseDisabledReason={writeBlockedReason}
+          canResetBase={isAdmin(currentUserFull) && canUseLocalSnapshot}
+          canResetBaseEnabled={isAdmin(currentUserFull) && canUseLocalSnapshot && canWritePortalData}
+          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponivel apenas no ambiente local de manutencao.' : writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}
