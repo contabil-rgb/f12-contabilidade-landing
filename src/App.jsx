@@ -490,9 +490,45 @@ const TEAM_MEMBER_DISPLAY_ALIASES = {
   tiago: 'Thiago',
 };
 
+const BOOTSTRAP_METADATA_KEYS = ['importedAt', 'generatedAt'];
+
 function createRuntimeListBase() {
   return Object.fromEntries(
     Object.entries(SELECT_LIST_FALLBACKS).map(([key, values]) => [key, [...values]]),
+  );
+}
+
+function sanitizeBootstrapMetadata(metadata) {
+  const safe = { ...INITIAL_METADATA };
+  if (!metadata || typeof metadata !== 'object') {
+    return safe;
+  }
+
+  BOOTSTRAP_METADATA_KEYS.forEach((key) => {
+    safe[key] = String(metadata?.[key] ?? '').trim();
+  });
+
+  return safe;
+}
+
+function sanitizeBootstrapListagens(listagens) {
+  const allowedKeys = new Set([
+    ...Object.keys(SELECT_LIST_FALLBACKS),
+    ...FIELD_DEFINITIONS.map((field) => field.listKey).filter(Boolean),
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(listagens ?? {})
+      .filter(([key, values]) => allowedKeys.has(key) && Array.isArray(values))
+      .map(([key, values]) => [
+        key,
+        uniqueValues(
+          values
+            .map((value) => normalizeFieldDisplayValue(key, value))
+            .filter(Boolean),
+        ),
+      ])
+      .filter(([, values]) => values.length > 0),
   );
 }
 
@@ -513,13 +549,10 @@ function loadInitialState() {
       ? parsed.clientes.map(withClientDefaults)
       : [];
     const listagens = mergeListagensFromClients(
-      mergeListagensFromSupabase(createRuntimeListBase(), parsed?.listagens ?? {}),
+      mergeListagensFromSupabase(createRuntimeListBase(), sanitizeBootstrapListagens(parsed?.listagens ?? {})),
       clientes,
     );
-    const metadata = {
-      ...INITIAL_METADATA,
-      ...(parsed?.metadata && typeof parsed.metadata === 'object' ? parsed.metadata : {}),
-    };
+    const metadata = sanitizeBootstrapMetadata(parsed?.metadata);
 
     return {
       clientes,
@@ -551,8 +584,10 @@ function saveBootstrapCache({ clientes, listagens, metadata }) {
   try {
     const payload = {
       clientes: Array.isArray(clientes) ? clientes.map(withClientDefaults) : [],
-      listagens: listagens && typeof listagens === 'object' ? listagens : createRuntimeListBase(),
-      metadata: metadata && typeof metadata === 'object' ? metadata : { ...INITIAL_METADATA },
+      listagens: sanitizeBootstrapListagens(
+        listagens && typeof listagens === 'object' ? listagens : createRuntimeListBase(),
+      ),
+      metadata: sanitizeBootstrapMetadata(metadata),
     };
     window.localStorage.setItem(PORTAL_BOOTSTRAP_CACHE_KEY, JSON.stringify(payload));
   } catch {
