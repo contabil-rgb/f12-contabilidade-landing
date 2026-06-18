@@ -1106,6 +1106,47 @@ function getPersistedAcompanhamentoStatusLabel(client) {
   return 'Sem notificacao';
 }
 
+function getPersistedRiscoCode(client) {
+  if (!hasRiscoPersistido(client)) return '';
+
+  const persisted = getRiscoPersistido(client);
+  const persistedCode = normalizeText(persisted?.risco_codigo || '');
+  if (persistedCode) return persistedCode;
+
+  if (
+    getRiscoFlag(client, 'situacao_critica', false)
+    || getRiscoFlag(client, 'pendencia_tecnica', false)
+    || getRiscoFlag(client, 'pendencia_critica', false)
+  ) {
+    return 'danger';
+  }
+
+  if (
+    getRiscoFlag(client, 'em_atraso', false)
+    || getRiscoFlag(client, 'has_pendencia', false)
+    || getRiscoFlag(client, 'documentos_atrasados', false)
+    || getRiscoFlag(client, 'ata_pendente', false)
+    || Number(getRiscoPersistido(client)?.pendencias_obrigacoes_total ?? 0) > 0
+  ) {
+    return 'warning';
+  }
+
+  return 'ok';
+}
+
+function getPersistedRiscoLabel(client) {
+  if (!hasRiscoPersistido(client)) return '';
+
+  const persisted = getRiscoPersistido(client);
+  const persistedLabel = String(persisted?.risco_label ?? '').trim();
+  if (persistedLabel) return persistedLabel;
+
+  const code = getPersistedRiscoCode(client);
+  if (code === 'danger') return 'Critico';
+  if (code === 'warning') return 'Atencao';
+  return 'Em dia';
+}
+
 function getDiasAtrasoValue(client) {
   const persisted = getRiscoPersistido(client)?.dias_atraso;
   if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
@@ -1113,7 +1154,10 @@ function getDiasAtrasoValue(client) {
 }
 
 function isEmAtraso(client) {
-  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'em_atraso', false);
+  if (hasRiscoPersistido(client)) {
+    if (getRiscoFlag(client, 'em_atraso', false)) return true;
+    return getPersistedRiscoCode(client) === 'warning' && getDiasAtrasoValue(client) > 0;
+  }
   return getRiscoFlag(client, 'em_atraso', getClientAnalysis(client).emAtraso);
 }
 
@@ -1138,7 +1182,10 @@ function isAtaPendente(client) {
 }
 
 function hasPendenciaOperacional(client) {
-  if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'has_pendencia', false);
+  if (hasRiscoPersistido(client)) {
+    if (getRiscoFlag(client, 'has_pendencia', false)) return true;
+    return getPersistedRiscoCode(client) === 'danger' || getPersistedRiscoCode(client) === 'warning';
+  }
   return getRiscoFlag(client, 'has_pendencia', getClientAnalysis(client).hasPendencia);
 }
 
@@ -1275,6 +1322,67 @@ function getObrigacaoResponsavel(client) {
   );
 }
 
+function getPersistedReinfStatusCode(client) {
+  if (!hasObrigacoesPersistidas(client)) return '';
+
+  const persisted = getObrigacoesPersistidas(client);
+  const persistedCode = normalizeText(persisted?.reinf_status_codigo || '');
+  if (persistedCode) return persistedCode;
+
+  if (getObrigacaoFlag(client, 'reinf_comprovante_anexado', false)) return 'concluido';
+  if (getObrigacaoFlag(client, 'reinf_pendente', false)) return 'em_atraso';
+  if (getObrigacaoFlag(client, 'recibo_reinf_pendente', false)) return 'aguardando_envio';
+  if (persisted?.reinf_data_entrega) return 'aguardando_envio';
+  return 'sem_data';
+}
+
+function getPersistedReinfStatusLabel(client) {
+  if (!hasObrigacoesPersistidas(client)) return '';
+
+  const persisted = getObrigacoesPersistidas(client);
+  const persistedLabel = String(persisted?.reinf_status_label ?? '').trim();
+  if (persistedLabel) return persistedLabel;
+
+  const code = getPersistedReinfStatusCode(client);
+  if (code === 'concluido') return 'Concluido';
+  if (code === 'em_atraso') return 'Em atraso';
+  if (code === 'aguardando_envio') return 'Aguardando envio';
+  return 'Sem data';
+}
+
+function getPersistedObrigacoesStatusCode(client) {
+  if (!hasObrigacoesPersistidas(client)) return '';
+
+  const persisted = getObrigacoesPersistidas(client);
+  const persistedCode = normalizeText(persisted?.obrigacoes_status_codigo || '');
+  if (persistedCode) return persistedCode;
+
+  if (getObrigacaoFlag(client, 'ecd_pendente', false) || getObrigacaoFlag(client, 'ecf_pendente', false)) {
+    return 'obrigacao_pendente';
+  }
+  if (getObrigacaoFlag(client, 'ecd_aguardando_envio', false)) return 'aguardando_envio';
+  if (getObrigacaoFlag(client, 'ecd_responsavel_pendente', false)) return 'responsavel_pendente';
+  if (getObrigacaoFlag(client, 'recibo_ecd_pendente', false) || getObrigacaoFlag(client, 'recibo_ecf_pendente', false)) {
+    return 'comprovante_pendente';
+  }
+  return 'em_dia';
+}
+
+function getPersistedObrigacoesStatusLabel(client) {
+  if (!hasObrigacoesPersistidas(client)) return '';
+
+  const persisted = getObrigacoesPersistidas(client);
+  const persistedLabel = String(persisted?.obrigacoes_status_label ?? '').trim();
+  if (persistedLabel) return persistedLabel;
+
+  const code = getPersistedObrigacoesStatusCode(client);
+  if (code === 'obrigacao_pendente') return 'Obrigacao pendente';
+  if (code === 'aguardando_envio') return 'Aguardando envio';
+  if (code === 'responsavel_pendente') return 'Responsavel pendente';
+  if (code === 'comprovante_pendente') return 'Comprovante pendente';
+  return 'Em dia';
+}
+
 function getReinfDataEntregaValue(client) {
   return getObrigacoesPersistidas(client)?.reinf_data_entrega || client?.data_enviada_reinf || '';
 }
@@ -1285,54 +1393,82 @@ function hasObrigacaoComprovante(client, key, fallbackField) {
 
 function isReinfEnviada(client) {
   if (hasObrigacoesPersistidas(client)) {
-    return getObrigacoesPersistidas(client)?.reinf_status_codigo === 'concluido'
+    return getPersistedReinfStatusCode(client) === 'concluido'
       || hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf');
   }
   return isYes(client?.envio_reinf) || hasAttachment(client?.anexo_recibo_reinf);
 }
 
 function isReinfPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'reinf_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'reinf_pendente', false)) return true;
+    return getPersistedReinfStatusCode(client) === 'em_atraso';
+  }
   return getObrigacaoFlag(client, 'reinf_pendente', getClientAnalysis(client).reinfPendente);
 }
 
 function isReciboReinfPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_reinf_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'recibo_reinf_pendente', false)) return true;
+    const persistedCode = getPersistedReinfStatusCode(client);
+    return persistedCode === 'aguardando_envio' || persistedCode === 'em_atraso';
+  }
   return getObrigacaoFlag(client, 'recibo_reinf_pendente', getClientAnalysis(client).reciboReinfPendente);
 }
 
 function isEcdPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'ecd_pendente', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecd_status_codigo || '') === 'obrigacao_pendente';
+  }
   return getObrigacaoFlag(client, 'ecd_pendente', getClientAnalysis(client).ecdPendente);
 }
 
 function isEcdAguardandoEnvio(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_aguardando_envio', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'ecd_aguardando_envio', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecd_status_codigo || '') === 'aguardando_envio';
+  }
   return getObrigacaoFlag(client, 'ecd_aguardando_envio', getClientAnalysis(client).ecdAguardandoEnvio);
 }
 
 function isEcdResponsavelPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecd_responsavel_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'ecd_responsavel_pendente', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecd_status_codigo || '') === 'responsavel_pendente';
+  }
   return getObrigacaoFlag(client, 'ecd_responsavel_pendente', getClientAnalysis(client).ecdResponsavelPendente);
 }
 
 function isReciboEcdPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_ecd_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'recibo_ecd_pendente', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecd_status_codigo || '') === 'comprovante_pendente';
+  }
   return getObrigacaoFlag(client, 'recibo_ecd_pendente', getClientAnalysis(client).reciboEcdPendente);
 }
 
 function isEcfPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'ecf_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'ecf_pendente', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecf_status_codigo || '') === 'obrigacao_pendente';
+  }
   return getObrigacaoFlag(client, 'ecf_pendente', getClientAnalysis(client).ecfPendente);
 }
 
 function isReciboEcfPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'recibo_ecf_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'recibo_ecf_pendente', false)) return true;
+    return normalizeText(getObrigacoesPersistidas(client)?.ecf_status_codigo || '') === 'comprovante_pendente';
+  }
   return getObrigacaoFlag(client, 'recibo_ecf_pendente', getClientAnalysis(client).reciboEcfPendente);
 }
 
 function isComunicacaoPendente(client) {
-  if (hasObrigacoesPersistidas(client)) return getObrigacaoFlag(client, 'comunicacao_pendente', false);
+  if (hasObrigacoesPersistidas(client)) {
+    if (getObrigacaoFlag(client, 'comunicacao_pendente', false)) return true;
+    return Boolean(getObrigacoesPersistidas(client)?.possui_pendencia_obrigacao) && !isClienteNotificado(client);
+  }
   return getObrigacaoFlag(client, 'comunicacao_pendente', getClientAnalysis(client).comunicacaoPendente);
 }
 
@@ -1452,8 +1588,8 @@ function ReinfAttachmentSentDateCell({ client }) {
 }
 
 function getReinfObrigacaoStatus(client) {
-  const persisted = getObrigacoesPersistidas(client);
-  if (persisted?.reinf_status_codigo) {
+  if (hasObrigacoesPersistidas(client)) {
+    const persistedCode = getPersistedReinfStatusCode(client);
     const toneMap = {
       concluido: 'success',
       sem_data: 'neutral',
@@ -1461,8 +1597,8 @@ function getReinfObrigacaoStatus(client) {
       aguardando_envio: 'warning',
     };
     return {
-      label: persisted.reinf_status_label || 'Status',
-      tone: toneMap[persisted.reinf_status_codigo] || 'neutral',
+      label: getPersistedReinfStatusLabel(client) || 'Status',
+      tone: toneMap[persistedCode] || 'neutral',
     };
   }
 
@@ -1501,8 +1637,8 @@ function ReinfObrigacaoStatusCell({ client }) {
 }
 
 function EcdEcfObrigacaoStatusCell({ client }) {
-  const persisted = getObrigacoesPersistidas(client);
-  if (persisted?.obrigacoes_status_codigo) {
+  if (hasObrigacoesPersistidas(client)) {
+    const persistedCode = getPersistedObrigacoesStatusCode(client);
     const toneMap = {
       obrigacao_pendente: 'warning',
       aguardando_envio: 'warning',
@@ -1511,8 +1647,8 @@ function EcdEcfObrigacaoStatusCell({ client }) {
       em_dia: 'success',
     };
     return (
-      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(toneMap[persisted.obrigacoes_status_codigo] || 'neutral')}`}>
-        {persisted.obrigacoes_status_label || 'Status'}
+      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(toneMap[persistedCode] || 'neutral')}`}>
+        {getPersistedObrigacoesStatusLabel(client) || 'Status'}
       </span>
     );
   }
@@ -2488,6 +2624,18 @@ function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }
 function getObrigacoesPendentesCount(client) {
   const persisted = getObrigacoesPersistidas(client)?.pendencias_obrigacoes_total;
   if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
+  if (hasObrigacoesPersistidas(client)) {
+    return [
+      isReinfPendente(client),
+      isReciboReinfPendente(client),
+      isEcdPendente(client),
+      isEcdAguardandoEnvio(client),
+      isEcdResponsavelPendente(client),
+      isReciboEcdPendente(client),
+      isEcfPendente(client),
+      isReciboEcfPendente(client),
+    ].filter(Boolean).length;
+  }
   return [
     isReinfPendente(client),
     isReciboReinfPendente(client),
@@ -2536,14 +2684,17 @@ function getDetailAcompanhamentoSummary(client) {
 }
 
 function getDetailRiscoSummary(client) {
-  const persisted = getRiscoPersistido(client);
   const fallbackCode = isPendenciaCritica(client) || isSituacaoCritica(client) || isPendenciaTecnica(client)
     ? 'danger'
     : hasPendenciaOperacional(client)
       ? 'warning'
       : 'ok';
-  const code = normalizeText(persisted?.risco_codigo || fallbackCode);
-  const label = persisted?.risco_label || (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia');
+  const code = hasRiscoPersistido(client)
+    ? getPersistedRiscoCode(client) || fallbackCode
+    : fallbackCode;
+  const label = hasRiscoPersistido(client)
+    ? getPersistedRiscoLabel(client) || (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia')
+    : (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia');
   const toneMap = {
     danger: 'danger',
     warning: 'warning',
@@ -2564,11 +2715,14 @@ function getDetailRiscoSummary(client) {
 }
 
 function getDetailObrigacoesSummary(client) {
-  const persisted = getObrigacoesPersistidas(client);
   const count = getObrigacoesPendentesCount(client);
   const fallbackCode = count > 0 ? 'obrigacao_pendente' : 'em_dia';
-  const code = normalizeText(persisted?.obrigacoes_status_codigo || fallbackCode);
-  const label = persisted?.obrigacoes_status_label || (count > 0 ? 'Obrigacoes pendentes' : 'Em dia');
+  const code = hasObrigacoesPersistidas(client)
+    ? getPersistedObrigacoesStatusCode(client) || fallbackCode
+    : fallbackCode;
+  const label = hasObrigacoesPersistidas(client)
+    ? getPersistedObrigacoesStatusLabel(client) || (count > 0 ? 'Obrigacoes pendentes' : 'Em dia')
+    : (count > 0 ? 'Obrigacoes pendentes' : 'Em dia');
   const toneMap = {
     obrigacao_pendente: 'warning',
     aguardando_envio: 'warning',
