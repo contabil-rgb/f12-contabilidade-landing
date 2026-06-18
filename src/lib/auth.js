@@ -247,25 +247,6 @@ export function lockUntilDate() {
   return new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000).toISOString();
 }
 
-export function createHistoryEntries({ user, previousClient, nextClient, fields, tipoAcao }) {
-  if (!user || !previousClient || !nextClient) return [];
-  const now = new Date().toISOString();
-  return fields
-    .filter((fieldKey) => String(previousClient[fieldKey] ?? '') !== String(nextClient[fieldKey] ?? ''))
-    .map((fieldKey) => ({
-      id: randomId('hist'),
-      usuario_id: user.id,
-      usuario_nome: user.nome,
-      cliente_id: nextClient.id,
-      cliente_nome: nextClient.nome_identificacao || nextClient.razao_social,
-      campo_alterado: fieldKey,
-      valor_anterior: previousClient[fieldKey] ?? '',
-      valor_novo: nextClient[fieldKey] ?? '',
-      data_alteracao: now,
-      tipo_acao: tipoAcao,
-    }));
-}
-
 export function hasPasswordHash(user) {
   return !isBlank(user?.senha_hash);
 }

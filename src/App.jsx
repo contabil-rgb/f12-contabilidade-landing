@@ -65,7 +65,6 @@ import {
   AUTH_SESSION_KEY,
   ACCESS_PROFILE_OPTIONS,
   ACCESS_PROFILES,
-  HISTORY_FIELDS,
   PERMISSIONS,
   USER_STATUS,
 } from './data/security.js';
@@ -75,7 +74,6 @@ import {
   canEditClientField,
   canViewClient,
   createEmptySecurityState,
-  createHistoryEntries,
   deniedReasonForField,
   getProfile,
   isAdmin,
@@ -5568,24 +5566,19 @@ export default function App() {
     setPage('clientes');
   }
 
-  function appendHistory(entries) {
-    if (!entries.length) return;
-    persistSecurity({
-      ...security,
-      historico_alteracoes: [...entries, ...security.historico_alteracoes],
-    });
-  }
-
   async function registrarHistoricoPersistente({
     clienteId,
     valoresAntigos,
     valoresNovos,
     tipoAcao,
     origem,
+    notifyOnError = false,
   }) {
-    if (!currentUserFull?.id || !clienteId) return;
+    if (!currentUserFull?.id || !clienteId) {
+      return { ok: false, skipped: true };
+    }
     try {
-      await registrarHistoricoAlteracoesSupabase(
+      const result = await registrarHistoricoAlteracoesSupabase(
         clienteId,
         valoresAntigos ?? {},
         valoresNovos ?? {},
@@ -5593,8 +5586,16 @@ export default function App() {
         tipoAcao,
         origem,
       );
+      return result ?? { ok: true };
     } catch (error) {
       console.warn('[historico] Falha ao registrar alteracao persistente:', error);
+      if (notifyOnError) {
+        setToast({
+          title: 'Historico nao confirmado',
+          message: 'A alteracao principal foi salva, mas o historico dessa acao nao conseguiu ser persistido agora.',
+        });
+      }
+      return { ok: false, error };
     }
   }
 
@@ -5613,6 +5614,11 @@ export default function App() {
     } finally {
       setHistoricoClienteLoading(false);
     }
+  }
+
+  async function recarregarHistoricoClienteAtivo(clienteId) {
+    if (page !== 'detalhe' || selectedClientId !== clienteId) return;
+    await carregarHistoricoCliente(clienteId);
   }
 
   async function saveClient(client) {
@@ -5660,13 +5666,17 @@ export default function App() {
           mergedClient = withClientDefaults({ ...mergedClient, ...saved });
           setSupabaseStatus({ connected: true, message: 'Alteracao salva no Supabase' });
           syncedWithSupabase = true;
-          await registrarHistoricoPersistente({
+          const historicoResult = await registrarHistoricoPersistente({
             clienteId: previous.id,
             valoresAntigos: previousForHistory ?? previous,
             valoresNovos: mergedClient,
             tipoAcao: 'edicao_manual',
             origem: origemEdicao,
+            notifyOnError: true,
           });
+          if (historicoResult?.ok) {
+            await recarregarHistoricoClienteAtivo(previous.id);
+          }
         } catch (error) {
           setSupabaseStatus({ connected: false, message: 'Falha ao salvar no Supabase' });
           setToast({
@@ -5677,13 +5687,6 @@ export default function App() {
         }
       }
       nextClients[index] = clearPersistedObrigacoes(mergedClient);
-      appendHistory(createHistoryEntries({
-        user: currentUserFull,
-        previousClient: previous,
-        nextClient: nextClients[index],
-        fields: HISTORY_FIELDS,
-        tipoAcao: 'edicao_cliente',
-      }));
     } else {
       let createdClient = { ...nextClient };
       try {
@@ -5738,13 +5741,17 @@ export default function App() {
         nextClient = withClientDefaults({ ...nextClient, ...saved });
         setSupabaseStatus({ connected: true, message: 'Atualizacao rapida salva no Supabase' });
         syncedWithSupabase = true;
-        await registrarHistoricoPersistente({
+        const historicoResult = await registrarHistoricoPersistente({
           clienteId: id,
           valoresAntigos: previousForHistory ?? previous,
           valoresNovos: nextClient,
           tipoAcao: 'edicao_manual',
           origem: page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes',
+          notifyOnError: true,
         });
+        if (historicoResult?.ok) {
+          await recarregarHistoricoClienteAtivo(id);
+        }
       } catch (error) {
         setSupabaseStatus({ connected: false, message: 'Falha na atualizacao do Supabase' });
         setToast({
@@ -5758,13 +5765,6 @@ export default function App() {
     const nextClients = clients.map((client) =>
       client.id === id ? clearPersistedObrigacoes(nextClient) : client,
     );
-    appendHistory(createHistoryEntries({
-      user: currentUserFull,
-      previousClient: previous,
-      nextClient,
-      fields: Object.keys(patch).filter((field) => HISTORY_FIELDS.includes(field)),
-      tipoAcao: 'atualizacao_rapida',
-    }));
     persist(nextClients);
     if (syncedWithSupabase) {
       void resyncSupabaseAfterMutation('atualizacao rapida');
@@ -5859,13 +5859,17 @@ export default function App() {
       try {
         await inativarClienteSupabase(client.id);
         setSupabaseStatus({ connected: true, message: 'Cliente inativado no Supabase' });
-        await registrarHistoricoPersistente({
+        const historicoResult = await registrarHistoricoPersistente({
           clienteId: client.id,
           valoresAntigos: previousForHistory ?? client,
           valoresNovos: { ...(previousForHistory ?? client), status: 'Inativo', situacao: 'Inativo' },
           tipoAcao: 'inativacao',
           origem: 'Base de Clientes',
+          notifyOnError: true,
         });
+        if (historicoResult?.ok) {
+          await recarregarHistoricoClienteAtivo(client.id);
+        }
       } catch (error) {
         setSupabaseStatus({ connected: false, message: 'Falha ao inativar no Supabase' });
         setToast({
@@ -5876,13 +5880,6 @@ export default function App() {
       }
     }
     const nextClient = { ...client, situacao: 'Inativo', status: 'Inativo', atualizado_em: todayBr() };
-    appendHistory(createHistoryEntries({
-      user: currentUserFull,
-      previousClient: client,
-      nextClient,
-      fields: ['situacao', 'status'],
-      tipoAcao: 'inativacao',
-    }));
     updateClientsPersisted((current) => current.filter((item) => item.id !== client.id));
     setToast({
       title: 'Cliente inativado',
