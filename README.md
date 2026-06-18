@@ -43,9 +43,11 @@ Crie ou ajuste [\.env.local](C:/Users/F12 CONTABILIDADE 13/Documents/New project
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false
 ```
 
 O frontend valida essas variaveis em [src/lib/supabase.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/lib/supabase.ts).
+O snapshot local administrativo fica desabilitado por padrao e so deve ser habilitado manualmente em manutencao local.
 
 ## Rodar localmente
 
@@ -109,6 +111,8 @@ O portal possui um fluxo administrativo isolado para reaplicar os clientes do sn
 
 Esse fluxo:
 
+- exige `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true`;
+- exige host local (`localhost`, `127.0.0.1` ou `::1`);
 - atualiza ou recria os registros do snapshot;
 - nao remove clientes extras existentes no banco;
 - nao recompõe anexos;

@@ -284,6 +284,7 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
 const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
+const ENABLE_LOCAL_SNAPSHOT_TOOLS = String(import.meta.env.VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS ?? '').trim().toLowerCase() === 'true';
 
 async function loginSupabase(email, senha) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -660,6 +661,10 @@ function shouldOpenResetViewFromUrl() {
 function isLocalPortalHost() {
   const hostname = String(window.location.hostname ?? '').trim().toLowerCase();
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+function canUseLocalSnapshotTools() {
+  return ENABLE_LOCAL_SNAPSHOT_TOOLS && isLocalPortalHost();
 }
 
 function formatDateTime(value) {
@@ -6005,10 +6010,10 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode reaplicar o snapshot local de clientes.' });
       return;
     }
-    if (!isLocalPortalHost()) {
+    if (!canUseLocalSnapshotTools()) {
       setToast({
         title: 'Ferramenta local apenas',
-        message: 'A reaplicacao de snapshot local fica disponivel somente no ambiente local de manutencao.',
+        message: 'A reaplicacao de snapshot local fica disponivel apenas no ambiente local de manutencao com a ferramenta explicitamente habilitada.',
       });
       return;
     }
@@ -6178,7 +6183,7 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
-  const canUseLocalSnapshot = isLocalPortalHost();
+  const canUseLocalSnapshot = canUseLocalSnapshotTools();
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -6335,7 +6340,7 @@ export default function App() {
           canExport={canExportReports}
           canResetBase={isAdmin(currentUserFull) && canUseLocalSnapshot}
           canResetBaseEnabled={isAdmin(currentUserFull) && canUseLocalSnapshot && canWritePortalData}
-          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponivel apenas no ambiente local de manutencao.' : writeBlockedReason}
+          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponivel apenas no ambiente local de manutencao com VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true.' : writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           onRefresh={refreshSupabaseData}

@@ -69,6 +69,8 @@ Confirmar:
 
 O botao administrativo de reaplicacao:
 
+- exige `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true` no `.env.local`;
+- exige ambiente local (`localhost`, `127.0.0.1` ou `::1`);
 - nao faz reset completo do portal;
 - nao remove clientes extras do banco;
 - nao remove nem recompõe anexos;
