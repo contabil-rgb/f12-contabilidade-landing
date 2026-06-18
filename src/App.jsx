@@ -284,6 +284,8 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
 const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
+const AUTH_RESTORE_VISUAL_DELAY_MS = 700;
+const CONNECTION_WARNING_VISUAL_DELAY_MS = 1200;
 const ENABLE_LOCAL_SNAPSHOT_TOOLS = String(import.meta.env.VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS ?? '').trim().toLowerCase() === 'true';
 
 async function loginSupabase(email, senha) {
@@ -432,6 +434,32 @@ async function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function useDelayedFlag(active, delayMs) {
+  const [visible, setVisible] = useState(() => !delayMs && Boolean(active));
+
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return undefined;
+    }
+
+    if (!delayMs || delayMs <= 0) {
+      setVisible(true);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVisible(true);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [active, delayMs]);
+
+  return visible;
 }
 
 function isAuthTimeoutError(error) {
@@ -1552,6 +1580,8 @@ function AppShell({
   canImportEnabled = true,
   importDisabledReason = '',
   supabaseStatus,
+  supabaseStatusLabel = '',
+  supabaseStatusTone = 'neutral',
   writeBlockedMessage = '',
   searchClients = [],
   searchHistory = [],
@@ -1565,6 +1595,14 @@ function AppShell({
   const profile = getProfile(currentUser);
   const currentTitle = NAV_ITEMS.find((item) => item.key === page)?.label ?? 'Cliente';
   const pageDescription = PAGE_DESCRIPTIONS[page] ?? 'Painel interno do escritório contábil';
+  const statusToneTextClass = {
+    success: 'text-emerald-300',
+    warning: 'text-amber-300',
+    info: 'text-sky-300',
+    danger: 'text-red-300',
+    muted: 'text-slate-400',
+    neutral: 'text-slate-300',
+  }[supabaseStatusTone] ?? 'text-slate-300';
   const searchRef = useRef(null);
   const [globalQuery, setGlobalQuery] = useState('');
   const [globalOpen, setGlobalOpen] = useState(false);
@@ -1782,8 +1820,8 @@ function AppShell({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Base carregada</p>
               <p className="mt-2 text-2xl font-black">{formatNumber(totalClientes)}</p>
               <p className="mt-1 text-xs text-slate-400">{getMetadataSourceDisplay(metadata?.source)}</p>
-              <p className={`mt-2 text-xs font-bold ${supabaseStatus?.connected ? 'text-emerald-300' : 'text-amber-300'}`}>
-                {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+              <p className={`mt-2 text-xs font-bold ${statusToneTextClass}`}>
+                {supabaseStatusLabel}
               </p>
             </div>
           </div>
@@ -1873,7 +1911,7 @@ function AppShell({
                 Sair
               </button>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
-              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{getSupabaseStatusDisplay(supabaseStatus, metadata)}</div>
+              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${chipClass(supabaseStatusTone)}`}>{supabaseStatusLabel}</div>
             </div>
           </div>
 
@@ -2023,7 +2061,7 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
 }
 
-function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, metadata, onRefresh, loading = false }) {
+function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
@@ -2103,8 +2141,8 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
         description="Indicadores da carteira contábil com atalhos para filtragem rápida."
         right={(
           <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
+              {statusLabel}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
               Fonte: {getMetadataSourceDisplay(metadata?.source)} | Atualizado: {metadata?.importedAt || metadata?.generatedAt || 'N/A'}
@@ -2818,6 +2856,8 @@ function PendenciasPage({
   onClearSearchContext,
   supabaseStatus,
   metadata,
+  statusLabel,
+  statusTone = 'neutral',
   onRefresh,
   loading = false,
 }) {
@@ -3133,8 +3173,8 @@ function PendenciasPage({
         description="Central de prioridades para o coordenador e o time atacarem primeiro o que exige ação."
         right={(
           <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
+              {statusLabel}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
@@ -3465,6 +3505,8 @@ function ReinfPage({
   loading = false,
   searchContext,
   onClearSearchContext,
+  statusLabel,
+  statusTone = 'neutral',
 }) {
   const emptyFilters = {
     search: '',
@@ -3527,8 +3569,8 @@ function ReinfPage({
         description="Acompanhamento do envio da REINF e dos comprovantes anexados."
         right={(
           <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
+              {statusLabel}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
@@ -3679,7 +3721,7 @@ function ReinfPage({
   );
 }
 
-function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, onRefresh, loading = false, searchContext, onClearSearchContext }) {
+function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -3746,8 +3788,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         description="Controle das obrigações anuais, responsáveis e comprovantes da ECD/ECF."
         right={(
           <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
+              {statusLabel}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
@@ -3959,6 +4001,8 @@ function ReportsPage({
   resetBaseDisabledReason = '',
   supabaseStatus,
   metadata,
+  statusLabel,
+  statusTone = 'neutral',
   onRefresh,
   loading = false,
 }) {
@@ -4014,8 +4058,8 @@ function ReportsPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
+            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
+              {statusLabel}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
@@ -4486,6 +4530,14 @@ function PageLoadingFallback({ label = 'Carregando módulo...' }) {
   );
 }
 
+function FullscreenStatusState({ label }) {
+  return (
+    <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
+      <p className="text-sm font-semibold">{label}</p>
+    </div>
+  );
+}
+
 function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient, onAnexoSuccess, onAnexoError }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
@@ -4935,13 +4987,34 @@ export default function App() {
   const shouldHoldAuthenticatedEntry = hasStoredSession && !currentUserFull;
 
   const currentUser = useMemo(() => sanitizeUser(currentUserFull), [currentUserFull]);
+  const showRestoreUi = useDelayedFlag(
+    Boolean(hasStoredSession && authRestoring),
+    AUTH_RESTORE_VISUAL_DELAY_MS,
+  );
+  const showConnectionWarningUi = useDelayedFlag(
+    !supabaseStatus.connected,
+    CONNECTION_WARNING_VISUAL_DELAY_MS,
+  );
   const canWritePortalData = supabaseStatus.connected && !authRestoring;
   const writeBlockedReason = authRestoring
     ? 'Sessao em restauracao. As consultas continuam disponiveis, mas gravacoes ficam bloqueadas ate a reconexao completa.'
     : !supabaseStatus.connected
       ? 'Supabase indisponivel no momento. O portal esta em modo protegido com leitura da ultima sincronizacao e gravacoes bloqueadas ate a reconexao.'
       : '';
-  const writeBlockedMessage = authRestoring ? '' : writeBlockedReason;
+  const authGateLabel = showRestoreUi ? 'Restaurando sessao...' : 'Validando sessao...';
+  const supabaseStatusLabel = authRestoring && currentUserFull
+    ? 'Sessao em restauracao...'
+    : !supabaseStatus.connected && !showConnectionWarningUi
+      ? 'Verificando conexao com o Supabase...'
+      : getSupabaseStatusDisplay(supabaseStatus, metadata);
+  const supabaseStatusTone = authRestoring && currentUserFull
+    ? 'info'
+    : !supabaseStatus.connected && !showConnectionWarningUi
+      ? 'info'
+      : supabaseStatus.connected
+        ? 'success'
+        : 'warning';
+  const writeBlockedMessage = !authRestoring && showConnectionWarningUi ? writeBlockedReason : '';
 
   const enrichedClients = useMemo(() => {
     const allClients = enrichClients(clients);
@@ -6146,22 +6219,17 @@ export default function App() {
     }
   }
 
-  if (!authReady) {
-    return (
-      <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
-        <p className="text-sm font-semibold">Validando sessão...</p>
-      </div>
-    );
+  if (!authReady) return <FullscreenStatusState label={authGateLabel} />;
+
+  if (!currentUserFull && (shouldHoldAuthenticatedEntry || (authRestoring && hasStoredSession))) {
+    return <FullscreenStatusState label={authGateLabel} />;
+  }
+
+  if (currentUserFull && !initialPortalReady) {
+    return <FullscreenStatusState label="Carregando dados do portal..." />;
   }
 
   if (!currentUserFull) {
-    if (shouldHoldAuthenticatedEntry || (authRestoring && hasStoredSession)) {
-      return (
-        <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
-          <p className="text-sm font-semibold">Restaurando sessao...</p>
-        </div>
-      );
-    }
     if (authView === 'firstAccess') {
       return (
         <FirstAccessPage
@@ -6194,14 +6262,6 @@ export default function App() {
     );
   }
 
-  if (!initialPortalReady) {
-    return (
-      <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
-        <p className="text-sm font-semibold">Carregando dados do portal...</p>
-      </div>
-    );
-  }
-
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
   const canUseLocalSnapshot = canUseLocalSnapshotTools();
@@ -6218,6 +6278,8 @@ export default function App() {
           }}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
+          statusLabel={supabaseStatusLabel}
+          statusTone={supabaseStatusTone}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing || supabaseBootstrapping}
         />
@@ -6313,6 +6375,8 @@ export default function App() {
           onClearSearchContext={() => setPendenciasSearchContext(null)}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
+          statusLabel={supabaseStatusLabel}
+          statusTone={supabaseStatusTone}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing || supabaseBootstrapping}
         />
@@ -6329,6 +6393,8 @@ export default function App() {
         onAnexoError={handleAnexoError}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
+        statusLabel={supabaseStatusLabel}
+        statusTone={supabaseStatusTone}
         onRefresh={refreshSupabaseData}
         loading={supabaseRefreshing || supabaseBootstrapping}
         searchContext={reinfSearchContext}
@@ -6344,6 +6410,8 @@ export default function App() {
         onAnexoError={handleAnexoError}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
+        statusLabel={supabaseStatusLabel}
+        statusTone={supabaseStatusTone}
         onRefresh={refreshSupabaseData}
         loading={supabaseRefreshing || supabaseBootstrapping}
         searchContext={ecdSearchContext}
@@ -6364,6 +6432,8 @@ export default function App() {
           resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponivel apenas no ambiente local de manutencao com VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true.' : writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
+          statusLabel={supabaseStatusLabel}
+          statusTone={supabaseStatusTone}
           onRefresh={refreshSupabaseData}
           loading={supabaseRefreshing || supabaseBootstrapping}
         />
@@ -6428,6 +6498,8 @@ export default function App() {
         canImportEnabled={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL) && canWritePortalData}
         importDisabledReason={writeBlockedReason}
         supabaseStatus={supabaseStatus}
+        supabaseStatusLabel={supabaseStatusLabel}
+        supabaseStatusTone={supabaseStatusTone}
         writeBlockedMessage={writeBlockedMessage}
         searchClients={enrichedClients}
         searchHistory={can(currentUserFull, PERMISSIONS.HISTORY_VIEW) ? security.historico_alteracoes : []}
