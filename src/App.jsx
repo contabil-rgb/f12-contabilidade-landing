@@ -1079,6 +1079,33 @@ function getAcompanhamentoText(client, key, fallback = '') {
   return fallback;
 }
 
+function getPersistedAcompanhamentoStatusCode(client) {
+  if (!hasAcompanhamentoPersistido(client)) return '';
+
+  const persistedCode = normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', ''));
+  if (persistedCode) return persistedCode;
+
+  if (getAcompanhamentoFlag(client, 'sem_retorno', false)) return 'sem_retorno';
+  if (getAcompanhamentoFlag(client, 'aguardando_retorno', false)) return 'aguardando_retorno';
+  if (getAcompanhamentoFlag(client, 'retorno_recebido', false)) return 'retorno_recebido';
+  if (getAcompanhamentoFlag(client, 'cliente_notificado_bool', false)) return 'notificado';
+  return 'sem_notificacao';
+}
+
+function getPersistedAcompanhamentoStatusLabel(client) {
+  if (!hasAcompanhamentoPersistido(client)) return '';
+
+  const persistedLabel = getAcompanhamentoText(client, 'status_acompanhamento_label', '').trim();
+  if (persistedLabel) return persistedLabel;
+
+  const code = getPersistedAcompanhamentoStatusCode(client);
+  if (code === 'sem_retorno') return 'Sem retorno';
+  if (code === 'aguardando_retorno') return 'Aguardando retorno';
+  if (code === 'retorno_recebido') return 'Retorno recebido';
+  if (code === 'notificado') return 'Notificado';
+  return 'Sem notificacao';
+}
+
 function getDiasAtrasoValue(client) {
   const persisted = getRiscoPersistido(client)?.dias_atraso;
   if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
@@ -1138,14 +1165,21 @@ function getStatusRetornoClienteValue(client) {
 }
 
 function hasRetornoConcluido(client) {
-  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'retorno_recebido', false);
+  if (hasAcompanhamentoPersistido(client)) {
+    if (getAcompanhamentoFlag(client, 'retorno_recebido', false)) return true;
+    return getPersistedAcompanhamentoStatusCode(client) === 'retorno_recebido';
+  }
   if (getAcompanhamentoFlag(client, 'retorno_recebido', false)) return true;
   const status = getStatusRetornoClienteValue(client);
   return status === normalizeText('Retorno recebido') || status === normalizeText('Concluido');
 }
 
 function isAguardandoRetorno(client) {
-  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'aguardando_retorno', false);
+  if (hasAcompanhamentoPersistido(client)) {
+    if (getAcompanhamentoFlag(client, 'aguardando_retorno', false)) return true;
+    const persistedCode = getPersistedAcompanhamentoStatusCode(client);
+    return persistedCode === 'aguardando_retorno' || persistedCode === 'sem_retorno';
+  }
   const fallback = (() => {
     if (!isYes(client?.cliente_notificado)) return false;
     if (hasRetornoConcluido(client)) return false;
@@ -1156,7 +1190,10 @@ function isAguardandoRetorno(client) {
 }
 
 function isSemRetorno(client) {
-  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'sem_retorno', false);
+  if (hasAcompanhamentoPersistido(client)) {
+    if (getAcompanhamentoFlag(client, 'sem_retorno', false)) return true;
+    return getPersistedAcompanhamentoStatusCode(client) === 'sem_retorno';
+  }
   const fallback = isYes(client?.cliente_notificado)
     && !hasRetornoConcluido(client)
     && getStatusRetornoClienteValue(client) === normalizeText('Sem retorno');
@@ -1164,7 +1201,10 @@ function isSemRetorno(client) {
 }
 
 function isClienteNotificado(client) {
-  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'cliente_notificado_bool', false);
+  if (hasAcompanhamentoPersistido(client)) {
+    if (getAcompanhamentoFlag(client, 'cliente_notificado_bool', false)) return true;
+    return getPersistedAcompanhamentoStatusCode(client) !== 'sem_notificacao';
+  }
   const fallback = isYes(client?.cliente_notificado);
   return fallback;
 }
@@ -1182,7 +1222,11 @@ function getDiasSemRetorno(client) {
 }
 
 function hasAcompanhamentoPendente(client) {
-  if (hasAcompanhamentoPersistido(client)) return getAcompanhamentoFlag(client, 'acompanhamento_pendente', false);
+  if (hasAcompanhamentoPersistido(client)) {
+    if (getAcompanhamentoFlag(client, 'acompanhamento_pendente', false)) return true;
+    const persistedCode = getPersistedAcompanhamentoStatusCode(client);
+    return persistedCode === 'aguardando_retorno' || persistedCode === 'sem_retorno';
+  }
   const fallback =
     isComunicacaoPendente(client)
     || isAguardandoRetorno(client);
@@ -1195,7 +1239,7 @@ function hasComunicacaoOuRetornoPendente(client) {
 
 function getStatusAcompanhamentoLabel(client) {
   if (hasAcompanhamentoPersistido(client)) {
-    return getAcompanhamentoText(client, 'status_acompanhamento_label', 'Sem notificacao') || 'Sem notificacao';
+    return getPersistedAcompanhamentoStatusLabel(client) || 'Sem notificacao';
   }
   const fallback = (() => {
     if (isSemRetorno(client)) return 'Sem retorno';
@@ -1209,7 +1253,7 @@ function getStatusAcompanhamentoLabel(client) {
 
 function getStatusAcompanhamentoCodigo(client) {
   if (hasAcompanhamentoPersistido(client)) {
-    return normalizeText(getAcompanhamentoText(client, 'status_acompanhamento_codigo', 'sem_notificacao') || 'sem_notificacao');
+    return getPersistedAcompanhamentoStatusCode(client) || 'sem_notificacao';
   }
   const fallback = (() => {
     if (isSemRetorno(client)) return 'sem_retorno';
