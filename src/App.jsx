@@ -667,6 +667,27 @@ function canUseLocalSnapshotTools() {
   return ENABLE_LOCAL_SNAPSHOT_TOOLS && isLocalPortalHost();
 }
 
+function getMetadataSourceDisplay(source) {
+  if (source === 'Cache local da ultima sincronizacao') return 'Leitura local da ultima sincronizacao';
+  if (source === 'Supabase indisponivel') return 'Sem leitura confirmada do Supabase';
+  if (source === 'Supabase') return 'Supabase';
+  return source || 'Origem nao informada';
+}
+
+function isProtectedReadMode(supabaseStatus, metadata) {
+  return !supabaseStatus?.connected && metadata?.source === 'Cache local da ultima sincronizacao';
+}
+
+function getSupabaseStatusDisplay(supabaseStatus, metadata) {
+  if (isProtectedReadMode(supabaseStatus, metadata)) {
+    return 'Modo protegido | leitura local da ultima sincronizacao';
+  }
+  if (!supabaseStatus?.connected && metadata?.source === 'Supabase indisponivel') {
+    return 'Supabase indisponivel | sem leitura local confirmada';
+  }
+  return supabaseStatus?.message || 'Dados locais';
+}
+
 function formatDateTime(value) {
   if (!value) return 'Não informado';
   const date = new Date(value);
@@ -1760,9 +1781,9 @@ function AppShell({
             <div className="rounded-lg border border-white/10 bg-white/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Base carregada</p>
               <p className="mt-2 text-2xl font-black">{formatNumber(totalClientes)}</p>
-              <p className="mt-1 text-xs text-slate-400">{metadata.source}</p>
+              <p className="mt-1 text-xs text-slate-400">{getMetadataSourceDisplay(metadata?.source)}</p>
               <p className={`mt-2 text-xs font-bold ${supabaseStatus?.connected ? 'text-emerald-300' : 'text-amber-300'}`}>
-                {supabaseStatus?.message ?? 'Dados locais'}
+                {getSupabaseStatusDisplay(supabaseStatus, metadata)}
               </p>
             </div>
           </div>
@@ -1852,7 +1873,7 @@ function AppShell({
                 Sair
               </button>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
-              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{supabaseStatus?.message ?? 'Dados locais'}</div>
+              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${supabaseStatus?.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{getSupabaseStatusDisplay(supabaseStatus, metadata)}</div>
             </div>
           </div>
 
@@ -2083,10 +2104,10 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {supabaseStatus?.message ?? 'Dados locais'}
+              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source || 'Local'} | Atualizado: {metadata?.importedAt || metadata?.generatedAt || 'N/A'}
+              Fonte: {getMetadataSourceDisplay(metadata?.source)} | Atualizado: {metadata?.importedAt || metadata?.generatedAt || 'N/A'}
             </span>
             <button
               type="button"
@@ -3113,10 +3134,10 @@ function PendenciasPage({
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {supabaseStatus?.message ?? 'Dados locais'}
+              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source || 'Local'}
+              Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
@@ -3507,10 +3528,10 @@ function ReinfPage({
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {supabaseStatus?.message ?? 'Dados locais'}
+              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source || 'Local'}
+              Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
@@ -3726,10 +3747,10 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {supabaseStatus?.message ?? 'Dados locais'}
+              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source || 'Local'}
+              Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
@@ -3994,10 +4015,10 @@ function ReportsPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${supabaseStatus?.connected ? chipClass('success') : chipClass('warning')}`}>
-              {supabaseStatus?.message ?? 'Dados locais'}
+              {getSupabaseStatusDisplay(supabaseStatus, metadata)}
             </span>
             <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {metadata?.source || 'Local'}
+              Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
@@ -4918,7 +4939,7 @@ export default function App() {
   const writeBlockedReason = authRestoring
     ? 'Sessao em restauracao. As consultas continuam disponiveis, mas gravacoes ficam bloqueadas ate a reconexao completa.'
     : !supabaseStatus.connected
-      ? 'Supabase indisponivel no momento. O portal esta em modo protegido: consultas liberadas e gravacoes bloqueadas ate a reconexao.'
+      ? 'Supabase indisponivel no momento. O portal esta em modo protegido com leitura da ultima sincronizacao e gravacoes bloqueadas ate a reconexao.'
       : '';
   const writeBlockedMessage = authRestoring ? '' : writeBlockedReason;
 
@@ -5390,8 +5411,8 @@ export default function App() {
       setSupabaseStatus({
         connected: false,
         message: hasCurrentClients
-          ? 'Sem conexao com o Supabase | leitura da ultima sincronizacao'
-          : 'Erro ao carregar dados do Supabase',
+          ? 'Modo protegido | leitura local da ultima sincronizacao'
+          : 'Supabase indisponivel | sem leitura local confirmada',
       });
       if (!silent) {
         setToast({

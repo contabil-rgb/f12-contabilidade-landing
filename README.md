@@ -130,4 +130,6 @@ Esse guia concentra:
 - checklist de banco;
 - checklist de usuarios;
 - smoke test operacional;
-- criterios de liberacao controlada.
+- criterios de liberacao controlada;
+- gate final de uso real;
+- checklist de publicacao em dominio.

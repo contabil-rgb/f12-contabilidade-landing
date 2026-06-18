@@ -112,3 +112,47 @@ Hoje o projeto ja esta utilizavel, mas ainda merece vigilancia em:
 - manter SQLs versionados e aplicados com cuidado;
 - registrar qualquer ajuste operacional sensivel.
 
+## 9. Gate final de liberacao
+
+Antes de considerar o portal pronto para uso real, fechar este gate:
+
+- `npm run build` executado sem erro;
+- `supabase/health-check.sql` conferido no projeto correto;
+- login e logout validados;
+- sessao restaurando corretamente apos reload;
+- coordenador validado nas areas administrativas;
+- usuario operacional validado sem acesso indevido;
+- edicao de cliente validada;
+- anexos validados;
+- historico validado;
+- modo protegido validado:
+  - leitura liberada com ultima sincronizacao;
+  - gravacoes bloqueadas durante indisponibilidade;
+  - reconexao limpando o estado de contingencia;
+- `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false` no ambiente normal de operacao.
+
+Se algum item acima falhar, a liberacao deve ser adiada ate o ajuste.
+
+## 10. Checklist de publicacao
+
+Ao publicar em dominio ou hospedagem real, confirmar:
+
+- variaveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` configuradas no host;
+- `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false` no ambiente publicado;
+- URL final do portal configurada corretamente no Supabase Auth;
+- URL de redirecionamento de recuperacao de senha configurada no Supabase Auth;
+- build publicado sem depender de `localhost`;
+- login funcionando no dominio final;
+- recuperacao de senha testada no dominio final;
+- leitura da base carregando do Supabase no dominio final;
+- anexos com upload, visualizacao e download testados no dominio final.
+
+## 11. Parecer atual
+
+Estado atual do projeto, com base nas auditorias ja feitas:
+
+- pronto para uso controlado com equipe pequena;
+- pronto para homologacao em dominio;
+- ainda merece acompanhamento nas primeiras semanas de uso real;
+- ainda nao possui testes automatizados.
+
