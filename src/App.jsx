@@ -285,6 +285,7 @@ const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
 const AUTH_RESTORE_VISUAL_DELAY_MS = 700;
+const TRANSIENT_SIGNED_OUT_GRACE_MS = 1600;
 const CONNECTION_WARNING_VISUAL_DELAY_MS = 1200;
 const ENABLE_LOCAL_SNAPSHOT_TOOLS = String(import.meta.env.VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS ?? '').trim().toLowerCase() === 'true';
 
@@ -4968,6 +4969,7 @@ export default function App() {
   const importInputRef = useRef(null);
   const currentUserFullRef = useRef(null);
   const hasStoredSessionRef = useRef(false);
+  const logoutIntentRef = useRef(false);
   const hasStoredSession = Boolean(session?.usuario_id && session?.auth_user_id);
   const hasCachedSessionProfile = Boolean(
     session?.usuario_id
@@ -5197,6 +5199,30 @@ export default function App() {
         && (!currentUserFullRef.current || !currentAuthUserId || currentAuthUserId !== incomingAuthUserId);
 
       if (event === 'SIGNED_OUT') {
+        if (!logoutIntentRef.current && hasKnownPortalSession) {
+          setAuthRestoring(true);
+          try {
+            await wait(TRANSIENT_SIGNED_OUT_GRACE_MS);
+            if (!active) return;
+            const recoveredSession = await resolveBootstrapAuthSession(currentAuthUserId);
+            if (recoveredSession?.user?.id) {
+              const perfil = await recuperarPerfilSessaoSupabase({
+                preferredAuthUserId: recoveredSession.user.id,
+                authSession: recoveredSession,
+              });
+              if (!active) return;
+              if (perfil) {
+                startSession(perfil);
+                setAuthRestoring(false);
+                setAuthReady(true);
+                return;
+              }
+            }
+          } catch {
+            // segue para logout definitivo abaixo quando a sessao nao reaparece
+          }
+        }
+        logoutIntentRef.current = false;
         setAuthRestoring(false);
         setSessionProfile(null);
         clearSession();
@@ -5205,6 +5231,7 @@ export default function App() {
         return;
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        logoutIntentRef.current = false;
         if (shouldRunVisibleRestore) {
           setAuthRestoring(true);
         }
@@ -5531,7 +5558,9 @@ export default function App() {
   }
 
   function logout(message) {
+    logoutIntentRef.current = true;
     logoutSupabase().catch(() => {});
+    setAuthRestoring(false);
     setSessionProfile(null);
     clearSession();
     setSession(null);
