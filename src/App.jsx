@@ -1161,6 +1161,12 @@ function isEmAtraso(client) {
   return getRiscoFlag(client, 'em_atraso', getClientAnalysis(client).emAtraso);
 }
 
+function isCompetenciaEmDia(client) {
+  const persisted = getRiscoPersistido(client)?.competencia_em_dia_bool;
+  if (typeof persisted === 'boolean') return persisted;
+  return isYes(client?.competencia_em_dia);
+}
+
 function isSituacaoCritica(client) {
   if (hasRiscoPersistido(client)) return getRiscoFlag(client, 'situacao_critica', false);
   return getRiscoFlag(client, 'situacao_critica', getClientAnalysis(client).situacaoCritica);
@@ -1477,6 +1483,41 @@ function isPendenciaCritica(client) {
   return getObrigacaoFlag(client, 'pendencia_critica', isSituacaoCritica(client) || isPendenciaTecnica(client));
 }
 
+function hasPendenciaObrigacaoReinf(client) {
+  return isReinfPendente(client) || isReciboReinfPendente(client);
+}
+
+function hasPendenciaObrigacaoEcd(client) {
+  return (
+    isEcdPendente(client)
+    || isEcdAguardandoEnvio(client)
+    || isEcdResponsavelPendente(client)
+    || isReciboEcdPendente(client)
+  );
+}
+
+function hasPendenciaObrigacaoEcf(client) {
+  return isEcfPendente(client) || isReciboEcfPendente(client);
+}
+
+function hasComprovanteObrigacaoPendente(client) {
+  return isReciboReinfPendente(client) || isReciboEcdPendente(client) || isReciboEcfPendente(client);
+}
+
+function hasObrigacaoAnual(client) {
+  return isYes(client?.ecd) || isYes(client?.ecf);
+}
+
+function hasPendenciaAtiva(client) {
+  return hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client);
+}
+
+function hasPendenciaAtrasada(client) {
+  if (isEmAtraso(client)) return true;
+  if (hasObrigacoesPersistidas(client)) return getPersistedReinfStatusCode(client) === 'em_atraso';
+  return isReinfPendente(client);
+}
+
 function getClientAlertSignals(client) {
   const diasAtraso = getDiasAtrasoValue(client);
   const dataNotificacao = getDataNotificacaoClienteValue(client);
@@ -1697,6 +1738,9 @@ function filterClients(clients, filters) {
     const matchesBaseFilters = FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
       if (!filterValue) return true;
+      if (field === 'competencia_em_dia') {
+        return normalizeText(isCompetenciaEmDia(client) ? 'Sim' : 'Nao') === normalizeText(filterValue);
+      }
       return normalizeText(normalizeFieldDisplayValue(field, client[field])) === normalizeText(normalizeFieldDisplayValue(field, filterValue));
     });
 
@@ -2279,12 +2323,12 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
 
 function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false }) {
   const total = clients.length;
-  const emDia = countWhere(clients, (client) => isYes(client.competencia_em_dia));
+  const emDia = countWhere(clients, (client) => isCompetenciaEmDia(client));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
   const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
   const comunicacaoPendente = countWhere(clients, (client) => isComunicacaoPendente(client));
   const retornoPendente = countWhere(clients, (client) => isAguardandoRetorno(client));
-  const pendencias = countWhere(clients, (client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
+  const pendencias = countWhere(clients, (client) => hasPendenciaAtiva(client));
   const diasAtrasoMedio = total
     ? (
       clients.reduce((sum, client) => sum + getDiasAtrasoValue(client), 0) / total
@@ -3115,27 +3159,19 @@ function PendenciasPage({
     {
       key: 'reinf',
       label: 'Pendências REINF',
-      value: countWhere(clients, (client) => isReinfPendente(client) || isReciboReinfPendente(client)),
+      value: countWhere(clients, (client) => hasPendenciaObrigacaoReinf(client)),
       tone: 'warning',
     },
     {
       key: 'ecd',
       label: 'Pendências ECD',
-      value: countWhere(
-        clients,
-        (client) => (
-          isEcdPendente(client) ||
-          isEcdAguardandoEnvio(client) ||
-          isEcdResponsavelPendente(client) ||
-          isReciboEcdPendente(client)
-        ),
-      ),
+      value: countWhere(clients, (client) => hasPendenciaObrigacaoEcd(client)),
       tone: 'warning',
     },
     {
       key: 'ecf',
       label: 'Pendências ECF',
-      value: countWhere(clients, (client) => isEcfPendente(client) || isReciboEcfPendente(client)),
+      value: countWhere(clients, (client) => hasPendenciaObrigacaoEcf(client)),
       tone: 'warning',
     },
     {
@@ -3326,24 +3362,18 @@ function PendenciasPage({
     {
       key: 'atrasadas',
       title: 'O que está atrasado',
-      value: uniqueClientCount(actionRows, (row) => {
-        const reinfAtrasada = getObrigacoesPersistidas(row.client)?.reinf_status_codigo === 'em_atraso';
-        return isEmAtraso(row.client) || reinfAtrasada;
-      }),
+      value: uniqueClientCount(actionRows, (row) => hasPendenciaAtrasada(row.client)),
       tone: 'warning',
       detail: 'Pendências com atraso operacional ou entrega REINF já vencida.',
-      highlights: topClientNames(actionRows, (row) => {
-        const reinfAtrasada = getObrigacoesPersistidas(row.client)?.reinf_status_codigo === 'em_atraso';
-        return isEmAtraso(row.client) || reinfAtrasada;
-      }),
+      highlights: topClientNames(actionRows, (row) => hasPendenciaAtrasada(row.client)),
     },
     {
       key: 'comprovantes',
       title: 'Sem comprovante',
-      value: uniqueClientCount(visibleActionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
+      value: uniqueClientCount(visibleActionRows, (row) => hasComprovanteObrigacaoPendente(row.client)),
       tone: 'warning',
       detail: 'Clientes aguardando recibo ou comprovante para fechar a obrigação.',
-      highlights: topClientNames(visibleActionRows, (row) => ['recibo_reinf', 'recibo_ecd', 'recibo_ecf'].includes(row.item.signalKey)),
+      highlights: topClientNames(visibleActionRows, (row) => hasComprovanteObrigacaoPendente(row.client)),
     },
     {
       key: 'notificacao',
@@ -4042,9 +4072,9 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
       />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="ECD obrigatoria" value={countWhere(clients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
-        <MetricCard title="Pendências ECD" value={countWhere(clients, (client) => isEcdPendente(client) || isEcdAguardandoEnvio(client) || isEcdResponsavelPendente(client) || isReciboEcdPendente(client))} icon={AlertTriangle} tone="warning" />
-        <MetricCard title="Pendências ECF" value={countWhere(clients, (client) => isEcfPendente(client) || isReciboEcfPendente(client))} icon={FolderClock} tone="warning" />
-        <MetricCard title="Comprovantes pendentes" value={countWhere(clients, (client) => isReciboEcdPendente(client) || isReciboEcfPendente(client))} icon={Paperclip} tone="warning" />
+        <MetricCard title="Pendências ECD" value={countWhere(clients, (client) => hasPendenciaObrigacaoEcd(client))} icon={AlertTriangle} tone="warning" />
+        <MetricCard title="Pendências ECF" value={countWhere(clients, (client) => hasPendenciaObrigacaoEcf(client))} icon={FolderClock} tone="warning" />
+        <MetricCard title="Comprovantes pendentes" value={countWhere(clients, (client) => hasComprovanteObrigacaoPendente(client))} icon={Paperclip} tone="warning" />
       </section>
 
       <section className="surface-card p-5">
@@ -4240,7 +4270,7 @@ function ReportsPage({
   onRefresh,
   loading = false,
 }) {
-  const clientesComPendencias = clients.filter((client) => hasPendenciaOperacional(client) || hasAcompanhamentoPendente(client));
+  const clientesComPendencias = clients.filter((client) => hasPendenciaAtiva(client));
   const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
   const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
   const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
@@ -4268,14 +4298,14 @@ function ReportsPage({
   const reports = [
     { title: 'Clientes por responsável', rows: getNormalizedBreakdownRows(clients, 'responsavel'), icon: UserCheck },
     { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2 },
-    { title: 'Clientes com atraso', rows: clients.filter((client) => isEmAtraso(client)), icon: FolderClock },
+    { title: 'Clientes com atraso', rows: clients.filter((client) => hasPendenciaAtrasada(client)), icon: FolderClock },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
     { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail },
     { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle },
     { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff },
-    { title: 'REINF pendente', rows: clients.filter((client) => isReinfPendente(client)), icon: FileSpreadsheet },
-    { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => isYes(client.ecd) || isYes(client.ecf)), icon: BookOpenCheck },
+    { title: 'REINF pendente', rows: clients.filter((client) => hasPendenciaObrigacaoReinf(client)), icon: FileSpreadsheet },
+    { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => hasObrigacaoAnual(client)), icon: BookOpenCheck },
     { title: 'Clientes por dificuldade', rows: normalizeBreakdownRows(toBreakdown(clients, 'dificuldade')), icon: AlertTriangle },
   ];
   const reportCount = (rows) =>
