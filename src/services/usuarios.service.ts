@@ -15,14 +15,6 @@ const USUARIO_UPDATE_FIELDS = new Set([
   'atualizado_em',
 ]);
 
-const OPTIONAL_USUARIO_FIELDS = new Set([
-  'cargo',
-  'setor',
-  'precisa_trocar_senha',
-  'tentativas_invalidas',
-  'bloqueado_ate',
-]);
-
 function normalizePerfilAcessoValue(value: unknown) {
   const raw = String(value ?? '').trim();
   const normalized = normalizeText(raw);
@@ -96,21 +88,6 @@ function toDatabasePatch(data: Record<string, unknown>) {
   return payload;
 }
 
-function shouldRetryWithoutOptionalFields(error: unknown) {
-  const message = String(error?.message ?? '').toLowerCase();
-  return (
-    message.includes('column') ||
-    message.includes('schema cache') ||
-    message.includes('could not find')
-  );
-}
-
-function stripOptionalFields(payload: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(payload).filter(([key]) => !OPTIONAL_USUARIO_FIELDS.has(key)),
-  );
-}
-
 export async function listarUsuariosPortal() {
   const { data, error } = await supabase
     .from('usuarios')
@@ -145,22 +122,12 @@ export async function atualizarUsuarioPortal(id: string, dados: Record<string, u
     atualizado_em: new Date().toISOString(),
   });
 
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from('usuarios')
     .update(payload)
     .eq('id', id)
     .select('*')
     .single();
-
-  if (error && shouldRetryWithoutOptionalFields(error)) {
-    const fallbackPayload = stripOptionalFields(payload);
-    ({ data, error } = await supabase
-      .from('usuarios')
-      .update(fallbackPayload)
-      .eq('id', id)
-      .select('*')
-      .single());
-  }
 
   if (error) {
     throw new Error(`Nao foi possivel atualizar usuario no Supabase: ${error.message}`);
