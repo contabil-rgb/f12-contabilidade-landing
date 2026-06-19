@@ -1,9 +1,7 @@
 export const AUTH_SESSION_KEY = 'portal-contabilidade-f12-session-v4';
 
-export const SESSION_TIMEOUT_MINUTES = 30;
 export const RESET_TOKEN_MINUTES = 15;
 export const LOGIN_LOCK_MINUTES = 15;
-export const MAX_INVALID_LOGIN_ATTEMPTS = 5;
 
 export const USER_STATUS = ['Ativo', 'Inativo'];
 
@@ -33,12 +31,12 @@ export const PERMISSIONS = {
 export const ACCESS_PROFILES = {
   [ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN]: {
     label: 'Coordenador / Administrador',
-    description: 'Acesso completo ao portal, clientes, importação, relatórios, histórico e configurações principais.',
+    description: 'Acesso completo ao portal, clientes, importacao, relatorios, historico e configuracoes principais.',
     permissions: Object.values(PERMISSIONS),
   },
   [ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL]: {
-    label: 'Setor Contábil / Operacional',
-    description: 'Acesso operacional compartilhado para consultar a base e atualizar competências, pendências e obrigações.',
+    label: 'Setor Contabil / Operacional',
+    description: 'Acesso operacional compartilhado para consultar a base e atualizar competencias, pendencias e obrigacoes.',
     permissions: [
       PERMISSIONS.CLIENTS_VIEW_ALL,
       PERMISSIONS.CLIENTS_EDIT_STATUS,
@@ -55,70 +53,6 @@ export const ACCESS_PROFILE_OPTIONS = Object.entries(ACCESS_PROFILES).map(([valu
   label: profile.label,
   description: profile.description,
 }));
-
-export const INITIAL_USERS = [
-  {
-    id: 'user-coordenador',
-    nome: 'Coordenador',
-    email: 'leticiacampos@f12contabilidade.com.br',
-    senha_hash: '',
-    cargo: 'Coordenador',
-    setor: 'Contabilidade',
-    perfil_acesso: ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN,
-    status: 'Ativo',
-    ultimo_acesso: '',
-    precisa_trocar_senha: false,
-    tentativas_invalidas: 0,
-    bloqueado_ate: '',
-    criado_em: '',
-    atualizado_em: '',
-  },
-  {
-    id: 'user-setor-contabil',
-    nome: 'Setor Contábil',
-    email: 'contabil@f12contabilidade.com.br',
-    senha_hash: '',
-    cargo: 'Operacional',
-    setor: 'Setor Contábil',
-    perfil_acesso: ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL,
-    status: 'Ativo',
-    ultimo_acesso: '',
-    precisa_trocar_senha: false,
-    tentativas_invalidas: 0,
-    bloqueado_ate: '',
-    criado_em: '',
-    atualizado_em: '',
-  },
-];
-
-export const ALLOWED_USER_EMAILS = INITIAL_USERS.map((user) => user.email);
-
-export const USER_FIELDS = [
-  'id',
-  'auth_user_id',
-  'nome',
-  'email',
-  'senha_hash',
-  'cargo',
-  'setor',
-  'perfil_acesso',
-  'status',
-  'ultimo_acesso',
-  'precisa_trocar_senha',
-  'tentativas_invalidas',
-  'bloqueado_ate',
-  'criado_em',
-  'atualizado_em',
-];
-
-export const RECOVERY_TOKEN_FIELDS = [
-  'id',
-  'usuario_id',
-  'token_hash',
-  'expira_em',
-  'usado_em',
-  'criado_em',
-];
 
 export const HISTORY_FIELDS = [
   'anexo_cartao_cnpj',
