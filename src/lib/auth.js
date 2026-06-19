@@ -143,9 +143,7 @@ export function validatePassword(password, userLike = {}) {
 export function createEmptySecurityState() {
   return {
     usuarios: [],
-    tokens_recuperacao: [],
     historico_alteracoes: [],
-    login_auditoria: [],
   };
 }
 

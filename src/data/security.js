@@ -1,4 +1,3 @@
-export const SECURITY_STORAGE_KEY = 'portal-contabilidade-f12-security-v4';
 export const AUTH_SESSION_KEY = 'portal-contabilidade-f12-session-v4';
 
 export const SESSION_TIMEOUT_MINUTES = 30;
