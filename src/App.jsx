@@ -243,6 +243,7 @@ const ATTACHMENT_FIELD_BY_TYPE = {
 const ATTACHMENT_TYPE_BY_FIELD = Object.fromEntries(
   Object.entries(ATTACHMENT_FIELD_BY_TYPE).map(([tipoAnexo, fieldKey]) => [fieldKey, tipoAnexo]),
 );
+const ATTACHMENT_FIELD_KEYS = Object.values(ATTACHMENT_FIELD_BY_TYPE);
 
 const ATTACHMENT_FILTERS = {
   all: 'Todos',
@@ -495,6 +496,26 @@ const BOOTSTRAP_METADATA_KEYS = ['importedAt', 'generatedAt'];
 function createRuntimeListBase() {
   return Object.fromEntries(
     Object.entries(SELECT_LIST_FALLBACKS).map(([key, values]) => [key, [...values]]),
+  );
+}
+
+function buildAttachmentFieldSnapshot(clients = []) {
+  return Object.fromEntries(
+    (clients ?? [])
+      .map((client) => {
+        const clientId = String(client?.id ?? '').trim();
+        if (!clientId) return null;
+
+        const attachmentFields = Object.fromEntries(
+          ATTACHMENT_FIELD_KEYS
+            .map((fieldKey) => [fieldKey, client?.[fieldKey] ?? ''])
+            .filter(([, value]) => hasAttachment(value)),
+        );
+
+        if (!Object.keys(attachmentFields).length) return null;
+        return [clientId, attachmentFields];
+      })
+      .filter(Boolean),
   );
 }
 
@@ -896,7 +917,7 @@ function applyResponsavelEcdFallback(base, patch) {
   };
 }
 
-async function hydrateClientesComAnexos(clientesBase, fallbackClients = []) {
+async function hydrateClientesComAnexos(clientesBase, fallbackAttachmentSnapshot = {}) {
   const normalized = (clientesBase ?? []).map(withClientDefaults);
   const ids = normalized
     .map((client) => String(client.id ?? '').trim())
@@ -919,19 +940,16 @@ async function hydrateClientesComAnexos(clientesBase, fallbackClients = []) {
     });
   } catch (error) {
     console.warn('[anexos] Falha ao hidratar anexos por cliente:', error);
-    const fallbackByClientId = new Map(
-      (fallbackClients ?? [])
-        .map((client) => [String(client?.id ?? '').trim(), withClientDefaults(client)])
-        .filter(([id]) => id),
-    );
 
     return normalized.map((client) => {
-      const fallbackClient = fallbackByClientId.get(String(client.id ?? '').trim());
-      if (!fallbackClient) return client;
+      const fallbackFields = fallbackAttachmentSnapshot[String(client.id ?? '').trim()];
+      if (!fallbackFields) return client;
 
       const next = { ...client };
-      Object.values(ATTACHMENT_FIELD_BY_TYPE).forEach((fieldKey) => {
-        next[fieldKey] = fallbackClient[fieldKey] ?? client[fieldKey] ?? '';
+      ATTACHMENT_FIELD_KEYS.forEach((fieldKey) => {
+        if (hasAttachment(next[fieldKey])) return;
+        if (!hasAttachment(fallbackFields[fieldKey])) return;
+        next[fieldKey] = fallbackFields[fieldKey];
       });
       return next;
     });
@@ -5711,6 +5729,7 @@ export default function App() {
 
   async function carregarDadosSupabase({ silent = true } = {}) {
     try {
+      const cachedAttachmentSnapshot = buildAttachmentFieldSnapshot(clients);
       const shouldLoadUsuariosPortal =
         can(currentUserFull, PERMISSIONS.USERS_MANAGE)
         || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
@@ -5739,7 +5758,7 @@ export default function App() {
             .catch((error) => ({ ok: false, error, skipped: false }))
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
       ]);
-      const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase, clients);
+      const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase, cachedAttachmentSnapshot);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
       const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesHydrated, obrigacoesIndex);
       const riscoIndex = riscoResult.ok ? indexarRiscoOperacional(riscoResult.rows) : {};
