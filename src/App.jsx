@@ -285,8 +285,8 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
 const PORTAL_BOOTSTRAP_CACHE_KEY = 'portal.bootstrap.cache.v1';
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
-const AUTH_RESTORE_VISUAL_DELAY_MS = 700;
 const TRANSIENT_SIGNED_OUT_GRACE_MS = 1600;
+const AUTH_RESTORE_VISUAL_DELAY_MS = TRANSIENT_SIGNED_OUT_GRACE_MS + 250;
 const CONNECTION_WARNING_VISUAL_DELAY_MS = 1200;
 const ENABLE_LOCAL_SNAPSHOT_TOOLS = String(import.meta.env.VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS ?? '').trim().toLowerCase() === 'true';
 
@@ -5280,7 +5280,6 @@ export default function App() {
   );
   const importInputRef = useRef(null);
   const currentUserFullRef = useRef(null);
-  const hasStoredSessionRef = useRef(false);
   const logoutIntentRef = useRef(false);
   const hasStoredSession = Boolean(session?.usuario_id && session?.auth_user_id);
   const hasCachedSessionProfile = Boolean(
@@ -5289,6 +5288,7 @@ export default function App() {
     && sessionProfile?.id === session.usuario_id
     && sessionProfile?.auth_user_id === session.auth_user_id,
   );
+  const canReuseBootstrapCache = Boolean(initialState.hasBootstrapCache && hasCachedSessionProfile);
 
   const currentUserFull = useMemo(() => {
     if (!session?.usuario_id) return null;
@@ -5299,6 +5299,13 @@ export default function App() {
     return user;
   }, [security.usuarios, session, sessionProfile]);
   const shouldHoldAuthenticatedEntry = hasStoredSession && !currentUserFull;
+
+  function canReuseCachedAuthenticatedSession(authSession = null) {
+    if (!hasStoredSession || !canReuseBootstrapCache || !session?.auth_user_id) return false;
+    const incomingAuthUserId = authSession?.user?.id ?? null;
+    if (incomingAuthUserId && incomingAuthUserId !== session.auth_user_id) return false;
+    return true;
+  }
 
   const currentUser = useMemo(() => sanitizeUser(currentUserFull), [currentUserFull]);
   const showRestoreUi = useDelayedFlag(
@@ -5353,8 +5360,7 @@ export default function App() {
 
   useEffect(() => {
     currentUserFullRef.current = currentUserFull;
-    hasStoredSessionRef.current = hasStoredSession;
-  }, [currentUserFull, hasStoredSession]);
+  }, [currentUserFull]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5434,7 +5440,7 @@ export default function App() {
           startSession(perfil);
           setAuthRestoring(false);
           if (!shouldOpenResetViewFromUrl()) setAuthView('login');
-        } else if (hasStoredSession && (authSession?.user?.id || hasCachedSessionProfile)) {
+        } else if (canReuseCachedAuthenticatedSession(authSession)) {
           setAuthRestoring(false);
           setAuthReady(true);
         } else {
@@ -5469,7 +5475,7 @@ export default function App() {
         }
         if (hasStoredSession) {
           const authSession = await resolveBootstrapAuthSession(session?.auth_user_id);
-          if (authSession?.user?.id || hasCachedSessionProfile) {
+          if (canReuseCachedAuthenticatedSession(authSession)) {
             setAuthRestoring(false);
             setAuthReady(true);
             return;
@@ -5498,11 +5504,9 @@ export default function App() {
 
       const hasKnownPortalSession =
         Boolean(currentUserFullRef.current?.auth_user_id)
-        || Boolean(hasStoredSessionRef.current)
-        || Boolean(session?.auth_user_id);
-      const hasSupabaseAuthUser = Boolean(authSession?.user?.id);
+        || canReuseCachedAuthenticatedSession(authSession);
       const shouldPreserveSession =
-        event !== 'SIGNED_OUT' && (hasKnownPortalSession || hasSupabaseAuthUser);
+        event !== 'SIGNED_OUT' && (Boolean(currentUserFullRef.current?.auth_user_id) || canReuseCachedAuthenticatedSession(authSession));
       const currentAuthUserId = currentUserFullRef.current?.auth_user_id ?? session?.auth_user_id ?? null;
       const incomingAuthUserId = authSession?.user?.id ?? null;
       const shouldRunVisibleRestore =
@@ -5553,7 +5557,7 @@ export default function App() {
               preferredAuthUserId: authSession?.user?.id ?? session?.auth_user_id,
               authSession,
             }),
-            getAuthBootstrapTimeoutMs(hasStoredSessionRef.current),
+            getAuthBootstrapTimeoutMs(hasStoredSession),
             'A atualizacao da sessao demorou mais do que o esperado.',
           );
           if (!active) return;
