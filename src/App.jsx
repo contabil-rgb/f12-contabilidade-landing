@@ -1004,6 +1004,37 @@ function renderFieldValue(value, type) {
   return valueOrDash(value, type);
 }
 
+function getResolvedFieldValue(client, fieldKey) {
+  if (!client || !fieldKey) return '';
+
+  switch (fieldKey) {
+    case 'competencia_em_dia':
+      return isCompetenciaEmDia(client) ? 'Sim' : 'Nao';
+    case 'data_enviada_reinf':
+      return getReinfDataEntregaValue(client);
+    case 'cliente_notificado':
+      return isClienteNotificado(client) ? 'Sim' : 'Nao';
+    case 'data_notificacao_cliente':
+      return getDataNotificacaoClienteValue(client);
+    case 'status_retorno_cliente': {
+      const persisted = getAcompanhamentoText(client, 'status_retorno_cliente', client?.status_retorno_cliente || '').trim();
+      if (persisted) return persisted;
+      if (isSemRetorno(client)) return 'Sem retorno';
+      if (hasRetornoConcluido(client)) return 'Retorno recebido';
+      if (isAguardandoRetorno(client)) return 'Aguardando retorno';
+      return '';
+    }
+    case 'data_retorno_cliente':
+      return getDataRetornoClienteValue(client);
+    default:
+      return client?.[fieldKey];
+  }
+}
+
+function renderResolvedFieldValue(client, fieldKey, type) {
+  return renderFieldValue(getResolvedFieldValue(client, fieldKey), type);
+}
+
 function normalizeDateInputValue(value) {
   if (isBlank(value)) return '';
   const raw = String(value).trim();
@@ -1922,7 +1953,7 @@ function AppShell({
     if (canSearchPendencias && results.length < 12) {
       for (const client of searchClients) {
         if (!client?.id) continue;
-        if (!hasPendenciaOperacional(client)) continue;
+        if (!hasPendenciaAtiva(client)) continue;
 
         const id = String(client.id);
         const seenKey = `pendencia:${id}`;
@@ -2843,11 +2874,11 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                   <td key={field.key} className="border-b border-slate-100 px-4 py-4 align-top text-sm font-semibold text-slate-700">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(client[field.key], client))}`}>
-                        {valueOrDash(client[field.key])}
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
+                        {valueOrDash(getResolvedFieldValue(client, field.key))}
                       </span>
                     ) : (
-                      <span>{renderFieldValue(client[field.key], field.type)}</span>
+                      <span>{renderResolvedFieldValue(client, field.key, field.type)}</span>
                     ))}
                   </td>
                 ))}
@@ -3054,7 +3085,7 @@ function DetailPage({
                 return (
                   <div key={fieldKey} className="rounded-lg bg-slate-50 p-3">
                     <dt className="text-xs font-black uppercase tracking-normal text-slate-500">{field?.label ?? fieldKey}</dt>
-                    <dd className="mt-1 text-sm font-bold text-slate-900">{renderFieldValue(client[fieldKey], field?.type)}</dd>
+                    <dd className="mt-1 text-sm font-bold text-slate-900">{renderResolvedFieldValue(client, fieldKey, field?.type)}</dd>
                   </div>
                 );
               })}
@@ -4201,7 +4232,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
                         {client[column] || client.razao_social}
                       </button>
                     ) : (
-                      renderFieldValue(client[column], FIELD_DEFINITIONS.find((field) => field.key === column)?.type)
+                      renderResolvedFieldValue(client, column, FIELD_DEFINITIONS.find((field) => field.key === column)?.type)
                     ))}
                   </td>
                 ))}
