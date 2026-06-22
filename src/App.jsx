@@ -2152,8 +2152,8 @@ function AppShell({
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
-              <h1 className="mt-1 text-[2rem] font-black tracking-tight text-slate-950 dark:text-gray-100 sm:text-[2.15rem]">{currentTitle}</h1>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{pageDescription}</p>
+              <h1 className={`mt-1 font-black tracking-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
+              <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
@@ -2409,8 +2409,8 @@ function DashboardTotalCard({ total, onClick }) {
     >
       <div className="relative z-10 flex min-h-[300px] flex-col justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-gray-300">Total de clientes</p>
-          <p className="mt-6 text-6xl font-black tracking-tight text-slate-950 dark:text-gray-100">{formatNumber(total)}</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-300">Total de clientes</p>
+          <p className="mt-5 text-5xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.5rem]">{formatNumber(total)}</p>
         </div>
         <div className="flex items-end justify-center">
           <span className="flex h-28 w-28 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_24px_60px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
@@ -2440,7 +2440,7 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     <SurfacePanel className="p-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Carteira por regime tributário</h2>
+          <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Carteira por regime tributário</h2>
         </div>
       </div>
       <div className="mt-8 grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
@@ -2452,8 +2452,8 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
             }}
           >
             <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95">
-              <span className="text-5xl font-black tracking-tight text-slate-950 dark:text-gray-100">{formatNumber(total)}</span>
-              <span className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">clientes</span>
+              <span className="text-4xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 xl:text-[2.85rem]">{formatNumber(total)}</span>
+              <span className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">clientes</span>
             </div>
           </div>
         </div>
@@ -2471,8 +2471,8 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
                   className="h-3 w-3 rounded-full"
                   style={{ backgroundColor: DASHBOARD_DONUT_COLORS[index % DASHBOARD_DONUT_COLORS.length] }}
                 />
-                <span className="min-w-0 flex-1 text-base font-semibold text-slate-700 dark:text-gray-200">{row.label}</span>
-                <span className="text-base font-bold text-slate-500 dark:text-gray-300">
+                <span className="min-w-0 flex-1 text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
+                <span className="text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
                   {formatNumber(row.value)} ({percentage}%)
                 </span>
               </button>
@@ -2502,13 +2502,13 @@ function DashboardSituationCard({ values, total }) {
   return (
     <SurfacePanel className="overflow-hidden p-8">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Situação da carteira</h2>
-        <span className="inline-flex h-11 min-w-[3.25rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-xl font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Situação da carteira</h2>
+        <span className="inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-lg font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           {formatNumber(total)}
         </span>
       </div>
       <div className="mt-8 flex gap-5">
-        <div className="hidden w-12 shrink-0 flex-col justify-between text-sm font-semibold text-slate-500 dark:text-gray-400 md:flex" style={{ height: `${height}px` }}>
+        <div className="hidden w-12 shrink-0 flex-col justify-between text-xs font-semibold text-slate-500 dark:text-gray-400 md:flex" style={{ height: `${height}px` }}>
           {ticks.map((tick) => (
             <span key={tick.position}>{formatNumber(tick.label)}</span>
           ))}
@@ -2547,7 +2547,7 @@ function DashboardSituationCard({ values, total }) {
             </svg>
             {lastPoint ? (
               <div
-                className="absolute -translate-x-1/2 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-lg font-black text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
+                className="absolute -translate-x-1/2 rounded-2xl border border-blue-200 bg-white px-3 py-1.5 text-base font-black text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
                 style={{
                   left: `${(lastPoint.x / width) * 100}%`,
                   top: `${Math.max(((lastPoint.y - 52) / height) * 100, 6)}%`,
@@ -2557,7 +2557,7 @@ function DashboardSituationCard({ values, total }) {
               </div>
             ) : null}
           </div>
-          <div className="mt-5 grid grid-cols-6 gap-2 text-center text-base font-semibold text-slate-600 dark:text-gray-300">
+          <div className="mt-5 grid grid-cols-6 gap-2 text-center text-sm font-semibold text-slate-600 dark:text-gray-300">
             {DASHBOARD_MONTH_LABELS.map((label) => (
               <span key={label}>{label}</span>
             ))}
@@ -2574,11 +2574,11 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
   return (
     <SurfacePanel className="p-8">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">{title}</h2>
+        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">{title}</h2>
         <button
           type="button"
           onClick={onViewAll}
-          className="text-base font-bold text-sky-600 transition duration-150 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
+          className="text-sm font-bold text-sky-600 transition duration-150 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
         >
           Ver todos
         </button>
@@ -2598,8 +2598,8 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-base font-semibold text-slate-700 dark:text-gray-200">{row.label}</span>
-                  <span className="shrink-0 text-base font-bold text-slate-500 dark:text-gray-300">
+                  <span className="truncate text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
+                  <span className="shrink-0 text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
                     {formatNumber(row.value)} ({percentage}%)
                   </span>
                 </div>
@@ -2629,7 +2629,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   return (
     <SurfacePanel className="p-8">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Ações rápidas</h2>
+        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Ações rápidas</h2>
       </div>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {actions.map((action) => {
@@ -2644,7 +2644,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
               <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${action.accentBg} ${action.accent}`}>
                 <Icon size={26} aria-hidden="true" />
               </span>
-              <span className="text-[1.05rem] font-semibold leading-7 text-slate-700 dark:text-gray-200">{action.label}</span>
+              <span className="text-sm font-semibold leading-6 text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{action.label}</span>
             </button>
           );
         })}
@@ -3317,7 +3317,7 @@ function DetailPage({
                       <p className="font-black text-slate-900 dark:text-gray-100">{item.usuario_nome || 'Usuário'}</p>
                       <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">{item.usuario_email || '-'}</p>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 font-mono text-xs font-black text-slate-700 dark:border-gray-800 dark:text-gray-200">
+                    <td className="border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700 dark:border-gray-800 dark:text-gray-200">
                       {item.campo_alterado}
                     </td>
                     <td className="border-b border-slate-100 px-3 py-2 text-slate-600 dark:border-gray-800 dark:text-gray-300">
@@ -4663,7 +4663,7 @@ function ReportsPage({
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {['clientes_contabeis', 'tipos_cliente', 'regimes_tributários', 'atividades', 'responsaveis', 'revisores', 'situacoes', 'modos_entrega', 'motivos_atraso', 'dificuldades'].map((table) => (
             <div key={table} className="rounded-lg bg-slate-50 p-3">
-              <p className="font-mono text-sm font-black text-slate-800">{table}</p>
+              <p className="text-sm font-black text-slate-800">{table}</p>
             </div>
           ))}
         </div>
