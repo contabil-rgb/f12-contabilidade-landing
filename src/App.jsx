@@ -5095,8 +5095,8 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
       id: protectedForm.id || stableIdFromCnpj(digits),
       cnpj: formatCnpj(digits),
       cnpj_digitos: digits,
-      criado_em: protectedForm.criado_em || todayBr(),
-      atualizado_em: todayBr(),
+      criado_em: protectedForm.criado_em || new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
     });
   }
 
@@ -6270,7 +6270,8 @@ export default function App() {
       return;
     }
 
-    let nextClient = { ...client, atualizado_em: todayBr() };
+    const mutationTimestamp = new Date().toISOString();
+    let nextClient = { ...client, atualizado_em: mutationTimestamp };
     if (previous) {
       EDITABLE_FIELDS.forEach((field) => {
         if (!canEditClientField(currentUserFull, field.key)) {
@@ -6278,7 +6279,7 @@ export default function App() {
         }
       });
     } else {
-      nextClient = { ...nextClient, criado_em: todayBr() };
+      nextClient = { ...nextClient, criado_em: mutationTimestamp };
     }
 
     if (index >= 0) {
@@ -6357,7 +6358,7 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: deniedReasonForField(currentUserFull, deniedField) });
       return;
     }
-    let nextClient = { ...previous, ...patch, atualizado_em: todayBr() };
+    let nextClient = { ...previous, ...patch, atualizado_em: new Date().toISOString() };
     if (isUuid(id)) {
       try {
         const previousFromDb = await buscarClientePorIdSupabase(id);
@@ -6508,7 +6509,7 @@ export default function App() {
         return;
       }
     }
-    const nextClient = { ...client, situacao: 'Inativo', status: 'Inativo', atualizado_em: todayBr() };
+    const nextClient = { ...client, situacao: 'Inativo', status: 'Inativo', atualizado_em: new Date().toISOString() };
     updateClientsPersisted((current) => current.filter((item) => item.id !== client.id));
     setToast({
       title: 'Cliente inativado',

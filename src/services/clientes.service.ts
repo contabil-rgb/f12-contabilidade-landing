@@ -10,6 +10,9 @@ const DATE_FIELDS = new Set([
   'data_notificacao_cliente',
   'data_retorno_cliente',
 ]);
+const TIMESTAMP_FIELDS = new Set([
+  'atualizado_em',
+]);
 const CLIENTE_FIELDS = new Set([
   'cnpj',
   'razao_social',
@@ -78,6 +81,18 @@ function toIsoDate(value: unknown) {
   return null;
 }
 
+function toIsoTimestamp(value: unknown) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw}T00:00:00.000Z`;
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}T00:00:00.000Z`;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
 function fromIsoDate(value: unknown) {
   const raw = String(value ?? '').trim();
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -90,7 +105,9 @@ function normalizePatch(data: Record<string, unknown>) {
   for (const [key, value] of Object.entries(data)) {
     if (key === 'id' || key === 'criado_em') continue;
     if (!CLIENTE_FIELDS.has(key)) continue;
-    if (DATE_FIELDS.has(key)) {
+    if (TIMESTAMP_FIELDS.has(key)) {
+      out[key] = toIsoTimestamp(value);
+    } else if (DATE_FIELDS.has(key)) {
       out[key] = toIsoDate(value);
     } else if (key === 'dias_atraso') {
       out[key] = Number(value ?? 0) || 0;
@@ -170,6 +187,7 @@ export async function buscarClientePorCnpj(cnpj: string) {
 export async function criarCliente(cliente: Record<string, unknown>) {
   const payload = normalizePatch(cliente);
   delete payload.id;
+  delete payload.atualizado_em;
 
   const { data, error } = await supabase
     .from('clientes')
