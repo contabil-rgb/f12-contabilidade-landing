@@ -82,6 +82,13 @@ import {
 } from './lib/auth.js';
 import { AnexosClienteSection } from './components/anexos/AnexosClienteSection';
 import { UploadAnexoButton } from './components/anexos/UploadAnexoButton';
+import ActionButton from './components/ui/ActionButton';
+import AlertBanner from './components/ui/AlertBanner';
+import DataTableShell from './components/ui/DataTableShell';
+import MetricTile from './components/ui/MetricTile';
+import StatusBadge from './components/ui/StatusBadge';
+import SurfacePanel from './components/ui/SurfacePanel';
+import ThemeToggle from './components/ui/ThemeToggle.jsx';
 import { TIPOS_ANEXO } from './types/anexo';
 import { listarUltimosAnexosPorClientes } from './services/anexos.service';
 import {
@@ -807,12 +814,12 @@ function statusTone(value, client) {
 
 function chipClass(tone = 'neutral') {
   const tones = {
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    warning: 'border-amber-200 bg-amber-50 text-amber-700',
-    danger: 'border-red-200 bg-red-50 text-red-700',
-    info: 'border-sky-200 bg-sky-50 text-sky-700',
-    muted: 'border-slate-200 bg-slate-100 text-slate-500',
-    neutral: 'border-slate-200 bg-white text-slate-600',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-500/20 dark:text-gray-100',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/35 dark:bg-amber-500/20 dark:text-gray-100',
+    danger: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/35 dark:bg-red-500/20 dark:text-gray-100',
+    info: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/35 dark:bg-sky-500/20 dark:text-gray-100',
+    muted: 'border-slate-200 bg-slate-100 text-slate-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200',
+    neutral: 'border-slate-200 bg-white text-slate-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100',
   };
   return tones[tone] ?? tones.neutral;
 }
@@ -2077,12 +2084,12 @@ function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-900/10 bg-[#0c1528] text-white lg:block">
+    <div className="min-h-screen bg-transparent text-slate-900 dark:text-gray-100">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-900/10 bg-[#0c1528] text-white dark:border-gray-800 dark:bg-gray-950 lg:block">
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-6 py-6">
+          <div className="border-b border-white/10 px-6 py-6 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950 shadow-sm">F12</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950 shadow-sm dark:bg-gray-100">F12</span>
               <div>
                 <p className="text-base font-black">Portal Contábil</p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gestão interna</p>
@@ -2100,7 +2107,7 @@ function AppShell({
                     type="button"
                     onClick={() => setPage(key)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition ${
-                      page === key ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      page === key ? 'bg-white text-slate-950 shadow-sm dark:bg-gray-100 dark:text-gray-950' : 'text-slate-300 hover:bg-white/10 hover:text-white dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
                     }`}
                   >
                     <Icon size={18} aria-hidden="true" />
@@ -2111,21 +2118,21 @@ function AppShell({
             ))}
           </nav>
 
-          <div className="border-t border-white/10 p-5">
-            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-4">
+          <div className="border-t border-white/10 p-5 dark:border-gray-800">
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-4 dark:border-gray-800 dark:bg-gray-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Usuário conectado</p>
               <p className="mt-2 truncate text-sm font-black">{currentUser?.nome ?? 'Sessão em validação'}</p>
               <p className="mt-1 truncate text-xs text-slate-400">{profile.label}</p>
               <button
                 type="button"
                 onClick={onLogout}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white hover:text-slate-950"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white hover:text-slate-950 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-100 dark:hover:text-gray-950"
               >
                 <LogOut size={15} aria-hidden="true" />
                 Sair
               </button>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-4 dark:border-gray-800 dark:bg-gray-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Base carregada</p>
               <p className="mt-2 text-2xl font-black">{formatNumber(totalClientes)}</p>
               <p className="mt-1 text-xs text-slate-400">{getMetadataSourceDisplay(metadata?.source)}</p>
@@ -2133,25 +2140,28 @@ function AppShell({
                 {supabaseStatusLabel}
               </p>
             </div>
+            <div className="mt-3">
+              <ThemeToggle className="w-full justify-center dark:border-gray-800 dark:bg-gray-900" />
+            </div>
           </div>
         </div>
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Escritório contábil | Carteira de clientes</p>
-              <h1 className="mt-1 text-[2rem] font-black tracking-tight text-slate-950 sm:text-[2.15rem]">{currentTitle}</h1>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{pageDescription}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
+              <h1 className="mt-1 text-[2rem] font-black tracking-tight text-slate-950 dark:text-gray-100 sm:text-[2.15rem]">{currentTitle}</h1>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{pageDescription}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="hidden xl:block">
                 <div ref={searchRef} className="relative">
-                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
                   <input
-                    className="h-11 w-80 rounded-lg border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
+                    className="input-shell w-80 pl-9"
                     value={globalQuery}
                     onFocus={() => setGlobalOpen(true)}
                     onChange={(event) => {
@@ -2161,7 +2171,7 @@ function AppShell({
                     placeholder="Busca por CNPJ, razão social ou nome"
                   />
                   {globalOpen ? (
-                    <div className="absolute right-0 z-50 mt-2 max-h-80 w-[34rem] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft">
+                    <div className="absolute right-0 z-50 mt-2 max-h-80 w-[34rem] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft dark:border-gray-700 dark:bg-gray-800">
                       {!globalQuery.trim() ? (
                         <p className="px-2 py-2 text-sm font-semibold text-slate-500">
                           Digite para buscar clientes, pendências e histórico.
@@ -2174,7 +2184,7 @@ function AppShell({
                               type="button"
                               onMouseDown={(event) => event.preventDefault()}
                               onClick={() => handleGlobalResultClick(result)}
-                              className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-slate-50"
+                              className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700"
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
@@ -2182,7 +2192,7 @@ function AppShell({
                                   <p className="text-xs font-semibold text-slate-500">{renderHighlighted(result.razao)}</p>
                                   <p className="text-xs font-semibold text-slate-500">{renderHighlighted(result.cnpj)}</p>
                                 </div>
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black text-slate-600">
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black text-slate-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
                                   {result.subtitle}
                                 </span>
                               </div>
@@ -2198,46 +2208,42 @@ function AppShell({
                   ) : null}
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">{currentUser?.nome ?? 'Usuário'}</div>
+              <div className="pill-shell">{currentUser?.nome ?? 'Usuário'}</div>
+              <ThemeToggle />
               {canImport ? (
-                <button
+                <ActionButton
                   type="button"
                   onClick={onImportClick}
                   disabled={!canImportEnabled}
                   title={!canImportEnabled ? importDisabledReason : ''}
-                  className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Upload size={17} aria-hidden="true" />
                   Importar Excel
-                </button>
+                </ActionButton>
               ) : null}
-              <button
-                type="button"
-                onClick={onLogout}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-red-200 hover:text-red-600"
-              >
+              <ActionButton type="button" variant="secondary" onClick={onLogout}>
                 <LogOut size={17} aria-hidden="true" />
                 Sair
-              </button>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
-              <div className={`rounded-lg border px-4 py-2.5 text-sm font-bold shadow-sm ${chipClass(supabaseStatusTone)}`}>{supabaseStatusLabel}</div>
+              </ActionButton>
+              <div className="pill-shell">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
+              <StatusBadge toneClass={chipClass(supabaseStatusTone)} size="md">{supabaseStatusLabel}</StatusBadge>
             </div>
           </div>
 
           {writeBlockedMessage ? (
-            <div className="border-t border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 sm:px-6">
-              {writeBlockedMessage}
+            <div className="border-t border-amber-100 px-4 py-3 sm:px-6">
+              <AlertBanner tone="warning">{writeBlockedMessage}</AlertBanner>
             </div>
           ) : null}
 
-          <div className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-3 sm:px-6 lg:hidden">
+          <div className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-3 sm:px-6 dark:border-gray-800 lg:hidden">
             {visibleNavItems.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setPage(key)}
                 className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${
-                  page === key ? 'bg-brand-blue text-white' : 'bg-white text-slate-700 shadow-sm'
+                  page === key ? 'bg-brand-blue text-white' : 'bg-white text-slate-700 shadow-sm dark:bg-gray-800 dark:text-gray-100'
                 }`}
               >
                 <Icon size={16} aria-hidden="true" />
@@ -2295,33 +2301,22 @@ class PageContentErrorBoundary extends Component {
 }
 
 function MetricCard({ title, value, detail, icon: Icon, tone = 'neutral', onClick }) {
-  const Component = onClick ? 'button' : 'div';
   return (
-    <Component
-      type={onClick ? 'button' : undefined}
+    <MetricTile
+      title={title}
+      value={formatNumber(value)}
+      detail={detail}
+      icon={Icon}
+      toneClass={chipClass(tone)}
       onClick={onClick}
-      className={`group surface-card min-h-[156px] p-5 text-left transition ${
-        onClick ? 'hover:-translate-y-0.5 hover:border-brand-blue/40 hover:shadow-soft' : ''
-      }`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
-          <p className="mt-3 text-3xl font-black leading-none text-slate-950 sm:text-[2.2rem]">{formatNumber(value)}</p>
-          {detail ? <p className="mt-3 max-w-[28ch] text-sm font-semibold leading-6 text-slate-500">{detail}</p> : null}
-        </div>
-        <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white/90 shadow-sm ${chipClass(tone)}`}>
-          <Icon size={21} aria-hidden="true" />
-        </span>
-      </div>
-    </Component>
+    />
   );
 }
 
 function BreakdownPanel({ title, rows, total, onSelect, field }) {
   const max = Math.max(...rows.map((row) => row.value), 1);
   return (
-    <section className="surface-card p-6">
+    <SurfacePanel className="p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-black text-slate-950">{title}</h2>
         <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-brand-blue">
@@ -2352,7 +2347,7 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
           </button>
         ))}
       </div>
-    </section>
+    </SurfacePanel>
   );
 }
 
@@ -2538,15 +2533,7 @@ function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, me
 
 function PageHeader({ title, description, right }) {
   return (
-    <section className="surface-card p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h2 className="text-[1.65rem] font-black tracking-tight text-slate-950">{title}</h2>
-          {description ? <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{description}</p> : null}
-        </div>
-        {right ? <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">{right}</div> : null}
-      </div>
-    </section>
+    <SurfacePanel title={title} description={description} right={right} />
   );
 }
 
@@ -2575,40 +2562,35 @@ function SearchAndFilters({
     label,
   }));
   return (
-    <section className="surface-card p-6">
+    <SurfacePanel className="p-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             value={filters.search}
             onChange={(event) => updateFilter({ search: event.target.value })}
-            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50/80 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand-blue focus:bg-white focus:ring-4 focus:ring-brand-blue/10"
+            className="input-shell pl-10"
             placeholder="Pesquisar cliente, CNPJ ou razão social"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+          <span className="pill-shell">
             {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
           </span>
-          <button
-            type="button"
-            onClick={onClear}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-red-200 hover:text-red-600"
-          >
+          <ActionButton type="button" variant="secondary" size="sm" onClick={onClear}>
             <RefreshCcw size={16} aria-hidden="true" />
             Limpar filtros
-          </button>
+          </ActionButton>
           {canCreateClient ? (
-            <button
+            <ActionButton
               type="button"
               onClick={onNewClient}
               disabled={!canCreateClientEnabled}
               title={!canCreateClientEnabled ? createDisabledReason : ''}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={16} aria-hidden="true" />
               Novo cliente
-            </button>
+            </ActionButton>
           ) : null}
         </div>
       </div>
@@ -2629,7 +2611,7 @@ function SearchAndFilters({
           <select
             value={filters.alerta}
             onChange={(event) => updateFilter({ alerta: event.target.value })}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+            className="select-shell mt-1 normal-case"
           >
             <option value="">Todos</option>
             {alertOptions.map((option) => (
@@ -2648,7 +2630,7 @@ function SearchAndFilters({
               <select
                 value={filters[fieldKey]}
                 onChange={(event) => updateFilter({ [fieldKey]: event.target.value })}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                className="select-shell mt-1 normal-case"
               >
                 <option value="">Todos</option>
                 {options.map((option) => (
@@ -2664,7 +2646,7 @@ function SearchAndFilters({
       <p className="mt-3 text-xs font-semibold text-slate-500">
         Clique no cliente para abrir o detalhe completo ou use os botões da última coluna para editar e inativar.
       </p>
-    </section>
+    </SurfacePanel>
   );
 }
 
@@ -2695,14 +2677,14 @@ function AlertsList({ alerts }) {
 
 function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }) {
   return (
-    <article className="surface-card min-h-[176px] p-5">
+    <SurfacePanel as="article" className="min-h-[176px] p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
           <div className="mt-3">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(tone)}`}>
+            <StatusBadge toneClass={chipClass(tone)}>
               {label}
-            </span>
+            </StatusBadge>
           </div>
           {detail ? <p className="mt-3 max-w-[28ch] text-sm font-semibold leading-6 text-slate-600">{detail}</p> : null}
         </div>
@@ -2710,7 +2692,7 @@ function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }
           <Icon size={21} aria-hidden="true" />
         </span>
       </div>
-    </article>
+    </SurfacePanel>
   );
 }
 
@@ -4496,9 +4478,9 @@ function ReportsPage({
 
 function AuthShell({ title, description, children }) {
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-8 text-slate-950">
+    <div className="min-h-screen bg-slate-100 px-4 py-8 text-slate-950 dark:bg-gray-950 dark:text-gray-100">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
-        <section className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="bg-[#0b1427] p-8 text-white sm:p-10">
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950">
@@ -4520,7 +4502,13 @@ function AuthShell({ title, description, children }) {
               ))}
             </div>
           </div>
-          <div className="p-6 sm:p-10">{children}</div>
+          <div className="relative p-6 sm:p-10">
+            {/* Atalho visível também na autenticação para o usuário alternar o tema antes do login. */}
+            <div className="mb-6 flex justify-end">
+              <ThemeToggle />
+            </div>
+            {children}
+          </div>
         </section>
       </div>
     </div>
@@ -4570,7 +4558,7 @@ function LoginPage({ onLogin, onForgot, onReset, onFirstAccess }) {
           <button type="button" onClick={onFirstAccess} className="text-brand-blue hover:text-navy-700">
             Primeiro acesso
           </button>
-          <button type="button" onClick={onReset} className="text-slate-500 hover:text-slate-800">
+          <button type="button" onClick={onReset} className="text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-gray-100">
             Tenho token de redefinição
           </button>
         </div>
@@ -4609,7 +4597,7 @@ function FirstAccessPage({ onBack, onCreatePassword }) {
         <button type="submit" disabled={busy} className="w-full rounded-lg bg-brand-blue px-4 py-3 text-sm font-black text-white transition hover:bg-navy-700 disabled:opacity-60">
           {busy ? 'Enviando link...' : 'Enviar link'}
         </button>
-        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">
+        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-100">
           Voltar ao login
         </button>
       </form>
@@ -4635,7 +4623,7 @@ function ForgotPasswordPage({ onBack, onRequestReset }) {
         <button type="submit" className="w-full rounded-lg bg-brand-blue px-4 py-3 text-sm font-black text-white">
           Solicitar redefinição
         </button>
-        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">
+        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-100">
           Voltar ao login
         </button>
       </form>
@@ -4670,7 +4658,7 @@ function ResetPasswordPage({ onBack, onResetPassword }) {
         <button type="submit" className="w-full rounded-lg bg-brand-blue px-4 py-3 text-sm font-black text-white">
           Redefinir senha
         </button>
-        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">
+        <button type="button" onClick={onBack} className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-100">
           Voltar ao login
         </button>
       </form>
@@ -4685,22 +4673,22 @@ function AuthTextField({ label, value, onChange, type = 'text', icon: Icon, disa
   const RevealIcon = isRevealed ? EyeOff : Eye;
 
   return (
-    <label className="block text-xs font-black uppercase tracking-normal text-slate-500">
+    <label className="block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
       {label}
       <div className="relative mt-1">
-        {Icon ? <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" /> : null}
+        {Icon ? <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" size={17} aria-hidden="true" /> : null}
         <input
           type={inputType}
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
-          className={`h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${Icon ? 'pl-10' : ''} ${canReveal ? 'pr-11' : ''}`}
+          className={`h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 ${Icon ? 'pl-10' : ''} ${canReveal ? 'pr-11' : ''}`}
         />
         {canReveal ? (
           <button
             type="button"
             onClick={() => setIsRevealed((current) => !current)}
-            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/10"
+            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/10 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-blue-300"
             aria-label={isRevealed ? `Ocultar ${label.toLowerCase()}` : `Exibir ${label.toLowerCase()}`}
             title={isRevealed ? 'Ocultar senha' : 'Exibir senha'}
           >
@@ -4765,13 +4753,13 @@ function UserModal({ user, users, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
-      <form onSubmit={submit} className="mx-auto max-w-3xl rounded-lg bg-white shadow-panel">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+      <form onSubmit={submit} className="mx-auto max-w-3xl rounded-lg bg-white shadow-panel dark:bg-gray-900">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-gray-800">
           <div>
-            <h2 className="text-xl font-black text-slate-950">Editar usuário institucional</h2>
-            <p className="text-sm font-semibold text-slate-500">Edicao de status e dados complementares do perfil.</p>
+            <h2 className="text-xl font-black text-slate-950 dark:text-gray-100">Editar usuário institucional</h2>
+            <p className="text-sm font-semibold text-slate-500 dark:text-gray-300">Edicao de status e dados complementares do perfil.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600 dark:border-gray-700 dark:text-gray-300">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
@@ -4782,9 +4770,9 @@ function UserModal({ user, users, onClose, onSave }) {
             <AuthTextField label="E-mail profissional" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} disabled />
             <AuthTextField label="Cargo / funcao" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} />
             <AuthTextField label="Setor" value={form.setor} onChange={(value) => setForm((current) => ({ ...current, setor: value }))} />
-            <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+            <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
               Perfil de acesso
-              <select value={form.perfil_acesso} onChange={(event) => setForm((current) => ({ ...current, perfil_acesso: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10">
+              <select value={form.perfil_acesso} onChange={(event) => setForm((current) => ({ ...current, perfil_acesso: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                 {ACCESS_PROFILE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -4792,9 +4780,9 @@ function UserModal({ user, users, onClose, onSave }) {
                 ))}
               </select>
             </label>
-            <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+            <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
               Status
-              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10">
+              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                 {USER_STATUS.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -4804,15 +4792,15 @@ function UserModal({ user, users, onClose, onSave }) {
             </label>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             O e-mail institucional e a senha continuam protegidos pelo Supabase Auth. Aqui gerimos nome, cargo, setor, perfil e status do acesso.
           </div>
 
           <ErrorList errors={errors} />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700">
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-gray-800">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-100">
             Cancelar
           </button>
           <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">
@@ -4838,14 +4826,14 @@ function AccessDeniedPage({ title = 'Acesso negado', message = 'Seu perfil não 
 function PageLoadingFallback({ label = 'Carregando módulo...' }) {
   return (
     <section className="surface-card p-8 text-center">
-      <p className="text-sm font-bold text-slate-600">{label}</p>
+      <p className="text-sm font-bold text-slate-600 dark:text-gray-300">{label}</p>
     </section>
   );
 }
 
 function FullscreenStatusState({ label }) {
   return (
-    <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600">
+    <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-600 dark:bg-gray-950 dark:text-gray-300">
       <p className="text-sm font-semibold">{label}</p>
     </div>
   );
@@ -5155,17 +5143,19 @@ function FormField({
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   return (
-    <div className="fixed bottom-5 right-5 z-[60] max-w-md rounded-lg border border-slate-200 bg-white p-4 shadow-panel">
-      <div className="flex items-start gap-3">
-        <CheckCircle2 className="mt-0.5 text-emerald-600" size={19} aria-hidden="true" />
-        <div className="flex-1">
-          <p className="font-black text-slate-950">{toast.title}</p>
-          {toast.message ? <p className="mt-1 text-sm font-semibold text-slate-600">{toast.message}</p> : null}
+    <div className="fixed bottom-5 right-5 z-[60] max-w-md">
+      <SurfacePanel className="p-4 shadow-panel">
+        <div className="flex items-start gap-3">
+          <CheckCircle2 className="mt-0.5 text-emerald-600" size={19} aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-black text-slate-950">{toast.title}</p>
+            {toast.message ? <p className="mt-1 text-sm font-semibold text-slate-600">{toast.message}</p> : null}
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+            <X size={15} aria-hidden="true" />
+          </button>
         </div>
-        <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
-          <X size={15} aria-hidden="true" />
-        </button>
-      </div>
+      </SurfacePanel>
     </div>
   );
 }
@@ -5177,7 +5167,7 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <SurfacePanel className="w-full max-w-2xl shadow-panel">
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="text-lg font-black text-slate-950">Pré-visualização da importação</p>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
@@ -5206,9 +5196,7 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
 
         {errors.length ? (
           <div className="px-5 pb-2">
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-              {errors[0]}
-            </div>
+            <AlertBanner tone="danger">{errors[0]}</AlertBanner>
           </div>
         ) : null}
 
@@ -5231,7 +5219,7 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
             {busy ? 'Importando...' : 'Confirmar importação'}
           </button>
         </div>
-      </div>
+      </SurfacePanel>
     </div>
   );
 }

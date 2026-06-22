@@ -49,6 +49,22 @@ VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false
 O frontend valida essas variaveis em [src/lib/supabase.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/lib/supabase.ts).
 O snapshot local administrativo fica desabilitado por padrao e so deve ser habilitado manualmente em manutencao local.
 
+## Tema claro e escuro
+
+O portal agora possui alternancia global de tema com persistencia local no navegador.
+
+- o botao de tema aparece na autenticacao, no topo do portal e na barra lateral;
+- a preferencia atual fica salva em `localStorage` na chave `portal-theme-preference`;
+- a classe `dark` e aplicada no elemento raiz para ativar as variacoes do Tailwind;
+- os componentes compartilhados do frontend usam `dark:` diretamente ou herdam os overrides de [src/index.css](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/index.css).
+
+Para adaptar novos componentes ao dark mode:
+
+1. prefira reutilizar [src/components/ui/SurfacePanel.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/SurfacePanel.jsx), [src/components/ui/ActionButton.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/ActionButton.jsx), [src/components/ui/MetricTile.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/MetricTile.jsx) e [src/components/ui/DataTableShell.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/DataTableShell.jsx);
+2. se criar uma classe nova com `bg-white`, `border-slate-*` ou `text-slate-*`, adicione a contraparte `dark:` no proprio componente quando aquilo for especifico;
+3. para padroes repetidos do portal inteiro, concentre os overrides compartilhados em [src/index.css](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/index.css);
+4. o estado do tema e disponibilizado por [src/components/ui/theme-context.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/theme-context.jsx) e o controle visual esta em [src/components/ui/ThemeToggle.jsx](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/components/ui/ThemeToggle.jsx).
+
 ## Rodar localmente
 
 ```bash
