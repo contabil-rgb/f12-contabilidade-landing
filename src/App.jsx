@@ -2318,7 +2318,7 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
   return (
     <SurfacePanel className="p-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-black text-slate-950">{title}</h2>
+        <h2 className="text-base font-black text-slate-950 dark:text-gray-100">{title}</h2>
         <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-brand-blue">
           <BarChart3 size={18} aria-hidden="true" />
         </span>
@@ -2332,16 +2332,16 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
             className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-slate-200 hover:bg-slate-50"
           >
             <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-              <span className="font-bold text-slate-700">{row.label}</span>
-              <span className="font-black text-slate-950">{row.value}</span>
+              <span className="font-bold text-slate-700 dark:text-gray-200">{row.label}</span>
+              <span className="font-black text-slate-950 dark:text-gray-100">{row.value}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800">
               <div
                 className="h-full rounded-full bg-brand-blue"
                 style={{ width: `${Math.max((row.value / max) * 100, 4)}%` }}
               />
             </div>
-            <p className="mt-1 text-xs font-semibold text-slate-400">
+            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">
               {total ? `${((row.value / total) * 100).toFixed(1)}% da base` : '0% da base'}
             </p>
           </button>
@@ -3022,16 +3022,16 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
     <section className="surface-card">
       <div className="overflow-auto overflow-soft">
         <table className="min-w-[1700px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
+          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
             <tr>
-              <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
+              <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                 Cliente
               </th>
-              <th className="w-48 border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
+              <th className="w-48 border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
                 Alertas
               </th>
               {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                <th key={field.key} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500">
+                <th key={field.key} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
                   <button
                     type="button"
                     onClick={() => sortColumn(field.key)}
@@ -3042,7 +3042,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                   </button>
                 </th>
               ))}
-              <th className="sticky right-0 z-20 w-36 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+              <th className="sticky right-0 z-20 w-36 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                 Ações
               </th>
             </tr>
@@ -3055,20 +3055,20 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
-                  className="cursor-pointer transition even:bg-slate-50/40 hover:bg-sky-50/70"
+                  className="cursor-pointer transition even:bg-slate-50/40 hover:bg-sky-50/70 dark:even:bg-gray-800/35 dark:hover:bg-gray-800/80"
                 >
-                <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top">
+                <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
                   <div className="max-w-72">
-                    <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{client.cnpj}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">{client.razao_social}</p>
+                    <p className="font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{client.cnpj}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500 dark:text-gray-400">{client.razao_social}</p>
                   </div>
                 </td>
-                <td className="border-b border-slate-100 px-4 py-4 align-top">
+                <td className="border-b border-slate-100 px-4 py-4 align-top dark:border-gray-800">
                   <AlertsList alerts={alerts} />
                 </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                  <td key={field.key} className="border-b border-slate-100 px-4 py-4 align-top text-sm font-semibold text-slate-700">
+                  <td key={field.key} className="border-b border-slate-100 px-4 py-4 align-top text-sm font-semibold text-slate-700 dark:border-gray-800 dark:text-gray-200">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
                         {valueOrDash(getResolvedFieldValue(client, field.key))}
@@ -3078,7 +3078,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                     ))}
                   </td>
                 ))}
-                <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-4 align-top">
+                <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
                   <div className="flex items-center gap-2">
                     {canEditRow(client) ? (
                       <button
@@ -3088,7 +3088,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                           event.stopPropagation();
                           onEdit(client);
                         }}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue"
+                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                       >
                         <Edit3 size={16} aria-hidden="true" />
                       </button>
@@ -3101,7 +3101,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                           event.stopPropagation();
                           onInactivate(client);
                         }}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-red-200 hover:text-red-600"
+                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-red-200 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
                       >
                         <Trash2 size={16} aria-hidden="true" />
                       </button>
@@ -3119,8 +3119,8 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
       {!clients.length ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
           <Search className="text-slate-300" size={42} aria-hidden="true" />
-          <p className="text-lg font-black text-slate-800">Nenhum cliente encontrado para os filtros selecionados.</p>
-          <p className="text-sm font-semibold text-slate-500">Revise os filtros aplicados ou limpe a busca para voltar a ver a carteira.</p>
+          <p className="text-lg font-black text-slate-800 dark:text-gray-100">Nenhum cliente encontrado para os filtros selecionados.</p>
+          <p className="text-sm font-semibold text-slate-500 dark:text-gray-300">Revise os filtros aplicados ou limpe a busca para voltar a ver a carteira.</p>
         </div>
       ) : null}
     </section>
@@ -3206,7 +3206,7 @@ function DetailPage({
   if (!client) {
     return (
       <div className="surface-card p-8 text-center">
-        <p className="font-black text-slate-900">Cliente não encontrado.</p>
+        <p className="font-black text-slate-900 dark:text-gray-100">Cliente não encontrado.</p>
         <button type="button" onClick={onBack} className="mt-4 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white">
           Voltar
         </button>
@@ -3227,9 +3227,9 @@ function DetailPage({
               <ChevronRight className="rotate-180" size={16} aria-hidden="true" />
               Base de clientes
             </button>
-            <h2 className="text-3xl font-black text-slate-950">{client.nome_identificacao || client.razao_social}</h2>
-            <p className="mt-2 text-sm font-semibold text-slate-500">{client.razao_social}</p>
-            <p className="mt-1 text-sm font-bold text-slate-700">{client.cnpj}</p>
+            <h2 className="text-3xl font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-300">{client.razao_social}</p>
+            <p className="mt-1 text-sm font-bold text-slate-700 dark:text-gray-200">{client.cnpj}</p>
           </div>
           {canEditCurrent ? (
             <button
@@ -3274,14 +3274,14 @@ function DetailPage({
       <section className="grid gap-5 xl:grid-cols-2">
         {DETAIL_SECTIONS.map((section) => (
           <article key={section.title} className="surface-card p-5">
-            <h3 className="text-lg font-black text-slate-950">{section.title}</h3>
+            <h3 className="text-lg font-black text-slate-950 dark:text-gray-100">{section.title}</h3>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               {section.fields.map((fieldKey) => {
                 const field = FIELD_DEFINITIONS.find((item) => item.key === fieldKey);
                 return (
-                  <div key={fieldKey} className="rounded-lg bg-slate-50 p-3">
-                    <dt className="text-xs font-black uppercase tracking-normal text-slate-500">{field?.label ?? fieldKey}</dt>
-                    <dd className="mt-1 text-sm font-bold text-slate-900">{renderResolvedFieldValue(client, fieldKey, field?.type)}</dd>
+                  <div key={fieldKey} className="rounded-lg bg-slate-50 p-3 dark:bg-gray-800">
+                    <dt className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">{field?.label ?? fieldKey}</dt>
+                    <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-gray-100">{renderResolvedFieldValue(client, fieldKey, field?.type)}</dd>
                   </div>
                 );
               })}
@@ -3290,18 +3290,18 @@ function DetailPage({
         ))}
       </section>
       <section className="surface-card p-5">
-        <h3 className="text-lg font-black text-slate-950">Histórico de Alterações</h3>
+        <h3 className="text-lg font-black text-slate-950 dark:text-gray-100">Histórico de Alterações</h3>
         {historicoLoading ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500">Carregando histórico...</p>
+          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Carregando histórico...</p>
         ) : !historicoRows.length ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500">Nenhuma alteração registrada para este cliente.</p>
+          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma alteração registrada para este cliente.</p>
         ) : (
           <div className="mt-4 overflow-auto overflow-soft">
             <table className="min-w-[980px] text-left text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50 dark:bg-gray-800/95">
                 <tr>
                   {['Data/hora', 'Usuário', 'Campo', 'Anterior', 'Novo', 'Tipo', 'Origem'].map((header) => (
-                    <th key={header} className="border-b border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-normal text-slate-500">
+                    <th key={header} className="border-b border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
                       {header}
                     </th>
                   ))}
@@ -3309,29 +3309,29 @@ function DetailPage({
               </thead>
               <tbody>
                 {historicoRows.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-600">
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-gray-800/70">
+                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">
                       {formatDateTime(item.data_alteracao)}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <p className="font-black text-slate-900">{item.usuario_nome || 'Usuário'}</p>
-                      <p className="text-xs font-semibold text-slate-500">{item.usuario_email || '-'}</p>
+                    <td className="border-b border-slate-100 px-3 py-2 dark:border-gray-800">
+                      <p className="font-black text-slate-900 dark:text-gray-100">{item.usuario_nome || 'Usuário'}</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">{item.usuario_email || '-'}</p>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 font-mono text-xs font-black text-slate-700">
+                    <td className="border-b border-slate-100 px-3 py-2 font-mono text-xs font-black text-slate-700 dark:border-gray-800 dark:text-gray-200">
                       {item.campo_alterado}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600">
+                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600 dark:border-gray-800 dark:text-gray-300">
                       {valueOrDash(item.valor_anterior, 'text')}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-800">
+                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-800 dark:border-gray-800 dark:text-gray-100">
                       {valueOrDash(item.valor_novo, 'text')}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
+                    <td className="border-b border-slate-100 px-3 py-2 dark:border-gray-800">
                       <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass('info')}`}>
                         {item.tipo_acao || '-'}
                       </span>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600">
+                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600 dark:border-gray-800 dark:text-gray-300">
                       {item.origem || '-'}
                     </td>
                   </tr>
@@ -3667,14 +3667,14 @@ function PendenciasPage({
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
               {statusLabel}
             </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Atualizando...' : 'Atualizar dados'}
@@ -3692,7 +3692,7 @@ function PendenciasPage({
                 key={bucket.label}
                 type="button"
                 onClick={() => setAttachmentFilter(bucket.key)}
-                className={`group rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${chipClass(bucket.tone)} ${attachmentFilter === bucket.key ? 'ring-2 ring-brand-blue/20' : ''}`}
+                className={`group rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900/95 ${chipClass(bucket.tone)} ${attachmentFilter === bucket.key ? 'ring-2 ring-brand-blue/20' : ''}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -3705,7 +3705,7 @@ function PendenciasPage({
                           : 'Pendências que pedem ação nesta frente'}
                     </p>
                   </div>
-                  <span className="rounded-lg border border-current/15 bg-white/70 p-2">
+                  <span className="rounded-lg border border-current/15 bg-white/70 p-2 dark:bg-gray-900/90">
                     <Icon size={16} aria-hidden="true" />
                   </span>
                 </div>
@@ -3724,12 +3724,12 @@ function PendenciasPage({
       <section className="surface-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Resumo do dia</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Resumo do dia</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
               Um retrato rápido do que pede ação agora, sem precisar percorrer toda a lista.
             </p>
           </div>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             Atualizado com base no filtro atual
           </span>
         </div>
@@ -3738,31 +3738,31 @@ function PendenciasPage({
             const Icon = getExecutiveSummaryIcon(item.key);
 
             return (
-              <div key={item.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={item.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/95">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-black text-slate-900">{item.title}</p>
-                    <p className="mt-2 text-3xl font-black text-slate-950">{formatNumber(item.value)}</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-gray-100">{item.title}</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(item.value)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(item.tone)}`}>
                       {item.tone === 'danger' ? 'Urgente' : item.tone === 'info' ? 'Acompanhar' : 'Prioridade'}
                     </span>
-                    <span className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-500">
+                    <span className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                       <Icon size={16} aria-hidden="true" />
                     </span>
                   </div>
                 </div>
-                <p className="mt-3 text-sm font-semibold text-slate-600">{item.detail}</p>
-                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] font-bold uppercase tracking-normal text-slate-500">Exemplos agora</p>
+                <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-gray-300">{item.detail}</p>
+                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/70">
+                  <p className="text-[11px] font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Exemplos agora</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {item.highlights.length ? item.highlights.map((name) => (
-                      <span key={`${item.key}-${name}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-600">
+                      <span key={`${item.key}-${name}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
                         {name}
                       </span>
                     )) : (
-                      <span className="text-xs font-semibold text-slate-400">Nenhum cliente neste grupo.</span>
+                      <span className="text-xs font-semibold text-slate-400 dark:text-gray-500">Nenhum cliente neste grupo.</span>
                     )}
                   </div>
                 </div>
@@ -3783,7 +3783,7 @@ function PendenciasPage({
             <button
               type="button"
               onClick={onClearSearchContext}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               Limpar filtro da busca
             </button>
@@ -3792,11 +3792,11 @@ function PendenciasPage({
       ) : null}
 
       <section className="surface-card">
-        <div className="border-b border-slate-200 p-5">
+        <div className="border-b border-slate-200 p-5 dark:border-gray-800">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black text-slate-950">Pendências por obrigação</h2>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+              <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Pendências por obrigação</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
                 Mostramos a pendência mais urgente de cada cliente para facilitar a triagem e a próxima ação.
               </p>
             </div>
@@ -3809,7 +3809,7 @@ function PendenciasPage({
                   className={`rounded-lg border px-3 py-1.5 text-xs font-black transition ${
                     attachmentFilter === bucket.key
                       ? chipClass(bucket.tone)
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600'
                   }`}
                 >
                   {bucket.label}: {formatNumber(bucket.value)}
@@ -3818,8 +3818,8 @@ function PendenciasPage({
             </div>
           </div>
         </div>
-        <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
-          <p className="text-xs font-bold uppercase tracking-normal text-slate-500">
+        <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/70">
+          <p className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Exibindo {formatNumber(actionRows.length)} cliente(s) priorizado(s) nesta visão.
           </p>
         </div>
@@ -3948,7 +3948,7 @@ function PendenciasPage({
               );
             })() : null
           )) : (
-            <div className="px-4 py-8 text-center text-sm font-semibold text-slate-500">
+            <div className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-gray-300">
               Nenhuma pendência operacional para o filtro selecionado.
             </div>
           )}
@@ -4063,14 +4063,14 @@ function ReinfPage({
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
               {statusLabel}
             </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Atualizando...' : 'Atualizar dados'}
@@ -4097,7 +4097,7 @@ function ReinfPage({
                 setFocusedClientId('');
                 setFocusedClientLabel('');
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               Ver todos novamente
             </button>
@@ -4108,9 +4108,9 @@ function ReinfPage({
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Controle de REINF</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400">Use os filtros para separar envio, comprovante e pendências da REINF.</p>
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de REINF</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Use os filtros para separar envio, comprovante e pendências da REINF.</p>
           </div>
           <button
             type="button"
@@ -4118,7 +4118,7 @@ function ReinfPage({
               setQuick('todos');
               setFilters(emptyFilters);
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
           >
             <RefreshCcw size={15} aria-hidden="true" />
             Limpar filtros
@@ -4130,20 +4130,20 @@ function ReinfPage({
               key={item.key}
               type="button"
               onClick={() => setQuick(item.key)}
-              className={`rounded-full border px-3 py-2 text-xs font-black transition ${quick === item.key ? chipClass(item.tone) : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+              className={`rounded-full border px-3 py-2 text-xs font-black transition ${quick === item.key ? chipClass(item.tone) : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'}`}
             >
               {item.label}
             </button>
           ))}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
-            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold normal-case outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
+            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             CNPJ
-            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold normal-case outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
+            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label="Envio de REINF" value={filters.envio_reinf} options={YES_NO_OPTIONS} onChange={(value) => updateFilter({ envio_reinf: value })} />
@@ -4282,14 +4282,14 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
               {statusLabel}
             </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Atualizando...' : 'Atualizar dados'}
@@ -4307,9 +4307,9 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Controle de ECD / ECF</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400">Separe rapidamente por situação, responsável e comprovantes pendentes.</p>
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de ECD / ECF</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Separe rapidamente por situação, responsável e comprovantes pendentes.</p>
           </div>
           <button
             type="button"
@@ -4317,7 +4317,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
               setMode('todos');
               setFilters(emptyFilters);
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
           >
             <RefreshCcw size={15} aria-hidden="true" />
             Limpar filtros
@@ -4326,13 +4326,13 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
-            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold normal-case outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
+            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             CNPJ
-            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold normal-case outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
+            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label="Responsavel" value={filters.responsavel_ecd} options={uniqueValues(clients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
@@ -4406,25 +4406,25 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
     <>
       <div className="overflow-auto overflow-soft">
         <table className="min-w-[1080px] text-left text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-50 dark:bg-gray-800/95">
             <tr>
               {columns.map((column) => (
-                <th key={column} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+                <th key={column} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
                   {columnLabels[column] ?? getFieldLabel(FIELD_DEFINITIONS, column)}
                 </th>
               ))}
-              <th className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+              <th className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
                 Status da obrigação
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((client) => (
-              <tr key={client.id} className="hover:bg-slate-50">
+              <tr key={client.id} className="hover:bg-slate-50 dark:hover:bg-gray-800/70">
                 {columns.map((column) => (
-                  <td key={column} className="border-b border-slate-100 px-4 py-3 align-top">
+                  <td key={column} className="border-b border-slate-100 px-4 py-3 align-top dark:border-gray-800 dark:text-gray-200">
                     {renderCell?.(client, column) ?? (column === 'nome_identificacao' ? (
-                      <button type="button" onClick={() => onView(client.id)} className="text-left font-black text-slate-950 hover:text-brand-blue">
+                      <button type="button" onClick={() => onView(client.id)} className="text-left font-black text-slate-950 hover:text-brand-blue dark:text-gray-100 dark:hover:text-blue-300">
                         {client[column] || client.razao_social}
                       </button>
                     ) : (
@@ -4432,7 +4432,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
                     ))}
                   </td>
                 ))}
-                <td className="border-b border-slate-100 px-4 py-3 align-top">{trailing(client)}</td>
+                <td className="border-b border-slate-100 px-4 py-3 align-top dark:border-gray-800">{trailing(client)}</td>
               </tr>
             ))}
           </tbody>
@@ -4441,7 +4441,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
       {!rows.length ? (
         <div className="flex min-h-56 flex-col items-center justify-center gap-3 p-8 text-center">
           <Search className="text-slate-300" size={40} aria-hidden="true" />
-          <p className="text-base font-black text-slate-800">Nenhum cliente encontrado para os filtros selecionados.</p>
+          <p className="text-base font-black text-slate-800 dark:text-gray-100">Nenhum cliente encontrado para os filtros selecionados.</p>
         </div>
       ) : null}
     </>
@@ -4454,23 +4454,23 @@ function StaticBreakdownPanel({ title, rows, total, icon: Icon = BarChart3 }) {
   return (
     <section className="surface-card p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-black text-slate-950">{title}</h2>
+        <h2 className="text-base font-black text-slate-950 dark:text-gray-100">{title}</h2>
         <Icon className="text-brand-blue" size={19} aria-hidden="true" />
       </div>
       <div className="mt-4 space-y-3">
         {rows.slice(0, 9).map((row) => (
           <div key={row.label} className="rounded-lg p-2">
             <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-              <span className="font-bold text-slate-700">{row.label}</span>
-              <span className="font-black text-slate-950">{row.value}</span>
+              <span className="font-bold text-slate-700 dark:text-gray-200">{row.label}</span>
+              <span className="font-black text-slate-950 dark:text-gray-100">{row.value}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800">
               <div
                 className="h-full rounded-full bg-brand-blue"
                 style={{ width: `${Math.max((row.value / max) * 100, 4)}%` }}
               />
             </div>
-            <p className="mt-1 text-xs font-semibold text-slate-400">
+            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">
               {total ? `${((row.value / total) * 100).toFixed(1)}% da base` : '0% da base'}
             </p>
           </div>
@@ -4543,8 +4543,8 @@ function ReportsPage({
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Exportação da base</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Exportação da base</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
               {formatNumber(filteredClients.length)} registros filtrados, {formatNumber(clients.length)} registros na base.
             </p>
           </div>
@@ -4552,14 +4552,14 @@ function ReportsPage({
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
               {statusLabel}
             </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               Fonte: {getMetadataSourceDisplay(metadata?.source)}
             </span>
             <button
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
             >
               <RefreshCcw size={16} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
               {loading ? 'Atualizando...' : 'Atualizar dados'}
@@ -4577,7 +4577,7 @@ function ReportsPage({
                 <button
                   type="button"
                   onClick={() => onExportCsv(filteredClients, 'clientes-contabeis-filtrados.csv')}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                 >
                   <FileDown size={16} aria-hidden="true" />
                   CSV filtrado
@@ -4607,10 +4607,10 @@ function ReportsPage({
             <article key={title} className="surface-card p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-black text-slate-900">{title}</p>
-                  <p className="mt-3 text-3xl font-black text-slate-950">{formatNumber(count)}</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-gray-100">{title}</p>
+                  <p className="mt-3 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(count)}</p>
                 </div>
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-brand-blue">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-brand-blue dark:bg-gray-800 dark:text-blue-300">
                   <Icon size={19} aria-hidden="true" />
                 </span>
               </div>
@@ -4620,20 +4620,20 @@ function ReportsPage({
                     <button
                       type="button"
                       onClick={() => onExportXlsx(rows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:border-brand-blue hover:text-brand-blue"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                     >
                       Excel
                     </button>
                     <button
                       type="button"
                       onClick={() => onExportCsv(rows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:border-brand-blue hover:text-brand-blue"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                     >
                       CSV
                     </button>
                   </>
                 ) : (
-                  <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-black text-slate-500">
+                  <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
                     Exportação bloqueada
                   </span>
                 )}
