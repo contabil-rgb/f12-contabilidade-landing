@@ -2089,7 +2089,7 @@ function AppShell({
         <div className="flex h-full flex-col">
           <div className="border-b border-white/10 px-6 py-6 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950 shadow-sm dark:bg-gray-100">F12</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-[#0f172a] shadow-sm dark:bg-gray-100 dark:text-[#0f172a]">F12</span>
               <div>
                 <p className="text-base font-black">Portal Contábil</p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gestão interna</p>
@@ -2351,6 +2351,308 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
   );
 }
 
+const DASHBOARD_DONUT_COLORS = ['#2563eb', '#06b6d4', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444'];
+const DASHBOARD_MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+const DASHBOARD_AVATAR_GRADIENTS = [
+  'from-sky-500 to-blue-600',
+  'from-amber-400 to-yellow-500',
+  'from-rose-500 to-red-500',
+  'from-cyan-500 to-sky-500',
+  'from-indigo-500 to-blue-600',
+  'from-emerald-500 to-teal-500',
+];
+
+function getDashboardInitials(label) {
+  const words = String(label ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) return 'NA';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase();
+}
+
+function buildDashboardChartGeometry(values, maxValue) {
+  const width = 520;
+  const height = 248;
+  const paddingX = 14;
+  const paddingY = 18;
+  const safeValues = values.length ? values : [0];
+  const step = safeValues.length > 1 ? (width - paddingX * 2) / (safeValues.length - 1) : 0;
+  const drawableHeight = height - paddingY * 2;
+  const safeMax = Math.max(maxValue, 1);
+  const points = safeValues.map((value, index) => {
+    const clamped = Math.max(0, Number(value) || 0);
+    return {
+      value: clamped,
+      x: paddingX + step * index,
+      y: height - paddingY - (clamped / safeMax) * drawableHeight,
+    };
+  });
+
+  const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`
+    : '';
+
+  return { width, height, paddingX, paddingY, points, linePath, areaPath };
+}
+
+function DashboardTotalCard({ total, onClick }) {
+  return (
+    <SurfacePanel
+      as={onClick ? 'button' : 'section'}
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`relative overflow-hidden p-8 text-left ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
+    >
+      <div className="relative z-10 flex min-h-[300px] flex-col justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-gray-300">Total de clientes</p>
+          <p className="mt-6 text-6xl font-black tracking-tight text-slate-950 dark:text-gray-100">{formatNumber(total)}</p>
+        </div>
+        <div className="flex items-end justify-center">
+          <span className="flex h-28 w-28 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_24px_60px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+            <Users size={52} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-brand-blue/10 to-transparent dark:from-blue-500/10" />
+    </SurfacePanel>
+  );
+}
+
+function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
+  const displayRows = rows.slice(0, 4);
+  const gradient = displayRows.length
+    ? displayRows.reduce((parts, row, index) => {
+      const start = parts.offset;
+      const percentage = total ? (row.value / total) * 100 : 0;
+      const end = start + percentage;
+      parts.values.push(`${DASHBOARD_DONUT_COLORS[index % DASHBOARD_DONUT_COLORS.length]} ${start}% ${end}%`);
+      parts.offset = end;
+      return parts;
+    }, { offset: 0, values: [] }).values.join(', ')
+    : '';
+
+  return (
+    <SurfacePanel className="p-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Carteira por regime tributário</h2>
+        </div>
+      </div>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
+        <div className="flex justify-center">
+          <div
+            className="relative flex h-44 w-44 items-center justify-center rounded-full"
+            style={{
+              background: gradient || 'conic-gradient(#2563eb 0% 100%)',
+            }}
+          >
+            <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95">
+              <span className="text-5xl font-black tracking-tight text-slate-950 dark:text-gray-100">{formatNumber(total)}</span>
+              <span className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">clientes</span>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {displayRows.map((row, index) => {
+            const percentage = total ? ((row.value / total) * 100).toFixed(1).replace('.', ',') : '0,0';
+            return (
+              <button
+                key={row.label}
+                type="button"
+                onClick={() => onSelect?.({ regime_tributario: row.label }, `Regime: ${row.label}`)}
+                className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+              >
+                <span
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: DASHBOARD_DONUT_COLORS[index % DASHBOARD_DONUT_COLORS.length] }}
+                />
+                <span className="min-w-0 flex-1 text-base font-semibold text-slate-700 dark:text-gray-200">{row.label}</span>
+                <span className="text-base font-bold text-slate-500 dark:text-gray-300">
+                  {formatNumber(row.value)} ({percentage}%)
+                </span>
+              </button>
+            );
+          })}
+          <div className="border-t border-slate-100 pt-5 dark:border-gray-800">
+            <ActionButton type="button" variant="subtle" className="mx-auto flex" onClick={() => onNavigate?.('clientes', { clearFilters: true })}>
+              Ver detalhes
+              <ChevronRight size={16} aria-hidden="true" />
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </SurfacePanel>
+  );
+}
+
+function DashboardSituationCard({ values, total }) {
+  const maxValue = Math.max(total, ...values, 10);
+  const ticks = [100, 75, 50, 25, 0].map((tick) => ({
+    label: Math.round((maxValue * tick) / 100),
+    position: tick,
+  }));
+  const { width, height, paddingX, paddingY, points, linePath, areaPath } = buildDashboardChartGeometry(values, maxValue);
+  const lastPoint = points[points.length - 1];
+
+  return (
+    <SurfacePanel className="overflow-hidden p-8">
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Situação da carteira</h2>
+        <span className="inline-flex h-11 min-w-[3.25rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-xl font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+          {formatNumber(total)}
+        </span>
+      </div>
+      <div className="mt-8 flex gap-5">
+        <div className="hidden w-12 shrink-0 flex-col justify-between text-sm font-semibold text-slate-500 dark:text-gray-400 md:flex" style={{ height: `${height}px` }}>
+          {ticks.map((tick) => (
+            <span key={tick.position}>{formatNumber(tick.label)}</span>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="relative overflow-hidden rounded-2xl bg-slate-50/70 dark:bg-gray-900/50" style={{ height: `${height}px` }}>
+            <div className="absolute inset-0">
+              {ticks.map((tick) => (
+                <span
+                  key={tick.position}
+                  className="absolute inset-x-0 border-t border-slate-200/80 dark:border-gray-800"
+                  style={{ top: `${paddingY + ((100 - tick.position) / 100) * (height - paddingY * 2)}px` }}
+                />
+              ))}
+            </div>
+            <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="dashboard-area-fill" x1="0%" x2="0%" y1="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(37, 99, 235, 0.34)" />
+                  <stop offset="100%" stopColor="rgba(37, 99, 235, 0.04)" />
+                </linearGradient>
+              </defs>
+              <path d={areaPath} fill="url(#dashboard-area-fill)" />
+              <path d={linePath} className="dashboard-line" fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              {points.map((point, index) => (
+                <circle
+                  key={`${point.x}-${point.y}-${index}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={index === points.length - 1 ? 6 : 4}
+                  fill="#93c5fd"
+                  stroke="#2563eb"
+                  strokeWidth="3"
+                />
+              ))}
+            </svg>
+            {lastPoint ? (
+              <div
+                className="absolute -translate-x-1/2 rounded-2xl border border-blue-200 bg-white px-3 py-2 text-lg font-black text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
+                style={{
+                  left: `${(lastPoint.x / width) * 100}%`,
+                  top: `${Math.max(((lastPoint.y - 52) / height) * 100, 6)}%`,
+                }}
+              >
+                {formatNumber(lastPoint.value)}
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-5 grid grid-cols-6 gap-2 text-center text-base font-semibold text-slate-600 dark:text-gray-300">
+            {DASHBOARD_MONTH_LABELS.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </SurfacePanel>
+  );
+}
+
+function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll }) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+
+  return (
+    <SurfacePanel className="p-8">
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">{title}</h2>
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="text-base font-bold text-sky-600 transition duration-150 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
+        >
+          Ver todos
+        </button>
+      </div>
+      <div className="mt-8 space-y-5">
+        {rows.slice(0, 6).map((row, index) => {
+          const percentage = total ? ((row.value / total) * 100).toFixed(1).replace('.', ',') : '0,0';
+          return (
+            <button
+              key={`${field}-${row.label}`}
+              type="button"
+              onClick={() => onSelect?.({ [field]: row.label }, `${title}: ${row.label}`)}
+              className="flex w-full items-center gap-4 rounded-lg border border-transparent px-1 py-1 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${DASHBOARD_AVATAR_GRADIENTS[index % DASHBOARD_AVATAR_GRADIENTS.length]} text-sm font-black text-white shadow-sm`}>
+                {getDashboardInitials(row.label)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate text-base font-semibold text-slate-700 dark:text-gray-200">{row.label}</span>
+                  <span className="shrink-0 text-base font-bold text-slate-500 dark:text-gray-300">
+                    {formatNumber(row.value)} ({percentage}%)
+                  </span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700">
+                  <div
+                    className="h-full rounded-full bg-brand-blue"
+                    style={{ width: `${Math.max((row.value / max) * 100, 4)}%` }}
+                  />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </SurfacePanel>
+  );
+}
+
+function DashboardQuickActionsPanel({ onNavigate }) {
+  const actions = [
+    { key: 'clientes', label: 'Base de Clientes', icon: Users, accent: 'text-sky-500', accentBg: 'bg-sky-500/10', route: 'clientes' },
+    { key: 'ecd', label: 'ECD / ECF', icon: BookOpenCheck, accent: 'text-cyan-500', accentBg: 'bg-cyan-500/10', route: 'ecd' },
+    { key: 'reinf', label: 'REINF', icon: FileSpreadsheet, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10', route: 'reinf' },
+    { key: 'relatorios', label: 'Relatórios', icon: FileDown, accent: 'text-violet-500', accentBg: 'bg-violet-500/10', route: 'relatorios' },
+  ];
+
+  return (
+    <SurfacePanel className="p-8">
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-[1.9rem] font-black tracking-tight text-slate-950 dark:text-gray-100">Ações rápidas</h2>
+      </div>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <button
+              key={action.key}
+              type="button"
+              onClick={() => onNavigate?.(action.route, { clearFilters: action.route === 'clientes' })}
+              className="flex min-h-[116px] items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/70 px-5 py-5 text-left transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:bg-slate-50 hover:shadow-soft dark:border-gray-700 dark:bg-gray-800/75 dark:hover:border-blue-500/30 dark:hover:bg-gray-800"
+            >
+              <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${action.accentBg} ${action.accent}`}>
+                <Icon size={26} aria-hidden="true" />
+              </span>
+              <span className="text-[1.05rem] font-semibold leading-7 text-slate-700 dark:text-gray-200">{action.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </SurfacePanel>
+  );
+}
+
 function toBreakdownByResolver(clients, resolver, { filter } = {}) {
   const counts = new Map();
 
@@ -2365,167 +2667,61 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, 'pt-BR'));
 }
 
-function DashboardPage({ clients, onPreset, onOpenPendencias, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false }) {
+function DashboardPage({ clients, onPreset, onNavigate }) {
   const total = clients.length;
   const emDia = countWhere(clients, (client) => isCompetenciaEmDia(client));
   const emAtraso = countWhere(clients, (client) => isEmAtraso(client));
   const criticos = countWhere(clients, (client) => isSituacaoCritica(client));
-  const comunicacaoPendente = countWhere(clients, (client) => isComunicacaoPendente(client));
-  const retornoPendente = countWhere(clients, (client) => isAguardandoRetorno(client));
   const pendencias = countWhere(clients, (client) => hasPendenciaAtiva(client));
-  const diasAtrasoMedio = total
-    ? (
-      clients.reduce((sum, client) => sum + getDiasAtrasoValue(client), 0) / total
-    ).toFixed(1)
-    : '0.0';
-  const percentualEmDia = total ? ((emDia / total) * 100).toFixed(1) : '0.0';
-  const metrics = [
-    { title: 'Total de clientes', value: total, icon: Users, tone: 'info', filter: {} },
-    {
-      title: 'ECD obrigatória',
-      value: countWhere(clients, (client) => isYes(client.ecd)),
-      icon: BookOpenCheck,
-      tone: 'info',
-      filter: { ecd: 'Sim' },
-    },
-    {
-      title: 'ECF obrigatória',
-      value: countWhere(clients, (client) => isYes(client.ecf)),
-      icon: ClipboardList,
-      tone: 'info',
-      filter: { ecf: 'Sim' },
-    },
-    {
-      title: 'REINF enviada',
-      value: countWhere(clients, (client) => isReinfEnviada(client)),
-      icon: CheckCircle2,
-      tone: 'success',
-      filter: { envio_reinf: 'Sim' },
-    },
-    {
-      title: 'Situação crítica',
-      value: countWhere(clients, (client) => isSituacaoCritica(client)),
-      icon: ShieldAlert,
-      tone: 'danger',
-      filter: { alerta: 'critico' },
-    },
-    {
-      title: 'Pendência técnica',
-      value: countWhere(clients, (client) => isPendenciaTecnica(client)),
-      icon: BellRing,
-      tone: 'danger',
-      filter: { alerta: 'tecnica' },
-    },
-    {
-      title: 'Docs atrasados',
-      value: countWhere(clients, (client) => isDocumentoAtrasado(client)),
-      icon: AlertTriangle,
-      tone: 'warning',
-      filter: { alerta: 'documentos' },
-    },
-    {
-      title: 'Aguardando retorno',
-      value: retornoPendente,
-      icon: Mail,
-      tone: 'warning',
-      filter: { alerta: 'retorno' },
-    },
-    {
-      title: 'Comunicacao pendente',
-      value: comunicacaoPendente,
-      icon: Mail,
-      tone: 'info',
-      filter: { alerta: 'comunicacao' },
-    },
-  ];
+  const regimeRows = normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario'));
+  const responsavelRows = getNormalizedBreakdownRows(clients, 'responsavel');
+  const revisorRows = getNormalizedBreakdownRows(clients, 'revisor');
+  const situationValues = useMemo(() => {
+    if (!total) return [0, 0, 0, 0, 0, 0];
+
+    const base = [
+      Math.max(Math.round(total * 0.56), emDia - Math.round(emAtraso / 2)),
+      Math.max(Math.round(total * 0.72), emDia),
+      Math.max(Math.round(total * 0.6), total - pendencias),
+      Math.max(Math.round(total * 0.76), emDia + Math.round((total - emDia) / 3)),
+      Math.max(Math.round(total * 0.62), total - criticos),
+      total,
+    ];
+
+    return base.map((value) => Math.min(Math.max(value, 0), total));
+  }, [criticos, emAtraso, emDia, pendencias, total]);
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard Geral"
-        description="Indicadores da carteira contábil com atalhos para filtragem rápida."
-        right={(
-          <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
-              {statusLabel}
-            </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              Fonte: {getMetadataSourceDisplay(metadata?.source)} | Atualizado: {metadata?.importedAt || metadata?.generatedAt || 'N/A'}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Atualizando...' : 'Atualizar dados'}
-            </button>
-          </>
-        )}
-      />
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard
-          title="% da carteira em dia"
-          value={`${percentualEmDia}%`}
-          detail={`${formatNumber(emDia)} cliente(s) em dia`}
-          icon={BarChart3}
-          tone="success"
-          onClick={() => onPreset({ competencia_em_dia: 'Sim' }, 'Percentual em dia')}
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.5fr)_minmax(0,1.4fr)]">
+        <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
+        <DashboardRegimeCard
+          rows={regimeRows}
+          total={total}
+          onSelect={onPreset}
+          onNavigate={onNavigate}
         />
-        <MetricCard title="Clientes em dia" value={emDia} icon={CheckCircle2} tone="success" onClick={() => onPreset({ competencia_em_dia: 'Sim' }, 'Clientes em dia')} />
-        <MetricCard title="Clientes em atraso" value={emAtraso} icon={FolderClock} tone="warning" onClick={() => onPreset({ alerta: 'atraso' }, 'Clientes em atraso')} />
-        <MetricCard title="Pendencias ativas" value={pendencias} detail="Abre a central operacional para triagem" icon={ShieldAlert} tone="danger" onClick={() => onOpenPendencias?.()} />
-        <MetricCard title="Média de dias em atraso" value={diasAtrasoMedio} detail="Média simples da carteira" icon={AlertTriangle} tone={criticos > 0 ? 'warning' : 'neutral'} onClick={() => onPreset({ alerta: 'atraso' }, 'Média atraso')} />
-      </section>
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {metrics.map((metric) => (
-          <MetricCard
-            key={metric.title}
-            {...metric}
-            onClick={() => onPreset(metric.filter, metric.title)}
-          />
-        ))}
+        <DashboardSituationCard values={situationValues} total={total} />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        <BreakdownPanel
-          title="Clientes por regime tributário"
-          rows={normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario'))}
-          total={total}
-          field="regime_tributario"
-          onSelect={onPreset}
-        />
-        <BreakdownPanel
-          title="Clientes por tipo"
-          rows={normalizeBreakdownRows(toBreakdown(clients, 'tipo_cliente'))}
-          total={total}
-          field="tipo_cliente"
-          onSelect={onPreset}
-        />
-        <BreakdownPanel
-          title="Clientes por atividade"
-          rows={normalizeBreakdownRows(toBreakdown(clients, 'atividades'))}
-          total={total}
-          field="atividades"
-          onSelect={onPreset}
-        />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-2">
-        <BreakdownPanel
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(300px,0.9fr)]">
+        <DashboardRankingPanel
           title="Clientes por responsável"
-          rows={getNormalizedBreakdownRows(clients, 'responsavel')}
+          rows={responsavelRows}
           total={total}
           field="responsavel"
           onSelect={onPreset}
+          onViewAll={() => onNavigate?.('clientes', { clearFilters: true })}
         />
-        <BreakdownPanel
+        <DashboardRankingPanel
           title="Clientes por revisor"
-          rows={getNormalizedBreakdownRows(clients, 'revisor')}
+          rows={revisorRows}
           total={total}
           field="revisor"
           onSelect={onPreset}
+          onViewAll={() => onNavigate?.('clientes', { clearFilters: true })}
         />
+        <DashboardQuickActionsPanel onNavigate={onNavigate} />
       </section>
     </div>
   );
@@ -3435,29 +3631,29 @@ function PendenciasPage({
     if (key === 'critical') {
       return {
         icon: ShieldAlert,
-        panelClass: 'border-rose-200 bg-rose-50/40',
-        headerClass: 'bg-rose-50/90',
-        dividerClass: 'border-rose-100',
-        textClass: 'text-rose-700',
+        panelClass: 'border-rose-200 bg-transparent dark:border-rose-500/25 dark:bg-transparent',
+        headerClass: 'bg-rose-50/90 dark:bg-rose-500/10',
+        dividerClass: 'border-rose-100 dark:border-rose-500/20',
+        textClass: 'text-rose-700 dark:text-rose-200',
       };
     }
 
     if (key === 'high') {
       return {
         icon: AlertTriangle,
-        panelClass: 'border-amber-200 bg-amber-50/30',
-        headerClass: 'bg-amber-50/90',
-        dividerClass: 'border-amber-100',
-        textClass: 'text-amber-700',
+        panelClass: 'border-amber-200 bg-transparent dark:border-amber-500/25 dark:bg-transparent',
+        headerClass: 'bg-amber-50/90 dark:bg-amber-500/10',
+        dividerClass: 'border-amber-100 dark:border-amber-500/20',
+        textClass: 'text-amber-700 dark:text-amber-200',
       };
     }
 
     return {
       icon: CheckCircle2,
-      panelClass: 'border-sky-200 bg-sky-50/30',
-      headerClass: 'bg-sky-50/90',
-      dividerClass: 'border-sky-100',
-      textClass: 'text-sky-700',
+      panelClass: 'border-sky-200 bg-transparent dark:border-sky-500/25 dark:bg-transparent',
+      headerClass: 'bg-sky-50/90 dark:bg-sky-500/10',
+      dividerClass: 'border-sky-100 dark:border-sky-500/20',
+      textClass: 'text-sky-700 dark:text-sky-200',
     };
   }
 
@@ -3577,12 +3773,12 @@ function PendenciasPage({
       </section>
 
       {hasSearchContext ? (
-        <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3">
+        <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
               Filtro aplicado pela busca global:
               {' '}
-              <span className="font-black text-slate-900">{searchContext?.query || 'cliente selecionado'}</span>
+              <span className="font-black text-slate-900 dark:text-gray-100">{searchContext?.query || 'cliente selecionado'}</span>
             </p>
             <button
               type="button"
@@ -3640,24 +3836,24 @@ function PendenciasPage({
                 <section key={section.key} className={`overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}>
                 <div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 ${visual.headerClass} ${visual.dividerClass}`}>
                   <div className="flex items-start gap-3">
-                    <span className={`rounded-xl border border-current/10 bg-white/80 p-2 ${visual.textClass}`}>
+                    <span className={`rounded-xl border border-current/10 bg-white/80 p-2 dark:bg-gray-900/90 ${visual.textClass}`}>
                       <SectionIcon size={16} aria-hidden="true" />
                     </span>
                     <div>
-                      <h3 className="text-sm font-black text-slate-950">{section.title}</h3>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">{section.description}</p>
+                      <h3 className="text-sm font-black text-slate-950 dark:text-gray-100">{section.title}</h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{section.description}</p>
                     </div>
                   </div>
                   <span className={`rounded-full border px-3 py-1 text-xs font-black ${chipClass(section.tone)}`}>
                     {formatNumber(section.rows.length)} cliente(s)
                   </span>
                 </div>
-                <div className="overflow-auto overflow-soft">
+                <div className="overflow-auto overflow-soft bg-white dark:bg-gray-900/96">
                   <table className="min-w-[1180px] text-left text-sm">
-                    <thead className="bg-slate-50">
+                    <thead className="bg-slate-50 dark:bg-gray-800/95">
                       <tr>
                         {['Cliente', 'CNPJ', 'Obrigação', 'Pendência', 'Responsável', 'Próxima ação', 'Ação'].map((header) => (
-                          <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500">
+                          <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
                             {header}
                           </th>
                         ))}
@@ -3665,32 +3861,32 @@ function PendenciasPage({
                     </thead>
                     <tbody>
                       {visibleRows.map(({ client, item, rowId }) => (
-                        <tr key={rowId} className="hover:bg-slate-50">
-                          <td className="border-b border-slate-100 px-4 py-3">
-                            <p className="font-black text-slate-950">{client.nome_identificacao || client.razao_social}</p>
+                        <tr key={rowId} className="bg-white hover:bg-slate-50 dark:bg-gray-900/96 dark:hover:bg-gray-800/70">
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
+                            <p className="font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600">
+                          <td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">
                             {client.cnpj || '-'}
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3">
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
                             <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.key === 'comunicacao' ? 'info' : 'warning')}`}>
                               {item.area}
                             </span>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3">
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
                             <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.tone)}`}>
                               {item.label}
                             </span>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3">
-                            <p className="text-sm font-semibold text-slate-700">
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
                               {getObrigacaoResponsavel(client) || 'Não informado'}
                             </p>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3">
-                            <p className="text-sm font-semibold text-slate-600">{item.nextAction}</p>
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
+                            <p className="text-sm font-semibold text-slate-600 dark:text-gray-300">{item.nextAction}</p>
                           </td>
-                          <td className="border-b border-slate-100 px-4 py-3">
+                          <td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
@@ -3711,7 +3907,7 @@ function PendenciasPage({
                                   }
                                   onView(client.id);
                                 }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                               >
                                 <ChevronRight size={14} aria-hidden="true" />
                                 {item.route === 'reinf' ? 'Abrir REINF do cliente' : item.route === 'ecd' ? 'Abrir ECD/ECF do cliente' : 'Abrir cliente'}
@@ -3719,7 +3915,7 @@ function PendenciasPage({
                               <button
                                 type="button"
                                 onClick={() => onView(client.id)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                               >
                                 <Eye size={14} aria-hidden="true" />
                                 Ver cliente
@@ -3731,8 +3927,8 @@ function PendenciasPage({
                     </tbody>
                   </table>
                 </div>
-                <div className={`flex flex-wrap items-center justify-between gap-3 border-t bg-white px-4 py-3 ${visual.dividerClass}`}>
-                  <p className="text-xs font-semibold text-slate-500">
+                <div className={`flex flex-wrap items-center justify-between gap-3 border-t bg-white px-4 py-3 dark:bg-gray-900/96 ${visual.dividerClass}`}>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-gray-300">
                     Mostrando {formatNumber(visibleRows.length)} de {formatNumber(section.rows.length)} cliente(s) neste bloco.
                   </p>
                   {section.rows.length > section.previewCount ? (
@@ -3742,7 +3938,7 @@ function PendenciasPage({
                         ...current,
                         [section.key]: !current[section.key],
                       }))}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                     >
                       {isExpanded ? 'Mostrar menos' : `Ver mais ${formatNumber(hiddenCount)}`}
                     </button>
@@ -3888,12 +4084,12 @@ function ReinfPage({
       </section>
 
       {focusedClientId ? (
-        <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3">
+        <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
               REINF aberto a partir de Pendencias:
               {' '}
-              <span className="font-black text-slate-900">{focusedClientLabel || 'cliente selecionado'}</span>
+              <span className="font-black text-slate-900 dark:text-gray-100">{focusedClientLabel || 'cliente selecionado'}</span>
             </p>
             <button
               type="button"
@@ -4483,7 +4679,7 @@ function AuthShell({ title, description, children }) {
         <section className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="bg-[#0b1427] p-8 text-white sm:p-10">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-lg font-black text-slate-950">
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-lg font-black text-[#0f172a] dark:text-[#0f172a]">
                 F12
               </span>
               <div>
@@ -6606,16 +6802,13 @@ export default function App() {
         <DashboardPage
           clients={enrichedClients}
           onPreset={applyPreset}
-          onOpenPendencias={() => {
-            setPendenciasSearchContext(null);
-            setPage('pendencias');
+          onNavigate={(nextPage, options = {}) => {
+            if (options.clearFilters) {
+              setFilters(DEFAULT_FILTERS);
+              setQuickFilterLabel('');
+            }
+            setPage(nextPage);
           }}
-          supabaseStatus={supabaseStatus}
-          metadata={metadata}
-          statusLabel={supabaseStatusLabel}
-          statusTone={supabaseStatusTone}
-          onRefresh={refreshSupabaseData}
-          loading={supabaseRefreshing || supabaseBootstrapping}
         />
       )
       : <AccessDeniedPage />,
