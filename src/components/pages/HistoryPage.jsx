@@ -20,7 +20,7 @@ export default function HistoryPage({
     >
       <DataTableShell
         headers={['Data', 'Usuario', 'Cliente', 'Campo', 'Valor anterior', 'Valor novo', 'Tipo de acao']}
-        minWidth="min-w-[1400px]"
+        minWidth="min-w-[1020px] xl:min-w-[1400px]"
         hasRows={history.length > 0}
         emptyTitle="Nenhuma alteracao registrada ainda."
       >

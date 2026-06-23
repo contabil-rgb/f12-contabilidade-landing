@@ -2147,7 +2147,7 @@ function AppShell({
         </div>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className="min-w-0 lg:pl-72">
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -2236,13 +2236,13 @@ function AppShell({
             </div>
           ) : null}
 
-          <div className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-3 sm:px-6 dark:border-gray-800 lg:hidden">
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 sm:px-6 dark:border-gray-800 lg:hidden">
             {visibleNavItems.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setPage(key)}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${
+                className={`inline-flex min-w-[calc(50%-0.25rem)] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold sm:min-w-0 ${
                   page === key ? 'bg-brand-blue text-white' : 'bg-white text-slate-700 shadow-sm dark:bg-gray-800 dark:text-gray-100'
                 }`}
               >
@@ -2253,7 +2253,7 @@ function AppShell({
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );
@@ -2692,8 +2692,8 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
   }, [criticos, emAtraso, emDia, pendencias, total]);
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.5fr)_minmax(0,1.4fr)]">
+    <div className="min-w-0 space-y-6">
+      <section className="min-w-0 grid gap-6 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.5fr)_minmax(0,1.4fr)]">
         <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
         <DashboardRegimeCard
           rows={regimeRows}
@@ -2704,7 +2704,7 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
         <DashboardSituationCard values={situationValues} total={total} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(300px,0.9fr)]">
+      <section className="min-w-0 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(300px,0.9fr)]">
         <DashboardRankingPanel
           title="Clientes por responsável"
           rows={responsavelRows}
@@ -2758,7 +2758,7 @@ function SearchAndFilters({
     label,
   }));
   return (
-    <SurfacePanel className="p-6">
+    <SurfacePanel className="min-w-0 p-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -3019,9 +3019,9 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
   }
 
   return (
-    <section className="surface-card">
-      <div className="overflow-auto overflow-soft">
-        <table className="min-w-[1700px] border-separate border-spacing-0 text-left text-sm">
+    <section className="min-w-0 surface-card">
+      <div className="w-full max-w-full overflow-auto overflow-soft">
+        <table className="w-full min-w-[1240px] xl:min-w-[1480px] 2xl:min-w-[1700px] border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
             <tr>
               <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -3158,7 +3158,7 @@ function BaseClientesPage(props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <PageHeader
         title="Base de Clientes"
         description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
@@ -3219,7 +3219,7 @@ function DetailPage({
   const obrigacoesSummary = getDetailObrigacoesSummary(client);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <section className="surface-card p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
@@ -3296,8 +3296,8 @@ function DetailPage({
         ) : !historicoRows.length ? (
           <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma alteração registrada para este cliente.</p>
         ) : (
-          <div className="mt-4 overflow-auto overflow-soft">
-            <table className="min-w-[980px] text-left text-sm">
+          <div className="mt-4 w-full max-w-full overflow-auto overflow-soft">
+            <table className="w-full min-w-[860px] lg:min-w-[980px] text-left text-sm">
               <thead className="bg-slate-50 dark:bg-gray-800/95">
                 <tr>
                   {['Data/hora', 'Usuário', 'Campo', 'Anterior', 'Novo', 'Tipo', 'Origem'].map((header) => (
@@ -3658,7 +3658,7 @@ function PendenciasPage({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <PageHeader
         title="Painel de Pendências"
         description="Central de prioridades para o coordenador e o time atacarem primeiro o que exige ação."
@@ -3791,7 +3791,7 @@ function PendenciasPage({
         </section>
       ) : null}
 
-      <section className="surface-card">
+      <section className="min-w-0 surface-card">
         <div className="border-b border-slate-200 p-5 dark:border-gray-800">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -3833,7 +3833,7 @@ function PendenciasPage({
               const SectionIcon = visual.icon;
 
               return (
-                <section key={section.key} className={`overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}>
+                <section key={section.key} className={`min-w-0 overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}>
                 <div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 ${visual.headerClass} ${visual.dividerClass}`}>
                   <div className="flex items-start gap-3">
                     <span className={`rounded-xl border border-current/10 bg-white/80 p-2 dark:bg-gray-900/90 ${visual.textClass}`}>
@@ -3848,8 +3848,8 @@ function PendenciasPage({
                     {formatNumber(section.rows.length)} cliente(s)
                   </span>
                 </div>
-                <div className="overflow-auto overflow-soft bg-white dark:bg-gray-900/96">
-                  <table className="min-w-[1180px] text-left text-sm">
+                <div className="w-full max-w-full overflow-auto overflow-soft bg-white dark:bg-gray-900/96">
+                  <table className="w-full min-w-[960px] xl:min-w-[1180px] text-left text-sm">
                     <thead className="bg-slate-50 dark:bg-gray-800/95">
                       <tr>
                         {['Cliente', 'CNPJ', 'Obrigação', 'Pendência', 'Responsável', 'Próxima ação', 'Ação'].map((header) => (
@@ -4054,7 +4054,7 @@ function ReinfPage({
   });
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <PageHeader
         title="REINF"
         description="Acompanhamento do envio da REINF e dos comprovantes anexados."
@@ -4162,7 +4162,7 @@ function ReinfPage({
         </div>
       </section>
 
-      <section className="surface-card">
+      <section className="min-w-0 surface-card">
         <DataTable
           rows={rows}
           columns={[
@@ -4273,7 +4273,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
   });
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <PageHeader
         title="ECD / ECF"
         description="Controle das obrigações anuais, responsáveis e comprovantes da ECD/ECF."
@@ -4341,7 +4341,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         </div>
       </section>
 
-      <section className="surface-card">
+      <section className="min-w-0 surface-card">
         <DataTable
           rows={rows}
           columns={[
@@ -4404,8 +4404,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
 function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels = {} }) {
   return (
     <>
-      <div className="overflow-auto overflow-soft">
-        <table className="min-w-[1080px] text-left text-sm">
+      <div className="w-full max-w-full overflow-auto overflow-soft">
+        <table className="w-full min-w-[920px] xl:min-w-[1080px] text-left text-sm">
           <thead className="bg-slate-50 dark:bg-gray-800/95">
             <tr>
               {columns.map((column) => (
@@ -4539,7 +4539,7 @@ function ReportsPage({
     rows.reduce((acc, row) => acc + (typeof row?.value === 'number' ? row.value : 1), 0);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>

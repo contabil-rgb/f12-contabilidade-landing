@@ -3,7 +3,7 @@ import { classNames } from './classNames';
 
 export default function DataTableShell({
   headers = [],
-  minWidth = 'min-w-[1080px]',
+  minWidth = 'min-w-[900px] lg:min-w-[1080px]',
   emptyTitle = 'Nenhum registro encontrado.',
   emptyDescription = '',
   children,
@@ -14,8 +14,8 @@ export default function DataTableShell({
 }) {
   return (
     <>
-      <div className={classNames('overflow-auto overflow-soft rounded-xl border border-slate-100/80 dark:border-gray-800', className)}>
-        <table className={classNames(minWidth, 'border-separate border-spacing-0 text-left text-sm', tableClassName)}>
+      <div className={classNames('w-full max-w-full overflow-auto overflow-soft rounded-xl border border-slate-100/80 dark:border-gray-800', className)}>
+        <table className={classNames('w-full border-separate border-spacing-0 text-left text-sm', minWidth, tableClassName)}>
           <thead className="bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
             <tr>
               {headers.map((header, index) => (

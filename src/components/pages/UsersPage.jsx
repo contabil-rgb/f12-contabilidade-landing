@@ -13,7 +13,7 @@ export default function UsersPage({
   formatDateTime,
 }) {
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <SurfacePanel
         title="Usuarios institucionais"
         description="Perfis sincronizados com o Supabase para gestao real do acesso ao portal."
@@ -23,7 +23,7 @@ export default function UsersPage({
       <SurfacePanel>
         <DataTableShell
           headers={['Nome', 'E-mail', 'Cargo', 'Setor', 'Perfil', 'Status', 'Ultimo acesso', 'Acoes']}
-          minWidth="min-w-[1200px]"
+          minWidth="min-w-[980px] xl:min-w-[1200px]"
           hasRows={users.length > 0}
           emptyTitle="Nenhum usuario sincronizado."
           emptyDescription="Assim que houver perfis cadastrados e vinculados ao portal, eles aparecerao aqui."
