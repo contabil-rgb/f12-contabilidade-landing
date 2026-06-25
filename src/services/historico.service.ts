@@ -175,7 +175,7 @@ export async function listarHistoricoPortal(limit = 200) {
     .limit(limit);
 
   if (error) {
-    throw new Error(`NÃ£o foi possÃ­vel carregar histÃ³rico geral do portal: ${error.message}`);
+    throw new Error(`Não foi possível carregar histórico geral do portal: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeHistoricoRow(row as Record<string, unknown>));
