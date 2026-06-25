@@ -1594,7 +1594,7 @@ function getClientAlertSignals(client) {
     isReciboEcfPendente(client) && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
     isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
     isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
-    isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicacao pendente', tone: 'info' },
+    isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
     isAguardandoRetorno(client) && {
       key: 'retorno',
       label: dataNotificacao
@@ -2781,16 +2781,16 @@ function SearchAndFilters({
 
   return (
     <SurfacePanel className="min-w-0 p-5 sm:p-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.75fr)]">
-        <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950/40">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.78fr)]">
+        <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/80 p-5 shadow-sm dark:border-gray-800 dark:from-gray-950/70 dark:via-gray-950/50 dark:to-gray-900/60">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
               <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
-                Localize clientes por nome, CNPJ ou razao social.
+                Localize clientes por nome, CNPJ ou razão social.
               </p>
             </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-black text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
             </span>
           </div>
@@ -2800,15 +2800,15 @@ function SearchAndFilters({
             <input
               value={filters.search}
               onChange={(event) => updateFilter({ search: event.target.value })}
-              className="input-shell h-12 pl-11 text-sm"
-              placeholder="Pesquisar cliente, CNPJ ou razao social"
+              className="input-shell h-12 pl-11 text-sm shadow-sm"
+              placeholder="Pesquisar cliente, CNPJ ou razão social"
             />
           </div>
         </div>
 
-        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-gray-800 dark:bg-gray-900/65">
+        <div className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Visao atual</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Visão atual</p>
             <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
               {activeFilterItems.length
                 ? `${formatNumber(activeFilterItems.length)} filtro(s) ativo(s) nesta carteira`
@@ -2818,7 +2818,7 @@ function SearchAndFilters({
               Ajuste a triagem e revise a carteira sem perder o contexto da listagem.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <ActionButton type="button" variant="secondary" size="sm" onClick={onClear}>
               <RefreshCcw size={16} aria-hidden="true" />
               Limpar filtros
@@ -2839,7 +2839,7 @@ function SearchAndFilters({
       </div>
 
       {quickFilterLabel || activeFilterItems.length ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/65">
+        <div className="mt-4 flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/65">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {quickFilterLabel ? (
               <div className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
@@ -2877,12 +2877,12 @@ function SearchAndFilters({
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-gray-800 dark:bg-gray-900/55">
+      <div className="mt-4 rounded-3xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/55">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-gray-800">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
             <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
-              Refine a listagem por acompanhamento, perfil e operacao da base.
+              Refine a listagem por acompanhamento, perfil e operação da base.
             </p>
           </div>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -2931,9 +2931,9 @@ function SearchAndFilters({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold text-slate-500 dark:text-gray-400">
-        <p>Clique no cliente para abrir o detalhe completo ou use os botoes da ultima coluna para editar e inativar.</p>
+        <p>Clique no cliente para abrir o detalhe completo ou use os botões da última coluna para editar e inativar.</p>
         <p className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          Visual pensado para triagem rapida
+          Visual pensado para triagem rápida
         </p>
       </div>
     </SurfacePanel>
@@ -3118,7 +3118,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Carteira listada</p>
           <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
-            {formatNumber(clients.length)} cliente(s) visivel(is) nesta consulta.
+            {formatNumber(clients.length)} cliente(s) visível(is) nesta consulta.
           </p>
         </div>
         <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -3126,7 +3126,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
         </span>
       </div>
       <div className="w-full max-w-full overflow-auto overflow-soft">
-        <table className="w-full min-w-[1240px] xl:min-w-[1480px] 2xl:min-w-[1700px] border-separate border-spacing-0 text-left text-sm">
+        <table className="w-full min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px] border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
             <tr>
               <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -3140,7 +3140,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                   <button
                     type="button"
                     onClick={() => sortColumn(field.key)}
-                    className="inline-flex items-center gap-1.5 transition hover:text-brand-blue"
+                    className="inline-flex items-center gap-1.5 rounded-md transition hover:text-brand-blue"
                   >
                     {field.label}
                     <ArrowDownUp size={13} aria-hidden="true" />
@@ -3160,7 +3160,7 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
-                  className="cursor-pointer transition even:bg-slate-50/40 hover:bg-sky-50/70 dark:even:bg-gray-800/35 dark:hover:bg-gray-800/80"
+                  className="cursor-pointer transition duration-150 even:bg-slate-50/40 hover:bg-sky-50/70 dark:even:bg-gray-800/35 dark:hover:bg-gray-800/80"
                 >
                   <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
                     <div className="flex max-w-80 items-start gap-3">
@@ -3243,9 +3243,9 @@ function BaseClientesPage(props) {
   const acompanhamentoMetrics = [
     {
       key: 'comunicacao',
-      title: 'Comunicacao pendente',
+      title: 'Comunicação pendente',
       value: countWhere(props.clients, (client) => isComunicacaoPendente(client)),
-      detail: 'Clientes com comunicacao pendente registrada',
+      detail: 'Clientes com comunicação pendente registrada',
       icon: Mail,
       tone: 'info',
       patch: { alerta: 'comunicacao' },
@@ -3254,7 +3254,7 @@ function BaseClientesPage(props) {
       key: 'retorno',
       title: 'Aguardando retorno',
       value: countWhere(props.clients, (client) => isAguardandoRetorno(client)),
-      detail: 'Clientes notificados sem retorno concluido',
+      detail: 'Clientes notificados sem retorno concluído',
       icon: Mail,
       tone: 'warning',
       patch: { alerta: 'retorno' },
@@ -3285,14 +3285,14 @@ function BaseClientesPage(props) {
         description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
         right={(
           <>
-            <span className="pill-shell">{formatNumber(props.clients.length)} cliente(s) visivel(is)</span>
+            <span className="pill-shell">{formatNumber(props.clients.length)} cliente(s) visível(is)</span>
             <span className={`rounded-full border px-3 py-1.5 text-xs font-black ${chipClass(activeFilterCount ? 'info' : 'neutral')}`}>
-              {activeFilterCount ? `${formatNumber(activeFilterCount)} filtro(s) ativo(s)` : 'Visao ampla'}
+              {activeFilterCount ? `${formatNumber(activeFilterCount)} filtro(s) ativo(s)` : 'Visão ampla'}
             </span>
           </>
         )}
       />
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {acompanhamentoMetrics.map((metric) => (
           <MetricCard
             key={metric.key}
@@ -3307,7 +3307,7 @@ function BaseClientesPage(props) {
         <MetricCard
           title="Carteira exibida"
           value={props.clients.length}
-          detail={`${formatNumber(props.allClients?.length ?? props.clients.length)} cliente(s) disponivel(is) na base`}
+          detail={`${formatNumber(props.allClients?.length ?? props.clients.length)} cliente(s) disponível(is) na base`}
           icon={Users}
           tone="neutral"
         />
