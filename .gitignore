@@ -3,6 +3,7 @@ dist
 .DS_Store
 vite-dev*.log
 .vite-dev*.log
+.codex-vite*.log
 
 # Environment files
 .env
