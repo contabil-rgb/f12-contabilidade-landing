@@ -156,3 +156,21 @@ Estado atual do projeto, com base nas auditorias ja feitas:
 - ainda merece acompanhamento nas primeiras semanas de uso real;
 - ainda nao possui testes automatizados.
 
+## 12. Publicacao atual
+
+Configuracao operacional ja validada:
+
+- dominio oficial publicado em `https://f12contabilidade.com.br`;
+- Cloudflare Pages ativa com fallback tecnico em `https://f12-contabilidade-landing.pages.dev`;
+- `Site URL` do Supabase Auth ajustado para `https://f12contabilidade.com.br`;
+- `Redirect URLs` validadas para:
+  - `https://f12contabilidade.com.br/**`
+  - `https://f12-contabilidade-landing.pages.dev/**`
+  - `http://127.0.0.1:5173/**`
+- login validado com os perfis Coordenador e Setor Contabil no dominio oficial.
+
+Se uma nova publicacao for feita, lembrar:
+
+- mudar no codigo local nao atualiza o site publicado sozinho;
+- a nova versao so chega ao dominio depois de commit, push e novo deploy no host;
+- qualquer ajuste visual critico deve ser validado no dominio oficial e nao apenas no ambiente local.
