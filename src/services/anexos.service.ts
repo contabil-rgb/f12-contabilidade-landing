@@ -86,14 +86,58 @@ async function uploadArquivoStorage(path: string, file: File) {
       contentType: file.type,
       upsert: false,
     });
+
   if (error) {
     throw new Error(`Erro ao enviar arquivo para o Storage: ${error.message}`);
+  }
+}
+
+async function removerArquivoStorage(path?: string | null) {
+  const caminho = String(path ?? '').trim();
+  if (!caminho) return;
+
+  const { error } = await supabase.storage
+    .from(BUCKET_DOCUMENTOS_CLIENTES)
+    .remove([caminho]);
+
+  if (error) {
+    throw new Error(`Erro ao remover arquivo do Storage: ${error.message}`);
   }
 }
 
 function ensureClientePersistido(clienteId: string) {
   if (clienteId) return clienteId;
   throw new Error('Salve primeiro o cliente no Supabase para anexar arquivos.');
+}
+
+async function criarRegistroAnexo(params: {
+  clienteId: string;
+  tipoAnexo: TipoAnexo;
+  file: File;
+  path: string;
+}) {
+  const enviadoPor = await getUsuarioPortalIdPorSessao();
+  const payload = {
+    cliente_id: params.clienteId,
+    tipo_anexo: params.tipoAnexo,
+    nome_arquivo: params.file.name,
+    caminho_arquivo: params.path,
+    mime_type: params.file.type,
+    tamanho_bytes: params.file.size,
+    enviado_por: enviadoPor,
+  };
+
+  const { data, error } = await supabase
+    .from('anexos')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(`Não foi possível gravar vínculo do anexo: ${error.message}`);
+  }
+
+  return normalizeAnexoRow(data as Record<string, unknown>);
 }
 
 export async function listarAnexosCliente(cliente: ClienteAnexoRef) {
@@ -183,28 +227,21 @@ export async function uploadAnexoCliente(params: {
   const path = buildStoragePath(clienteId, params.tipoAnexo, params.file.name);
   await uploadArquivoStorage(path, params.file);
 
-  const enviadoPor = await getUsuarioPortalIdPorSessao();
-  const payload = {
-    cliente_id: clienteId,
-    tipo_anexo: params.tipoAnexo,
-    nome_arquivo: params.file.name,
-    caminho_arquivo: path,
-    mime_type: params.file.type,
-    tamanho_bytes: params.file.size,
-    enviado_por: enviadoPor,
-  };
-
-  const { data, error } = await supabase
-    .from('anexos')
-    .insert(payload)
-    .select('*')
-    .single();
-
-  if (error) {
-    throw new Error(`Não foi possível gravar vínculo do anexo: ${error.message}`);
+  try {
+    return await criarRegistroAnexo({
+      clienteId,
+      tipoAnexo: params.tipoAnexo,
+      file: params.file,
+      path,
+    });
+  } catch (error) {
+    try {
+      await removerArquivoStorage(path);
+    } catch (cleanupError) {
+      console.warn('[anexos] Falha ao limpar upload sem vínculo após erro no banco.', cleanupError);
+    }
+    throw error;
   }
-
-  return normalizeAnexoRow(data as Record<string, unknown>);
 }
 
 export async function substituirAnexoCliente(params: {
@@ -220,35 +257,68 @@ export async function substituirAnexoCliente(params: {
   const novoPath = buildStoragePath(clienteId, params.tipoAnexo, params.file.name);
   await uploadArquivoStorage(novoPath, params.file);
 
-  const enviadoPor = await getUsuarioPortalIdPorSessao();
   if (!anexoAtual?.id) {
-    return uploadAnexoCliente(params);
+    try {
+      return await criarRegistroAnexo({
+        clienteId,
+        tipoAnexo: params.tipoAnexo,
+        file: params.file,
+        path: novoPath,
+      });
+    } catch (error) {
+      try {
+        await removerArquivoStorage(novoPath);
+      } catch (cleanupError) {
+        console.warn('[anexos] Falha ao limpar upload sem vínculo durante substituição.', cleanupError);
+      }
+      throw error;
+    }
   }
 
-  const { data, error } = await supabase
-    .from('anexos')
-    .update({
-      nome_arquivo: params.file.name,
-      caminho_arquivo: novoPath,
-      mime_type: params.file.type,
-      tamanho_bytes: params.file.size,
-      enviado_por: enviadoPor,
-      atualizado_em: new Date().toISOString(),
-    })
-    .eq('id', anexoAtual.id)
-    .select('*')
-    .single();
+  const enviadoPor = await getUsuarioPortalIdPorSessao();
+  const caminhoAnterior = String(anexoAtual.caminho_arquivo ?? '').trim();
 
-  if (error) {
-    throw new Error(`Não foi possível substituir anexo: ${error.message}`);
+  try {
+    const { data, error } = await supabase
+      .from('anexos')
+      .update({
+        nome_arquivo: params.file.name,
+        caminho_arquivo: novoPath,
+        mime_type: params.file.type,
+        tamanho_bytes: params.file.size,
+        enviado_por: enviadoPor,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq('id', anexoAtual.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      throw new Error(`Não foi possível substituir anexo: ${error.message}`);
+    }
+
+    if (caminhoAnterior && caminhoAnterior !== novoPath) {
+      try {
+        await removerArquivoStorage(caminhoAnterior);
+      } catch (cleanupError) {
+        console.warn('[anexos] Falha ao remover arquivo antigo após substituição.', cleanupError);
+      }
+    }
+
+    return normalizeAnexoRow(data as Record<string, unknown>);
+  } catch (error) {
+    try {
+      await removerArquivoStorage(novoPath);
+    } catch (cleanupError) {
+      console.warn('[anexos] Falha ao limpar novo upload após erro na substituição.', cleanupError);
+    }
+    throw error;
   }
-
-  return normalizeAnexoRow(data as Record<string, unknown>);
 }
 
 export async function gerarUrlAssinada(caminhoArquivo: string, expires = 600) {
   if (!caminhoArquivo) {
-    throw new Error('Caminho do arquivo nao informado.');
+    throw new Error('Caminho do arquivo não informado.');
   }
   if (/^(blob:|https?:\/\/)/i.test(caminhoArquivo)) {
     return caminhoArquivo;

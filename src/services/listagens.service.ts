@@ -52,7 +52,7 @@ function normalizeOptionValue(value: unknown) {
   if (!raw) return '';
   const normalized = normalizeText(raw);
   if (normalized === 'sim') return 'Sim';
-  if (normalized === 'nao') return 'Nao';
+  if (normalized === 'nao') return 'Não';
   return raw;
 }
 

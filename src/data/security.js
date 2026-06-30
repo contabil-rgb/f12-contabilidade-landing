@@ -31,12 +31,12 @@ export const PERMISSIONS = {
 export const ACCESS_PROFILES = {
   [ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN]: {
     label: 'Coordenador / Administrador',
-    description: 'Acesso completo ao portal, clientes, importacao, relatorios, historico e configuracoes principais.',
+    description: 'Acesso completo ao portal, clientes, importação, relatórios, histórico e configurações principais.',
     permissions: Object.values(PERMISSIONS),
   },
   [ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL]: {
     label: 'Setor Contabil / Operacional',
-    description: 'Acesso operacional compartilhado para consultar a base e atualizar competencias, pendencias e obrigacoes.',
+    description: 'Acesso operacional compartilhado para consultar a base e atualizar competências, pendências e obrigações.',
     permissions: [
       PERMISSIONS.CLIENTS_VIEW_ALL,
       PERMISSIONS.CLIENTS_EDIT_STATUS,

@@ -15,26 +15,26 @@ export default function UsersPage({
   return (
     <div className="min-w-0 space-y-5">
       <SurfacePanel
-        title="Usuarios institucionais"
-        description="Perfis sincronizados com o Supabase para gestao real do acesso ao portal."
-        right={<span className="pill-shell">{users.length} usuario(s) sincronizado(s)</span>}
+        title="Usuários institucionais"
+        description="Perfis sincronizados com o Supabase para gestão real do acesso ao portal."
+        right={<span className="pill-shell">{users.length} usuário(s) sincronizado(s)</span>}
       />
 
       <SurfacePanel>
         <DataTableShell
-          headers={['Nome', 'E-mail', 'Cargo', 'Setor', 'Perfil', 'Status', 'Ultimo acesso', 'Acoes']}
+          headers={['Nome', 'E-mail', 'Cargo', 'Setor', 'Perfil', 'Status', 'Último acesso', 'Ações']}
           minWidth="min-w-[980px] xl:min-w-[1200px]"
           hasRows={users.length > 0}
-          emptyTitle="Nenhum usuario sincronizado."
-          emptyDescription="Assim que houver perfis cadastrados e vinculados ao portal, eles aparecerao aqui."
+          emptyTitle="Nenhum usuário sincronizado."
+          emptyDescription="Assim que houver perfis cadastrados e vinculados ao portal, eles aparecerão aqui."
         >
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className="transition even:bg-slate-50/40 hover:bg-sky-50/60 dark:hover:bg-slate-800/80">
                 <td className="border-b border-slate-100 px-4 py-4 font-black text-slate-950 dark:text-gray-100">{user.nome}</td>
                 <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.email}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.cargo || 'Nao informado'}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.setor || 'Nao informado'}</td>
+                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.cargo || 'Não informado'}</td>
+                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.setor || 'Não informado'}</td>
                 <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
                 <td className="border-b border-slate-100 px-4 py-4">
                   <StatusBadge toneClass={chipClass(user.status === 'Ativo' ? 'success' : 'muted')}>
@@ -44,7 +44,7 @@ export default function UsersPage({
                 <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-600 dark:text-gray-300">{formatDateTime(user.ultimo_acesso)}</td>
                 <td className="border-b border-slate-100 px-4 py-4">
                   <div className="flex gap-2">
-                    <ActionButton type="button" variant="icon" size="icon" onClick={() => onEdit(user)} aria-label="Editar usuario">
+                    <ActionButton type="button" variant="icon" size="icon" onClick={() => onEdit(user)} aria-label="Editar usuário">
                       <Edit3 size={16} aria-hidden="true" />
                     </ActionButton>
                     <ActionButton
@@ -53,7 +53,7 @@ export default function UsersPage({
                       size="icon"
                       className="h-10 w-10 p-0"
                       onClick={() => onToggleStatus(user)}
-                      aria-label={user.status === 'Ativo' ? 'Inativar usuario' : 'Reativar usuario'}
+                      aria-label={user.status === 'Ativo' ? 'Inativar usuário' : 'Reativar usuário'}
                     >
                       <RefreshCcw size={16} aria-hidden="true" />
                     </ActionButton>

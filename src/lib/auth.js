@@ -20,18 +20,18 @@ export function validatePassword(password, userLike = {}) {
     .filter((part) => part.length >= 3);
 
   if (password.length < 8) errors.push('Use pelo menos 8 caracteres.');
-  if (!/[A-Z]/.test(password)) errors.push('Inclua pelo menos 1 letra maiuscula.');
-  if (!/[a-z]/.test(password)) errors.push('Inclua pelo menos 1 letra minuscula.');
-  if (!/\d/.test(password)) errors.push('Inclua pelo menos 1 numero.');
+  if (!/[A-Z]/.test(password)) errors.push('Inclua pelo menos 1 letra maiúscula.');
+  if (!/[a-z]/.test(password)) errors.push('Inclua pelo menos 1 letra minúscula.');
+  if (!/\d/.test(password)) errors.push('Inclua pelo menos 1 número.');
   if (!/[^A-Za-z0-9]/.test(password)) errors.push('Inclua pelo menos 1 caractere especial.');
   if (COMMON_PASSWORDS.some((common) => normalizedPassword === normalizeText(common))) {
     errors.push('Escolha uma senha menos comum.');
   }
   if (emailLocal && normalizedPassword.includes(emailLocal)) {
-    errors.push('A senha nao pode conter o e-mail do usuario.');
+    errors.push('A senha não pode conter o e-mail do usuário.');
   }
   if (nameParts.some((part) => normalizedPassword.includes(part))) {
-    errors.push('A senha nao pode conter o nome do usuario.');
+    errors.push('A senha não pode conter o nome do usuário.');
   }
 
   return errors;
@@ -110,6 +110,6 @@ export function canEditClient(user, client) {
 
 export function deniedReasonForField(user, fieldKey) {
   if (isReadOnly(user)) return 'Perfil somente consulta.';
-  if (SENSITIVE_CLIENT_FIELDS.includes(fieldKey)) return 'Campo sensivel bloqueado para este perfil.';
-  return 'Sem permissao para alterar este campo.';
+  if (SENSITIVE_CLIENT_FIELDS.includes(fieldKey)) return 'Campo sensível bloqueado para este perfil.';
+  return 'Sem permissão para alterar este campo.';
 }

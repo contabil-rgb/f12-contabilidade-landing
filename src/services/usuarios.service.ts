@@ -95,7 +95,7 @@ export async function listarUsuariosPortal() {
     .order('nome', { ascending: true });
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar usuarios do Supabase: ${error.message}`);
+    throw new Error(`Não foi possível carregar usuários do Supabase: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeUsuarioRow(row as Record<string, unknown>));
@@ -130,7 +130,7 @@ export async function atualizarUsuarioPortal(id: string, dados: Record<string, u
     .single();
 
   if (error) {
-    throw new Error(`Nao foi possivel atualizar usuario no Supabase: ${error.message}`);
+    throw new Error(`Não foi possível atualizar usuário no Supabase: ${error.message}`);
   }
 
   return normalizeUsuarioRow(data as Record<string, unknown>);

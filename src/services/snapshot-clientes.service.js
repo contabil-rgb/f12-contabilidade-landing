@@ -11,14 +11,14 @@ function isLocalMaintenanceHost() {
 
 export async function carregarSnapshotClientesLocal() {
   if (!snapshotToolsEnabled() || !isLocalMaintenanceHost()) {
-    throw new Error('Snapshot local bloqueado fora do ambiente local de manutencao habilitado.');
+    throw new Error('Snapshot local bloqueado fora do ambiente local de manutenção habilitado.');
   }
 
   const module = await import('../data/baseContabilidade.js');
   const rows = module?.clientesContabeis ?? [];
 
   if (!Array.isArray(rows) || !rows.length) {
-    throw new Error('Snapshot local de clientes vazio ou indisponivel.');
+    throw new Error('Snapshot local de clientes vazio ou indisponível.');
   }
 
   return rows.map((row) => ({ ...row }));

@@ -28,7 +28,7 @@ async function existingCnpjSet(cnpjs) {
   return new Set((data ?? []).map((row) => String(row.cnpj ?? '').trim()));
 }
 
-export async function sincronizarClientesRows(rows, sourceLabel = 'sincronizacao', options = {}) {
+export async function sincronizarClientesRows(rows, sourceLabel = 'sincronização', options = {}) {
   const apply = options.apply !== false;
   const errors = [];
   const preparedRows = [];

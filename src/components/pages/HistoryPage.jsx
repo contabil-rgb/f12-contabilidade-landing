@@ -14,21 +14,21 @@ export default function HistoryPage({
 
   return (
     <SurfacePanel
-      title="Historico de alteracoes"
-      description="Registros automaticos dos campos sensiveis e operacionais definidos."
+      title="Histórico de alterações"
+      description="Registros automáticos dos campos sensíveis e operacionais definidos."
       headerClassName="border-b border-slate-200"
     >
       <DataTableShell
-        headers={['Data', 'Usuario', 'Cliente', 'Campo', 'Valor anterior', 'Valor novo', 'Tipo de acao']}
+        headers={['Data', 'Usuário', 'Cliente', 'Campo', 'Valor anterior', 'Valor novo', 'Tipo de ação']}
         minWidth="min-w-[1020px] xl:min-w-[1400px]"
         hasRows={history.length > 0}
-        emptyTitle="Nenhuma alteracao registrada ainda."
+        emptyTitle="Nenhuma alteração registrada ainda."
       >
         <tbody>
           {history.map((item) => (
             <tr key={item.id} className="transition even:bg-slate-50/40 hover:bg-sky-50/60 dark:hover:bg-slate-800/80">
               <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-600 dark:text-gray-300">{formatDateTime(item.data_alteracao)}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{usersById.get(item.usuario_id)?.nome ?? item.usuario_nome ?? 'Usuario removido'}</td>
+              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{usersById.get(item.usuario_id)?.nome ?? item.usuario_nome ?? 'Usuário removido'}</td>
               <td className="border-b border-slate-100 px-4 py-4 font-bold text-slate-900 dark:text-gray-100">{item.cliente_nome}</td>
               <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{getFieldLabel(fieldDefinitions, item.campo_alterado)}</td>
               <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{valueOrDash(item.valor_anterior)}</td>

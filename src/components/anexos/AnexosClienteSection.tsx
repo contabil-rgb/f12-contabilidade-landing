@@ -137,7 +137,7 @@ export function AnexosClienteSection({
       } catch (error) {
         if (active) {
           console.warn('[anexos] Falha ao atualizar lista de anexos do cliente:', error);
-          setLocalWarning('Nao foi possivel atualizar os anexos agora. Mantivemos a ultima leitura disponivel.');
+          setLocalWarning('Não foi possível atualizar os anexos agora. Mantivemos a última leitura disponível.');
         }
       } finally {
         if (active) setLoading(false);

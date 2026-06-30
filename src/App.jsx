@@ -417,7 +417,7 @@ async function prepararSessaoRecuperacaoSenha() {
       type: 'recovery',
       token_hash: tokenHash,
     });
-    if (error) throw new Error(error.message || 'Link de recuperacao invalido ou expirado.');
+    if (error) throw new Error(error.message || 'Link de recuperação inválido ou expirado.');
     return verified?.session ?? null;
   }
 
@@ -588,7 +588,7 @@ function loadInitialState() {
       metadata: clientes.length
         ? {
           ...metadata,
-          source: 'Cache local da ultima sincronizacao',
+          source: 'Cache local da última sincronização',
         }
         : metadata,
       hasBootstrapCache: clientes.length > 0,
@@ -760,22 +760,22 @@ function canUseLocalSnapshotTools() {
 }
 
 function getMetadataSourceDisplay(source) {
-  if (source === 'Cache local da ultima sincronizacao') return 'Leitura local da ultima sincronizacao';
-  if (source === 'Supabase indisponivel') return 'Sem leitura confirmada do Supabase';
+  if (source === 'Cache local da última sincronização') return 'Leitura local da última sincronização';
+  if (source === 'Supabase indisponível') return 'Sem leitura confirmada do Supabase';
   if (source === 'Supabase') return 'Supabase';
-  return source || 'Origem nao informada';
+  return source || 'Origem não informada';
 }
 
 function isProtectedReadMode(supabaseStatus, metadata) {
-  return !supabaseStatus?.connected && metadata?.source === 'Cache local da ultima sincronizacao';
+  return !supabaseStatus?.connected && metadata?.source === 'Cache local da última sincronização';
 }
 
 function getSupabaseStatusDisplay(supabaseStatus, metadata) {
   if (isProtectedReadMode(supabaseStatus, metadata)) {
-    return 'Modo protegido | leitura local da ultima sincronizacao';
+    return 'Modo protegido | leitura local da última sincronização';
   }
-  if (!supabaseStatus?.connected && metadata?.source === 'Supabase indisponivel') {
-    return 'Supabase indisponivel | sem leitura local confirmada';
+  if (!supabaseStatus?.connected && metadata?.source === 'Supabase indisponível') {
+    return 'Supabase indisponível | sem leitura local confirmada';
   }
   return supabaseStatus?.message || 'Dados locais';
 }
@@ -1034,11 +1034,11 @@ function getResolvedFieldValue(client, fieldKey) {
 
   switch (fieldKey) {
     case 'competencia_em_dia':
-      return isCompetenciaEmDia(client) ? 'Sim' : 'Nao';
+      return isCompetenciaEmDia(client) ? 'Sim' : 'Não';
     case 'data_enviada_reinf':
       return getReinfDataEntregaValue(client);
     case 'cliente_notificado':
-      return isClienteNotificado(client) ? 'Sim' : 'Nao';
+      return isClienteNotificado(client) ? 'Sim' : 'Não';
     case 'data_notificacao_cliente':
       return getDataNotificacaoClienteValue(client);
     case 'status_retorno_cliente': {
@@ -1159,7 +1159,7 @@ function getPersistedAcompanhamentoStatusLabel(client) {
   if (code === 'aguardando_retorno') return 'Aguardando retorno';
   if (code === 'retorno_recebido') return 'Retorno recebido';
   if (code === 'notificado') return 'Notificado';
-  return 'Sem notificacao';
+  return 'Sem notificação';
 }
 
 function getPersistedRiscoCode(client) {
@@ -1348,14 +1348,14 @@ function hasComunicacaoOuRetornoPendente(client) {
 
 function getStatusAcompanhamentoLabel(client) {
   if (hasAcompanhamentoPersistido(client)) {
-    return getPersistedAcompanhamentoStatusLabel(client) || 'Sem notificacao';
+    return getPersistedAcompanhamentoStatusLabel(client) || 'Sem notificação';
   }
   const fallback = (() => {
     if (isSemRetorno(client)) return 'Sem retorno';
     if (isAguardandoRetorno(client)) return 'Aguardando retorno';
     if (hasRetornoConcluido(client)) return 'Retorno recebido';
     if (isClienteNotificado(client)) return 'Notificado';
-    return 'Sem notificacao';
+    return 'Sem notificação';
   })();
   return getAcompanhamentoText(client, 'status_acompanhamento_label', fallback) || fallback;
 }
@@ -1438,9 +1438,9 @@ function getPersistedObrigacoesStatusLabel(client) {
   if (persistedLabel) return persistedLabel;
 
   const code = getPersistedObrigacoesStatusCode(client);
-  if (code === 'obrigacao_pendente') return 'Obrigacao pendente';
+  if (code === 'obrigacao_pendente') return 'Obrigação pendente';
   if (code === 'aguardando_envio') return 'Aguardando envio';
-  if (code === 'responsavel_pendente') return 'Responsavel pendente';
+  if (code === 'responsavel_pendente') return 'Responsável pendente';
   if (code === 'comprovante_pendente') return 'Comprovante pendente';
   return 'Em dia';
 }
@@ -1583,17 +1583,17 @@ function getClientAlertSignals(client) {
       label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competencia em atraso',
       tone: 'danger',
     },
-    isSituacaoCritica(client) && { key: 'critico', label: 'Situacao critica', tone: 'danger' },
+    isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
     isReinfPendente(client) && { key: 'reinf', label: 'REINF pendente', tone: 'warning' },
     isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Recibo REINF pendente', tone: 'warning' },
     isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
-    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsavel nao definido', tone: 'warning' },
+    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
     isReciboEcdPendente(client) && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
     isEcfPendente(client) && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
     isReciboEcfPendente(client) && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
-    isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendencia tecnica', tone: 'danger' },
-    isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentacao atrasada', tone: 'warning' },
+    isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
+    isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
     isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
     isAguardandoRetorno(client) && {
       key: 'retorno',
@@ -1613,13 +1613,13 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   recibo_reinf: { key: 'reinf', area: 'REINF', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar recibo da REINF.' },
   ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
   ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
-  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Media', nextAction: 'Definir responsavel pela ECD.' },
+  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Media', nextAction: 'Definir responsável pela ECD.' },
   recibo_ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 82, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECD.' },
   ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Media', nextAction: 'Validar status da ECF.' },
   recibo_ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 80, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECF.' },
-  documentos: { key: 'documentos', area: 'Documentacao', route: 'cliente', priority: 68, priorityLabel: 'Media', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
+  documentos: { key: 'documentos', area: 'Documentação', route: 'cliente', priority: 68, priorityLabel: 'Media', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
   ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Media', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
-  comunicacao: { key: 'comunicacao', area: 'Comunicacao', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
+  comunicacao: { key: 'comunicacao', area: 'Comunicação', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
 };
 
@@ -1753,7 +1753,7 @@ function EcdEcfObrigacaoStatusCell({ client }) {
   const analysis = getClientAnalysis(client);
   const status = (() => {
     if (analysis.ecdPendente || analysis.ecfPendente) {
-      return { label: 'Obrigacao pendente', tone: 'warning' };
+      return { label: 'Obrigação pendente', tone: 'warning' };
     }
     if (analysis.ecdAguardandoEnvio) {
       return { label: 'Aguardando envio', tone: 'warning' };
@@ -1795,7 +1795,7 @@ function filterClients(clients, filters) {
       const filterValue = filters[field];
       if (!filterValue) return true;
       if (field === 'competencia_em_dia') {
-        return normalizeText(isCompetenciaEmDia(client) ? 'Sim' : 'Nao') === normalizeText(filterValue);
+        return normalizeText(isCompetenciaEmDia(client) ? 'Sim' : 'Não') === normalizeText(filterValue);
       }
       return normalizeText(normalizeFieldDisplayValue(field, client[field])) === normalizeText(normalizeFieldDisplayValue(field, filterValue));
     });
@@ -1806,7 +1806,7 @@ function filterClients(clients, filters) {
       const filterValue = filters[field];
       if (!filterValue) return true;
       if (field === 'envio_reinf') {
-        return normalizeText(isReinfEnviada(client) ? 'Sim' : 'Nao') === normalizeText(filterValue);
+        return normalizeText(isReinfEnviada(client) ? 'Sim' : 'Não') === normalizeText(filterValue);
       }
       return normalizeText(client[field]) === normalizeText(filterValue);
     });
@@ -1841,8 +1841,8 @@ function normalizeBreakdownRows(rows) {
   const grouped = new Map();
 
   (rows ?? []).forEach((row) => {
-    const label = String(row?.label ?? '').trim() || 'Nao informado';
-    const key = normalizeText(label) || 'nao informado';
+    const label = String(row?.label ?? '').trim() || 'Não informado';
+    const key = normalizeText(label) || 'não informado';
     const current = grouped.get(key);
     if (!current) {
       grouped.set(key, { label, value: Number(row?.value ?? 0) || 0 });
@@ -1966,7 +1966,7 @@ function AppShell({
       results.push({
         kind: 'cliente',
         id,
-        nome: nome || razao || 'Cliente sem identificacao',
+        nome: nome || razao || 'Cliente sem identificação',
         razao: razao || 'Razão social não informada',
         cnpj: cnpj || '-',
         subtitle: 'Cliente',
@@ -1998,10 +1998,10 @@ function AppShell({
         results.push({
           kind: 'pendencia',
           id,
-          nome: nome || razao || 'Cliente sem identificacao',
+          nome: nome || razao || 'Cliente sem identificação',
           razao: razao || 'Razão social não informada',
           cnpj: cnpj || '-',
-          subtitle: 'Pendencia',
+          subtitle: 'Pendência',
         });
 
         if (results.length >= 12) break;
@@ -2030,7 +2030,7 @@ function AppShell({
           nome: nomeCliente || 'Registro de historico',
           razao: String(item?.campo_alterado ?? 'Campo não informado'),
           cnpj: String(item?.tipo_acao ?? '-'),
-          subtitle: 'Historico',
+          subtitle: 'Histórico',
         });
 
         if (results.length >= 15) break;
@@ -2225,7 +2225,7 @@ function AppShell({
                 <LogOut size={17} aria-hidden="true" />
                 Sair
               </ActionButton>
-              <div className="pill-shell">Atualizado: {metadata.importedAt || metadata.generatedAt || 'nao informado'}</div>
+              <div className="pill-shell">Atualizado: {metadata.importedAt || metadata.generatedAt || 'não informado'}</div>
               <StatusBadge toneClass={chipClass(supabaseStatusTone)} size="md">{supabaseStatusLabel}</StatusBadge>
             </div>
           </div>
@@ -2658,7 +2658,7 @@ function toBreakdownByResolver(clients, resolver, { filter } = {}) {
 
   (clients ?? []).forEach((client) => {
     if (filter && !filter(client)) return;
-    const label = String(resolver(client) || '').trim() || 'Nao informado';
+    const label = String(resolver(client) || '').trim() || 'Não informado';
     counts.set(label, (counts.get(label) || 0) + 1);
   });
 
@@ -3030,7 +3030,7 @@ function getDetailAcompanhamentoSummary(client) {
     sem_notificacao: 'neutral',
   };
 
-  let detail = 'Sem notificacao registrada.';
+  let detail = 'Sem notificação registrada.';
   if (isAguardandoRetorno(client) && dataNotificacao) {
     detail = diasSemRetorno !== null
       ? `${diasSemRetorno} dia(s) sem retorno desde ${formatDateDisplay(dataNotificacao)}.`
@@ -3068,10 +3068,10 @@ function getDetailRiscoSummary(client) {
   const detalhes = [];
   const diasAtraso = getDiasAtrasoValue(client);
   if (diasAtraso > 0) detalhes.push(`${diasAtraso} dia(s) de atraso`);
-  if (isPendenciaTecnica(client)) detalhes.push('Pendencia tecnica');
-  if (isDocumentoAtrasado(client)) detalhes.push('Documentacao atrasada');
+  if (isPendenciaTecnica(client)) detalhes.push('Pendência técnica');
+  if (isDocumentoAtrasado(client)) detalhes.push('Documentação atrasada');
   if (isAtaPendente(client)) detalhes.push('Ata pendente');
-  if (!detalhes.length) detalhes.push('Sem sinais operacionais criticos no momento');
+  if (!detalhes.length) detalhes.push('Sem sinais operacionais críticos no momento');
   return {
     label,
     detail: detalhes.join(' | '),
@@ -3096,7 +3096,7 @@ function getDetailObrigacoesSummary(client) {
     em_dia: 'success',
   };
   const responsavel = getObrigacaoResponsavel(client);
-  const detail = `${count} pendencia(s) em obrigacoes${responsavel ? ` | Resp. ${responsavel}` : ''}`;
+  const detail = `${count} pendência(s) em obrigações${responsavel ? ` | Resp. ${responsavel}` : ''}`;
   return {
     label,
     detail,
@@ -3769,7 +3769,7 @@ function PendenciasPage({
           const visual = getPrioritySectionVisual(section.key);
           const SectionIcon = visual.icon;
           return (<section key={section.key} className={`min-w-0 overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}><div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5 ${visual.headerClass} ${visual.dividerClass}`}><div className="flex items-start gap-3"><span className={`rounded-xl border border-current/10 bg-white/80 p-2.5 shadow-sm dark:bg-gray-900/90 ${visual.textClass}`}><SectionIcon size={16} aria-hidden="true" /></span><div><h3 className="text-sm font-black text-slate-950 dark:text-gray-100">{section.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{section.description}</p></div></div><span className={`rounded-full border px-3 py-1 text-xs font-black ${chipClass(section.tone)}`}>{formatNumber(section.rows.length)} cliente(s)</span></div><div className="w-full max-w-full overflow-auto overflow-soft bg-white dark:bg-gray-900/96"><table className="w-full min-w-[960px] xl:min-w-[1180px] text-left text-sm"><thead className="bg-slate-50 dark:bg-gray-800/95"><tr>{['Cliente', 'CNPJ', 'Obrigação', 'Pendência', 'Responsável', 'Próxima ação', 'Ação'].map((header) => (<th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">{header}</th>))}</tr></thead><tbody>{visibleRows.map(({ client, item, rowId }) => (<tr key={rowId} className="bg-white align-top transition hover:bg-slate-50 dark:bg-gray-900/96 dark:hover:bg-gray-800/70"><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">{getDashboardInitials(client.nome_identificacao || client.razao_social || 'CL')}</span><div className="min-w-0"><p className="font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">{client.razao_social}</p></div></div></td><td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">{client.cnpj || '-'}</td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.key === 'comunicacao' ? 'info' : 'warning')}`}>{item.area}</span></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.tone)}`}>{item.label}</span></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><p className="text-sm font-semibold text-slate-700 dark:text-gray-200">{getObrigacaoResponsavel(client) || 'Não informado'}</p></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><p className="max-w-sm text-sm font-semibold leading-6 text-slate-600 dark:text-gray-300">{item.nextAction}</p></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><div className="inline-flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 dark:border-gray-700 dark:bg-gray-800/90"><button type="button" onClick={() => { if (item.route === 'reinf') { onGoReinf?.({ clientId: client.id, query: client.nome_identificacao || client.razao_social || client.cnpj || '' }); return; } if (item.route === 'ecd') { onGoEcd?.({ clientId: client.id, query: client.nome_identificacao || client.razao_social || client.cnpj || '' }); return; } onView(client.id); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"><ChevronRight size={14} aria-hidden="true" />{item.route === 'reinf' ? 'Abrir REINF do cliente' : item.route === 'ecd' ? 'Abrir ECD/ECF do cliente' : 'Abrir cliente'}</button><button type="button" onClick={() => onView(client.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"><Eye size={14} aria-hidden="true" />Ver cliente</button></div></td></tr>))}</tbody></table></div><div className={`flex flex-wrap items-center justify-between gap-3 border-t bg-white px-4 py-3 dark:bg-gray-900/96 ${visual.dividerClass}`}><p className="text-xs font-semibold text-slate-500 dark:text-gray-300">Mostrando {formatNumber(visibleRows.length)} de {formatNumber(section.rows.length)} cliente(s) neste bloco.</p>{section.rows.length > section.previewCount ? (<button type="button" onClick={() => setExpandedPrioritySections((current) => ({ ...current, [section.key]: !current[section.key] }))} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300">{isExpanded ? 'Mostrar menos' : `Ver mais ${formatNumber(hiddenCount)}`}</button>) : null}</div></section>);
-        })() : null)) : (<div className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma pendencia operacional para o filtro selecionado.</div>)}</div>
+        })() : null)) : (<div className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma pendência operacional para o filtro selecionado.</div>)}</div>
       </section>
     </div>
   );
@@ -3859,7 +3859,7 @@ function ReinfPage({
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
     if (filters.regime_tributario && normalizeText(client.regime_tributario) !== normalizeText(filters.regime_tributario)) return false;
-    if (filters.envio_reinf && normalizeText(envioReinfConcluido ? 'Sim' : 'Nao') !== normalizeText(filters.envio_reinf)) return false;
+    if (filters.envio_reinf && normalizeText(envioReinfConcluido ? 'Sim' : 'Não') !== normalizeText(filters.envio_reinf)) return false;
     if (filters.data_enviada_reinf && normalizeText(dataEntregaReinf) !== normalizeText(normalizeDateInputValue(filters.data_enviada_reinf))) return false;
     if (filters.anexo_recibo_reinf === 'attached' && !reinfComprovante) return false;
     if (filters.anexo_recibo_reinf === 'missing' && reinfComprovante) return false;
@@ -3903,7 +3903,7 @@ function ReinfPage({
         <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
-              REINF aberto a partir de Pendencias:
+              REINF aberto a partir de Pendências:
               {' '}
               <span className="font-black text-slate-900 dark:text-gray-100">{focusedClientLabel || 'cliente selecionado'}</span>
             </p>
@@ -4151,7 +4151,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
-          <FilterSelect label="Responsavel" value={filters.responsavel_ecd} options={uniqueValues(clients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
+          <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(clients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
           <FilterSelect label="Anexo recibo ECD" value={filters.anexo_recibo_ecd} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecd: value })} includeBlank={false} />
           <FilterSelect label="Anexo recibo ECF" value={filters.anexo_recibo_ecf} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecf: value })} includeBlank={false} />
         </div>
@@ -4309,7 +4309,7 @@ function StaticBreakdownPanel({ title, rows, total, icon: Icon = BarChart3 }) {
         </div>
       ) : (
         <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm font-medium text-slate-500 dark:border-gray-800 dark:bg-gray-900/35 dark:text-gray-400">
-          Nenhum dado disponivel neste recorte no momento.
+          Nenhum dado disponível neste recorte no momento.
         </div>
       )}
     </section>
@@ -4342,7 +4342,7 @@ function ReportsPage({
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
     { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
     { label: 'Sem retorno', value: clientesSemRetorno.length },
-    { label: 'Sem notificacao', value: clientesSemNotificacao.length },
+    { label: 'Sem notificação', value: clientesSemNotificacao.length },
     { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
@@ -4400,7 +4400,7 @@ function ReportsPage({
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
               Relatorios operacionais
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Exportacao da base</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Exportação da base</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
               {formatNumber(filteredClients.length)} registros filtrados, {formatNumber(clients.length)} registros na base.
             </p>
@@ -4418,7 +4418,7 @@ function ReportsPage({
           </div>
           <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-3 dark:border-gray-800 dark:bg-gray-900/70">
             <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Acoes de saida
+              Ações de saída
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -4451,7 +4451,7 @@ function ReportsPage({
                 </>
               ) : (
                 <span className="inline-flex items-center rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                  Exportacao bloqueada
+                  Exportação bloqueada
                 </span>
               )}
               {canResetBase ? (
@@ -4506,7 +4506,7 @@ function ReportsPage({
                 </>
               ) : (
                 <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                  Exportacao bloqueada
+                  Exportação bloqueada
                 </span>
               )}
             </div>
@@ -4535,7 +4535,7 @@ function ReportsPage({
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
               Mapa tecnico
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Estrutura tecnica preparada</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Estrutura técnica preparada</h2>
           </div>
           <span className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             Base de apoio para futuras automacoes
@@ -5386,15 +5386,15 @@ export default function App() {
   );
   const canWritePortalData = supabaseStatus.connected && !authRestoring;
   const writeBlockedReason = authRestoring
-    ? 'Sessao em restauracao. As consultas continuam disponiveis, mas gravacoes ficam bloqueadas ate a reconexao completa.'
+    ? 'Sessão em restauração. As consultas continuam disponíveis, mas gravações ficam bloqueadas até a reconexão completa.'
     : !supabaseStatus.connected
-      ? 'Supabase indisponivel no momento. O portal esta em modo protegido com leitura da ultima sincronizacao e gravacoes bloqueadas ate a reconexao.'
+      ? 'Supabase indisponível no momento. O portal está em modo protegido com leitura da última sincronização e gravações bloqueadas até a reconexão.'
       : '';
-  const authGateLabel = showRestoreUi ? 'Restaurando sessao...' : 'Validando sessao...';
+  const authGateLabel = showRestoreUi ? 'Restaurando sessão...' : 'Validando sessão...';
   const supabaseStatusLabel = authRestoring && currentUserFull
-    ? 'Sessao em restauracao...'
+    ? 'Sessão em restauração...'
     : !supabaseStatus.connected && !showConnectionWarningUi
-      ? 'Verificando conexao com o Supabase...'
+      ? 'Verificando conexão com o Supabase...'
       : getSupabaseStatusDisplay(supabaseStatus, metadata);
   const supabaseStatusTone = authRestoring && currentUserFull
     ? 'info'
@@ -5464,11 +5464,11 @@ export default function App() {
     hasStoredSession,
   ]);
 
-  function ensureSupabaseWriteReady(actionLabel = 'realizar esta gravacao') {
+  function ensureSupabaseWriteReady(actionLabel = 'realizar esta gravação') {
     if (canWritePortalData) return true;
     setToast({
-      title: 'Gravacao bloqueada',
-      message: writeBlockedReason || `Nao foi possivel ${actionLabel} porque o portal ainda nao esta pronto para gravar no Supabase.`,
+      title: 'Gravação bloqueada',
+      message: writeBlockedReason || `Não foi possível ${actionLabel} porque o portal ainda não está pronto para gravar no Supabase.`,
     });
     return false;
   }
@@ -5500,7 +5500,7 @@ export default function App() {
             authSession,
           }),
           getAuthBootstrapTimeoutMs(hasStoredSession),
-          'A validacao da sessao demorou mais do que o esperado.',
+          'A validação da sessão demorou mais do que o esperado.',
         );
         if (!active) return;
 
@@ -5556,8 +5556,8 @@ export default function App() {
         setAuthView('login');
         if (!isAuthTimeoutError(error)) {
           setToast({
-            title: 'Falha ao validar sessao',
-            message: error.message || 'Nao foi possivel validar a sessao atual no Supabase.',
+            title: 'Falha ao validar sessão',
+            message: error.message || 'Não foi possível validar a sessão atual no Supabase.',
           });
         }
       } finally {
@@ -5626,7 +5626,7 @@ export default function App() {
               authSession,
             }),
             getAuthBootstrapTimeoutMs(hasStoredSession),
-            'A atualizacao da sessao demorou mais do que o esperado.',
+            'A atualização da sessão demorou mais do que o esperado.',
           );
           if (!active) return;
           if (perfil) {
@@ -5672,14 +5672,14 @@ export default function App() {
       .then((session) => {
         if (!session) {
           setToast({
-            title: 'Sessao de recuperacao ausente',
+            title: 'Sessão de recuperação ausente',
             message: 'Abra novamente o link recebido por e-mail para redefinir a senha.',
           });
         }
       })
       .catch((error) => {
         setToast({
-          title: 'Falha no link de recuperacao',
+          title: 'Falha no link de recuperação',
           message: error.message || 'Não foi possível validar o link de redefinição.',
         });
       });
@@ -5883,25 +5883,25 @@ export default function App() {
       if (!hasCurrentClients) {
         persist([], createRuntimeListBase(), {
           ...metadata,
-          source: 'Supabase indisponivel',
+          source: 'Supabase indisponível',
           importedAt: metadata?.importedAt || '',
         });
       } else {
         persist(clients, listagens, {
           ...metadata,
-          source: 'Cache local da ultima sincronizacao',
+          source: 'Cache local da última sincronização',
           importedAt: metadata?.importedAt || metadata?.generatedAt || '',
         });
       }
       setSupabaseStatus({
         connected: false,
         message: hasCurrentClients
-          ? 'Modo protegido | leitura local da ultima sincronizacao'
-          : 'Supabase indisponivel | sem leitura local confirmada',
+          ? 'Modo protegido | leitura local da última sincronização'
+          : 'Supabase indisponível | sem leitura local confirmada',
       });
       if (!silent) {
         setToast({
-          title: 'Falha na conexao',
+          title: 'Falha na conexão',
           message: 'Não foi possível carregar os clientes do Supabase. Verifique as variáveis de ambiente e a estrutura do banco.',
         });
       }
@@ -5951,7 +5951,7 @@ export default function App() {
     setSession(null);
     setAuthView('login');
     setPage('dashboard');
-    if (message) setToast({ title: 'Sessao encerrada', message });
+    if (message) setToast({ title: 'Sessão encerrada', message });
   }
 
   async function createFirstAccessPassword(email) {
@@ -5992,17 +5992,17 @@ export default function App() {
 
     if (!perfil) {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: 'Usuario autenticado sem perfil em public.usuarios. Execute seed.sql e vincule auth_user_id.' };
+      return { ok: false, message: 'Usuário autenticado sem perfil em public.usuarios. Execute seed.sql e vincule auth_user_id.' };
     }
 
     if (perfil.status !== 'Ativo') {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: 'Usuario inativo. Solicite reativacao ao Coordenador.' };
+      return { ok: false, message: 'Usuário inativo. Solicite reativação ao Coordenador.' };
     }
 
     if (perfil.bloqueado_ate && new Date(perfil.bloqueado_ate).getTime() > Date.now()) {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: `Usuario bloqueado temporariamente ate ${formatDateTime(perfil.bloqueado_ate)}.` };
+      return { ok: false, message: `Usuário bloqueado temporariamente até ${formatDateTime(perfil.bloqueado_ate)}.` };
     }
 
     sincronizarPerfilUsuario(perfil);
@@ -6029,7 +6029,7 @@ export default function App() {
       if (!recoverySession) {
         return {
           ok: false,
-          errors: ['Sessao de autenticacao faltando. Abra novamente o link de redefinicao recebido por e-mail.'],
+          errors: ['Sessão de autenticação faltando. Abra novamente o link de redefinição recebido por e-mail.'],
         };
       }
       await atualizarSenhaUsuarioLogado(senha);
@@ -6047,7 +6047,7 @@ export default function App() {
   }
 
   async function changeRequiredPassword(senhaAtual, novaSenha, confirmar) {
-    if (!currentUserFull) return { ok: false, errors: ['Sessao expirada.'] };
+    if (!currentUserFull) return { ok: false, errors: ['Sessão expirada.'] };
     const auth = await loginSupabase(currentUserFull.email, senhaAtual);
     if (!auth.ok) return { ok: false, errors: ['Senha atual incorreta.'] };
     const errorsSupabase = novaSenha === confirmar ? validatePassword(novaSenha, currentUserFull) : ['As senhas não conferem.'];
@@ -6104,8 +6104,8 @@ export default function App() {
       console.warn('[historico] Falha ao registrar alteracao persistente:', error);
       if (notifyOnError) {
         setToast({
-          title: 'Historico nao confirmado',
-          message: 'A alteracao principal foi salva, mas o historico dessa acao nao conseguiu ser persistido agora.',
+          title: 'Histórico não confirmado',
+          message: 'A alteração principal foi salva, mas o histórico dessa ação não conseguiu ser persistido agora.',
         });
       }
       return { ok: false, error };
@@ -6212,7 +6212,7 @@ export default function App() {
         setSupabaseStatus({ connected: false, message: 'Falha ao criar no Supabase' });
         setToast({
           title: 'Falha ao criar no Supabase',
-          message: `${error.message}. O cliente nao foi criado localmente para evitar divergencia.`,
+          message: `${error.message}. O cliente não foi criado localmente para evitar divergência.`,
         });
         return;
       }
@@ -6388,7 +6388,7 @@ export default function App() {
         setSupabaseStatus({ connected: false, message: 'Falha ao inativar no Supabase' });
         setToast({
           title: 'Falha ao inativar no Supabase',
-          message: `${error.message}. O cliente foi mantido como esta para evitar divergencia.`,
+          message: `${error.message}. O cliente foi mantido como está para evitar divergência.`,
         });
         return;
       }
@@ -6419,7 +6419,7 @@ export default function App() {
       const result = await previsualizarImportacaoExcel(buffer, file.name);
       if (!result.ok) {
         setToast({
-          title: 'Falha na pre-visualizacao',
+          title: 'Falha na pré-visualização',
           message: result.errors?.[0] ?? 'Não foi possível importar clientes para o Supabase.',
         });
         return;
@@ -6469,7 +6469,7 @@ export default function App() {
           valoresAntigos: clienteAntes,
           valoresNovos: rowImportado,
           tipoAcao: 'importacao_excel',
-          origem: 'Importacao Excel',
+          origem: 'Importação Excel',
         });
       }
 
@@ -6479,7 +6479,7 @@ export default function App() {
         title: 'Planilha importada',
         message: recarregado
           ? `Linhas: ${result.summary.totalLinhasLidas} | Criados: ${result.summary.criados} | Atualizados: ${result.summary.atualizados} | Ignorados: ${result.summary.ignorados} | Erros: ${result.summary.erros}`
-          : 'Importacao concluida no Supabase, mas a interface nao conseguiu recarregar automaticamente.',
+          : 'Importação concluída no Supabase, mas a interface não conseguiu recarregar automaticamente.',
       });
     } catch (error) {
       setToast({ title: 'Falha ao importar', message: error.message });
@@ -6522,7 +6522,7 @@ export default function App() {
     if (!canUseLocalSnapshotTools()) {
       setToast({
         title: 'Ferramenta local apenas',
-        message: 'A reaplicacao de snapshot local fica disponivel apenas no ambiente local de manutencao com a ferramenta explicitamente habilitada.',
+        message: 'A reaplicação de snapshot local fica disponível apenas no ambiente local de manutenção com a ferramenta explicitamente habilitada.',
       });
       return;
     }
@@ -6562,27 +6562,27 @@ export default function App() {
         ? (sync.summary
             ? `Snapshot local reaplicado | Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
             : 'Snapshot local reaplicado com sucesso.')
-        : 'A reaplicacao no Supabase foi concluida, mas a interface nao conseguiu recarregar automaticamente.',
+        : 'A reaplicação no Supabase foi concluída, mas a interface não conseguiu recarregar automaticamente.',
     });
   }
 
   async function saveUser(userValues) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) return;
-    if (!ensureSupabaseWriteReady('salvar o usuario')) return;
+    if (!ensureSupabaseWriteReady('salvar o usuário')) return;
     if (!security.usuarios.some((user) => user.id === userValues.id)) {
-      setToast({ title: 'Acao bloqueada', message: 'Usuario nao encontrado na base local.' });
+      setToast({ title: 'Ação bloqueada', message: 'Usuário não encontrado na base local.' });
       return;
     }
     if (!isUuid(userValues.id)) {
-      setToast({ title: 'Sincronizacao pendente', message: 'Atualize os dados do Supabase antes de editar usuarios.' });
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de editar usuários.' });
       return;
     }
     if (userValues.id === currentUserFull?.id && userValues.status !== 'Ativo') {
-      setToast({ title: 'Acao bloqueada', message: 'Voce nao pode inativar seu proprio usuario.' });
+      setToast({ title: 'Ação bloqueada', message: 'Você não pode inativar seu próprio usuário.' });
       return;
     }
     if (userValues.id === currentUserFull?.id && userValues.perfil_acesso !== currentUserFull?.perfil_acesso) {
-      setToast({ title: 'Acao bloqueada', message: 'Altere o perfil do seu proprio usuario apenas por um fluxo administrado.' });
+      setToast({ title: 'Ação bloqueada', message: 'Altere o perfil do seu próprio usuário apenas por um fluxo administrado.' });
       return;
     }
     try {
@@ -6598,23 +6598,23 @@ export default function App() {
         usuarios: (current.usuarios ?? []).map((user) => (user.id === updated.id ? updated : user)),
       }));
       setEditingUser(null);
-      setToast({ title: 'Usuario salvo', message: updated.email });
+      setToast({ title: 'Usuário salvo', message: updated.email });
     } catch (error) {
       setToast({
-        title: 'Falha ao salvar usuario',
-        message: error.message || 'Nao foi possivel persistir o usuario no Supabase.',
+        title: 'Falha ao salvar usuário',
+        message: error.message || 'Não foi possível persistir o usuário no Supabase.',
       });
     }
   }
 
   async function toggleUserStatus(user) {
-    if (!ensureSupabaseWriteReady('alterar o status do usuario')) return;
+    if (!ensureSupabaseWriteReady('alterar o status do usuário')) return;
     if (user.id === currentUserFull?.id) {
-      setToast({ title: 'Acao bloqueada', message: 'Voce nao pode inativar seu proprio usuario.' });
+      setToast({ title: 'Ação bloqueada', message: 'Você não pode inativar seu próprio usuário.' });
       return;
     }
     if (!isUuid(user.id)) {
-      setToast({ title: 'Sincronizacao pendente', message: 'Atualize os dados do Supabase antes de alterar usuarios.' });
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar usuários.' });
       return;
     }
 
@@ -6625,11 +6625,11 @@ export default function App() {
         ...current,
         usuarios: (current.usuarios ?? []).map((item) => (item.id === updated.id ? updated : item)),
       }));
-      setToast({ title: 'Usuario ' + nextStatus.toLowerCase(), message: user.email });
+      setToast({ title: 'Usuário ' + nextStatus.toLowerCase(), message: user.email });
     } catch (error) {
       setToast({
         title: 'Falha ao atualizar status',
-        message: error.message || 'Nao foi possivel atualizar o usuario no Supabase.',
+        message: error.message || 'Não foi possível atualizar o usuário no Supabase.',
       });
     }
   }
@@ -6841,7 +6841,7 @@ export default function App() {
           canExport={canExportReports}
           canResetBase={isAdmin(currentUserFull) && canUseLocalSnapshot}
           canResetBaseEnabled={isAdmin(currentUserFull) && canUseLocalSnapshot && canWritePortalData}
-          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponivel apenas no ambiente local de manutencao com VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true.' : writeBlockedReason}
+          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponível apenas no ambiente local de manutenção com VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true.' : writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           statusLabel={supabaseStatusLabel}
@@ -6857,7 +6857,7 @@ export default function App() {
           <LazyUsersPage
             users={security.usuarios.map(sanitizeUser)}
             onEdit={(user) => {
-              if (!ensureSupabaseWriteReady('editar o usuario')) return;
+              if (!ensureSupabaseWriteReady('editar o usuário')) return;
               setEditingUser(security.usuarios.find((item) => item.id === user.id));
             }}
             onToggleStatus={toggleUserStatus}
@@ -6963,7 +6963,6 @@ export default function App() {
     </>
   );
 }
-
 
 
 

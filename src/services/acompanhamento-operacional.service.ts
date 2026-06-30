@@ -36,7 +36,7 @@ export async function listarAcompanhamentoOperacionalClientes() {
     .select('*');
 
   if (error) {
-    throw new Error(`Nao foi possivel carregar acompanhamento operacional: ${error.message}`);
+    throw new Error(`Não foi possível carregar acompanhamento operacional: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeAcompanhamentoRow(row as Record<string, unknown>));
