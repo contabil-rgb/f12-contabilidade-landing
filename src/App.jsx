@@ -3683,7 +3683,7 @@ function PendenciasPage({
         )}
       />
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.82fr)]">
+      <section className="grid gap-4">
         <SurfacePanel className="min-w-0 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
@@ -3700,7 +3700,7 @@ function PendenciasPage({
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-500/20 dark:bg-rose-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-700 dark:text-rose-200">Ação imediata</p><p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-100">{formatNumber(criticalCount)}</p><p className="mt-2 text-xs font-semibold text-rose-700/80 dark:text-rose-200/80">Clientes com urgência operacional alta.</p></div>
             <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">Alta prioridade</p><p className="mt-2 text-3xl font-black text-amber-700 dark:text-amber-100">{formatNumber(highCount)}</p><p className="mt-2 text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">Pendências que já pedem atuação do time.</p></div>
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">Acompanhamento</p><p className="mt-2 text-3xl font-black text-sky-700 dark:text-sky-100">{formatNumber(mediumCount)}</p><p className="mt-2 text-xs font-semibold text-sky-700/80 dark:text-sky-200/80">Itens que seguem ativos, mas com menor urgência.</p></div>
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">Acompanhamento</p><p className="mt-2 text-3xl font-black text-sky-700 dark:text-sky-100">{formatNumber(mediumCount)}</p><p className="mt-2 text-xs font-semibold text-sky-700/80 dark:text-sky-200/80">Itens que seguem ativos, mas com menor urg?ncia.</p></div>
           </div>
         </SurfacePanel>
         <SurfacePanel className="min-w-0 p-5 sm:p-6">
@@ -4347,7 +4347,7 @@ function ReportsPage({
   ].filter((row) => row.value > 0);
   const acompanhamentoPrazoRows = [
     {
-      label: 'Media dias sem retorno',
+      label: 'Média de dias sem retorno',
       value: clientesAguardandoRetorno.length
         ? Number(
           (
@@ -6963,6 +6963,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
