@@ -1,17 +1,30 @@
 import SurfacePanel from './SurfacePanel';
 import { classNames } from './classNames';
 
+export function getMetricPanelToneClass(tone = 'neutral') {
+  return {
+    success: 'surface-tone-success',
+    warning: 'surface-tone-warning',
+    danger: 'surface-tone-danger',
+    info: 'surface-tone-info',
+    muted: 'surface-tone-muted',
+    neutral: '',
+  }[tone] ?? '';
+}
+
 export default function MetricTile({
   title,
   value,
   detail,
   icon: Icon,
+  tone = 'neutral',
   toneClass = '',
   onClick,
   className = '',
 }) {
   const interactive = typeof onClick === 'function';
   const Component = interactive ? 'button' : 'div';
+  const panelToneClass = getMetricPanelToneClass(tone);
 
   return (
     <SurfacePanel
@@ -20,6 +33,7 @@ export default function MetricTile({
       onClick={onClick}
       className={classNames(
         'min-h-[168px] p-5 text-left',
+        panelToneClass,
         interactive ? 'group hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : '',
         className,
       )}

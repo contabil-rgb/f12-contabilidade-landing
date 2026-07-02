@@ -85,7 +85,7 @@ import { UploadAnexoButton } from './components/anexos/UploadAnexoButton';
 import ActionButton from './components/ui/ActionButton';
 import AlertBanner from './components/ui/AlertBanner';
 import DataTableShell from './components/ui/DataTableShell';
-import MetricTile from './components/ui/MetricTile';
+import MetricTile, { getMetricPanelToneClass } from './components/ui/MetricTile';
 import StatusBadge from './components/ui/StatusBadge';
 import SurfacePanel from './components/ui/SurfacePanel';
 import ThemeToggle from './components/ui/ThemeToggle.jsx';
@@ -2307,6 +2307,7 @@ function MetricCard({ title, value, detail, icon: Icon, tone = 'neutral', onClic
       value={formatNumber(value)}
       detail={detail}
       icon={Icon}
+      tone={tone}
       toneClass={chipClass(tone)}
       onClick={onClick}
     />
@@ -2405,7 +2406,7 @@ function DashboardTotalCard({ total, onClick }) {
       as={onClick ? 'button' : 'section'}
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`relative overflow-hidden p-8 text-left ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
+      className={`relative overflow-hidden p-8 text-left ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
     >
       <div className="relative z-10 flex min-h-[300px] flex-col justify-between">
         <div>
@@ -2437,7 +2438,7 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     : '';
 
   return (
-    <SurfacePanel className="p-8">
+    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Carteira por regime tributário</h2>
@@ -2500,7 +2501,7 @@ function DashboardSituationCard({ values, total }) {
   const lastPoint = points[points.length - 1];
 
   return (
-    <SurfacePanel className="overflow-hidden p-8">
+    <SurfacePanel className={`overflow-hidden p-8 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Situação da carteira</h2>
         <span className="inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-lg font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
@@ -2572,7 +2573,7 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
   const max = Math.max(...rows.map((row) => row.value), 1);
 
   return (
-    <SurfacePanel className="p-8">
+    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">{title}</h2>
         <button
@@ -2627,7 +2628,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   ];
 
   return (
-    <SurfacePanel className="p-8">
+    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Ações rápidas</h2>
       </div>
@@ -3309,7 +3310,7 @@ function BaseClientesPage(props) {
           value={props.clients.length}
           detail={`${formatNumber(props.allClients?.length ?? props.clients.length)} cliente(s) disponível(is) na base`}
           icon={Users}
-          tone="neutral"
+          tone="success"
         />
       </section>
       <SearchAndFilters {...props} clientsForOptions={props.allClients ?? props.clients} />
@@ -3597,19 +3598,6 @@ function PendenciasPage({
     return new Set(rows.filter(predicate).map((row) => String(row.client.id))).size;
   }
 
-  function topClientNames(rows, predicate, limit = 3) {
-    const names = [];
-    const seen = new Set();
-    rows.forEach((row) => {
-      if (!predicate(row)) return;
-      const clientId = String(row.client.id);
-      if (seen.has(clientId)) return;
-      seen.add(clientId);
-      names.push(row.client.nome_identificacao || row.client.razao_social || 'Cliente sem nome');
-    });
-    return names.slice(0, limit);
-  }
-
   function getPriorityGroup(row) {
     if (isPendenciaCritica(row.client) || row.item.priority >= 90) return 'critical';
     if (row.item.priority >= 80) return 'high';
@@ -3626,26 +3614,12 @@ function PendenciasPage({
     previewCount: section.key === 'critical' ? 5 : 4,
   }));
 
-  const executiveSummary = [
-    { key: 'imediata', title: 'Ação imediata', value: uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'critical'), tone: 'danger', detail: 'Clientes com risco maior ou que já podem comprometer o prazo da obrigação.', highlights: topClientNames(actionRows, (row) => getPriorityGroup(row) === 'critical') },
-    { key: 'atrasadas', title: 'O que está atrasado', value: uniqueClientCount(actionRows, (row) => hasPendenciaAtrasada(row.client)), tone: 'warning', detail: 'Pendências com atraso operacional ou entrega REINF já vencida.', highlights: topClientNames(actionRows, (row) => hasPendenciaAtrasada(row.client)) },
-    { key: 'comprovantes', title: 'Sem comprovante', value: uniqueClientCount(visibleActionRows, (row) => hasComprovanteObrigacaoPendente(row.client)), tone: 'warning', detail: 'Clientes aguardando recibo ou comprovante para fechar a obrigação.', highlights: topClientNames(visibleActionRows, (row) => hasComprovanteObrigacaoPendente(row.client)) },
-    { key: 'notificacao', title: 'Comunicação e retorno', value: uniqueClientCount(visibleActionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)), tone: 'info', detail: 'Clientes que ainda precisam de notificação ou retorno registrado.', highlights: topClientNames(visibleActionRows, (row) => ['comunicacao', 'retorno'].includes(row.item.signalKey)) },
-  ];
-
   function getPendenciaBucketIcon(key) {
     if (key === 'reinf') return AlertTriangle;
     if (key === 'ecd') return ClipboardList;
     if (key === 'ecf') return FolderClock;
     if (key === 'comunicacao') return BellRing;
     return ShieldAlert;
-  }
-
-  function getExecutiveSummaryIcon(key) {
-    if (key === 'imediata') return ShieldAlert;
-    if (key === 'atrasadas') return AlertTriangle;
-    if (key === 'comprovantes') return FolderClock;
-    return BellRing;
   }
 
   function getBucketDescription(key) {
@@ -3657,9 +3631,9 @@ function PendenciasPage({
   }
 
   function getPrioritySectionVisual(key) {
-    if (key === 'critical') return { icon: ShieldAlert, panelClass: 'border-rose-200 bg-transparent dark:border-rose-500/25 dark:bg-transparent', headerClass: 'bg-rose-50/90 dark:bg-rose-500/10', dividerClass: 'border-rose-100 dark:border-rose-500/20', textClass: 'text-rose-700 dark:text-rose-200' };
-    if (key === 'high') return { icon: AlertTriangle, panelClass: 'border-amber-200 bg-transparent dark:border-amber-500/25 dark:bg-transparent', headerClass: 'bg-amber-50/90 dark:bg-amber-500/10', dividerClass: 'border-amber-100 dark:border-amber-500/20', textClass: 'text-amber-700 dark:text-amber-200' };
-    return { icon: CheckCircle2, panelClass: 'border-sky-200 bg-transparent dark:border-sky-500/25 dark:bg-transparent', headerClass: 'bg-sky-50/90 dark:bg-sky-500/10', dividerClass: 'border-sky-100 dark:border-sky-500/20', textClass: 'text-sky-700 dark:text-sky-200' };
+    if (key === 'critical') return { icon: ShieldAlert, panelClass: 'surface-tone-danger', headerClass: 'bg-rose-50/90 dark:bg-rose-500/10', dividerClass: 'border-rose-100 dark:border-rose-500/20', textClass: 'text-rose-700 dark:text-rose-200' };
+    if (key === 'high') return { icon: AlertTriangle, panelClass: 'surface-tone-warning', headerClass: 'bg-amber-50/90 dark:bg-amber-500/10', dividerClass: 'border-amber-100 dark:border-amber-500/20', textClass: 'text-amber-700 dark:text-amber-200' };
+    return { icon: CheckCircle2, panelClass: 'surface-tone-info', headerClass: 'bg-sky-50/90 dark:bg-sky-500/10', dividerClass: 'border-sky-100 dark:border-sky-500/20', textClass: 'text-sky-700 dark:text-sky-200' };
   }
 
   const criticalCount = uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'critical');
@@ -3700,61 +3674,51 @@ function PendenciasPage({
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-500/20 dark:bg-rose-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-700 dark:text-rose-200">Ação imediata</p><p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-100">{formatNumber(criticalCount)}</p><p className="mt-2 text-xs font-semibold text-rose-700/80 dark:text-rose-200/80">Clientes com urgência operacional alta.</p></div>
             <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">Alta prioridade</p><p className="mt-2 text-3xl font-black text-amber-700 dark:text-amber-100">{formatNumber(highCount)}</p><p className="mt-2 text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">Pendências que já pedem atuação do time.</p></div>
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">Acompanhamento</p><p className="mt-2 text-3xl font-black text-sky-700 dark:text-sky-100">{formatNumber(mediumCount)}</p><p className="mt-2 text-xs font-semibold text-sky-700/80 dark:text-sky-200/80">Itens que seguem ativos, mas com menor urg?ncia.</p></div>
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">Acompanhamento</p><p className="mt-2 text-3xl font-black text-sky-700 dark:text-sky-100">{formatNumber(mediumCount)}</p><p className="mt-2 text-xs font-semibold text-sky-700/80 dark:text-sky-200/80">Itens que seguem ativos, mas com menor urgência.</p></div>
           </div>
-        </SurfacePanel>
-        <SurfacePanel className="min-w-0 p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Frentes operacionais</p>
-              <h2 className="mt-2 text-lg font-black text-slate-950 dark:text-gray-100">Triagem rápida por obrigação</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Escolha a frente que você quer atacar primeiro e a lista abaixo se reorganiza automaticamente.</p>
+          <div className="mt-6 border-t border-slate-200/80 pt-6 dark:border-gray-800">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="max-w-2xl">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Frentes operacionais</p>
+                <h2 className="mt-2 text-lg font-black text-slate-950 dark:text-gray-100">Triagem rápida por obrigação</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Escolha a frente que você quer atacar primeiro e a lista abaixo se reorganiza automaticamente.</p>
+              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                {formatNumber(buckets.reduce((total, bucket) => total + bucket.value, 0))} sinais ativos
+              </span>
             </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {formatNumber(buckets.reduce((total, bucket) => total + bucket.value, 0))} sinais ativos
-            </span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {buckets.map((bucket) => {
-              const Icon = getPendenciaBucketIcon(bucket.key);
-              const selected = attachmentFilter === bucket.key;
-              return (
-                <button
-                  key={bucket.label}
-                  type="button"
-                  onClick={() => setAttachmentFilter(bucket.key)}
-                  className={`w-full rounded-2xl border p-4 text-left shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md dark:bg-gray-900/95 ${chipClass(bucket.tone)} ${selected ? 'ring-2 ring-brand-blue/20' : ''}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] opacity-80">{bucket.label}</p>
-                        <span className="rounded-full border border-current/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] opacity-70">
-                          {selected ? 'Ativo' : 'Filtrar'}
-                        </span>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {buckets.map((bucket) => {
+                const Icon = getPendenciaBucketIcon(bucket.key);
+                const selected = attachmentFilter === bucket.key;
+                return (
+                  <button
+                    key={bucket.label}
+                    type="button"
+                    onClick={() => setAttachmentFilter(bucket.key)}
+                    className={`w-full rounded-2xl border p-4 text-left shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md ${getMetricPanelToneClass(bucket.tone)} ${selected ? 'ring-2 ring-brand-blue/20' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-700/80 dark:text-gray-100/85">{bucket.label}</p>
+                          <span className="rounded-full border border-current/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] opacity-70">
+                            {selected ? 'Ativo' : 'Filtrar'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(bucket.value)}</p>
+                        <p className="mt-2 text-xs font-semibold leading-5 text-slate-700/80 dark:text-gray-200/85">{getBucketDescription(bucket.key)}</p>
                       </div>
-                      <p className="mt-2 text-3xl font-black">{formatNumber(bucket.value)}</p>
-                      <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{getBucketDescription(bucket.key)}</p>
+                      <span className={`rounded-xl border border-current/15 bg-white/70 p-2.5 dark:bg-gray-900/90 ${chipClass(bucket.tone)}`}>
+                        <Icon size={16} aria-hidden="true" />
+                      </span>
                     </div>
-                    <span className="rounded-xl border border-current/15 bg-white/70 p-2.5 dark:bg-gray-900/90">
-                      <Icon size={16} aria-hidden="true" />
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </SurfacePanel>
-      </section>
-
-      <section className="surface-card p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Resumo do dia</h2><p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Um retrato rápido do que pede ação agora, sem precisar percorrer toda a lista.</p></div><span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">Atualizado com base no filtro atual</span></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {executiveSummary.map((item) => {
-            const Icon = getExecutiveSummaryIcon(item.key);
-            return (<div key={item.key} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/95"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">{item.title}</p><p className="mt-2 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(item.value)}</p></div><div className="flex flex-col items-end gap-2"><span className={`rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(item.tone)}`}>{item.tone === 'danger' ? 'Urgente' : item.tone === 'info' ? 'Acompanhar' : 'Prioridade'}</span><span className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"><Icon size={16} aria-hidden="true" /></span></div></div><p className="mt-3 text-sm font-semibold text-slate-600 dark:text-gray-300">{item.detail}</p><div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-800/70"><p className="text-[11px] font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Exemplos agora</p><div className="mt-2 flex flex-wrap gap-2">{item.highlights.length ? item.highlights.map((name) => (<span key={`${item.key}-${name}`} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">{name}</span>)) : (<span className="text-xs font-semibold text-slate-400 dark:text-gray-500">Nenhum cliente neste grupo.</span>)}</div></div></div>);
-          })}
-        </div>
       </section>
 
       {hasSearchContext ? (<section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-700 dark:text-gray-200">Filtro aplicado pela busca global <span className="font-black text-slate-900 dark:text-gray-100">{searchContext?.query || 'cliente selecionado'}</span></p><button type="button" onClick={onClearSearchContext} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300">Limpar filtro da busca</button></div></section>) : null}
@@ -4359,24 +4323,25 @@ function ReportsPage({
     },
   ].filter((row) => row.value > 0);
   const reports = [
-    { title: 'Clientes por responsável', rows: getNormalizedBreakdownRows(clients, 'responsavel'), icon: UserCheck },
-    { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2 },
-    { title: 'Clientes com atraso', rows: clients.filter((client) => hasPendenciaAtrasada(client)), icon: FolderClock },
-    { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert },
-    { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail },
-    { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail },
-    { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle },
-    { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff },
-    { title: 'REINF pendente', rows: clients.filter((client) => hasPendenciaObrigacaoReinf(client)), icon: FileSpreadsheet },
-    { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => hasObrigacaoAnual(client)), icon: BookOpenCheck },
-    { title: 'Clientes por dificuldade', rows: normalizeBreakdownRows(toBreakdown(clients, 'dificuldade')), icon: AlertTriangle },
+    { title: 'Clientes por responsável', rows: getNormalizedBreakdownRows(clients, 'responsavel'), icon: UserCheck, tone: 'info' },
+    { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2, tone: 'info' },
+    { title: 'Clientes com atraso', rows: clients.filter((client) => hasPendenciaAtrasada(client)), icon: FolderClock, tone: 'danger' },
+    { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert, tone: 'warning' },
+    { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail, tone: 'info' },
+    { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail, tone: 'warning' },
+    { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle, tone: 'danger' },
+    { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff, tone: 'muted' },
+    { title: 'REINF pendente', rows: clients.filter((client) => hasPendenciaObrigacaoReinf(client)), icon: FileSpreadsheet, tone: 'warning' },
+    { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => hasObrigacaoAnual(client)), icon: BookOpenCheck, tone: 'info' },
+    { title: 'Clientes por dificuldade', rows: normalizeBreakdownRows(toBreakdown(clients, 'dificuldade')), icon: AlertTriangle, tone: 'warning' },
   ];
   const reportCount = (rows) =>
     rows.reduce((acc, row) => acc + (typeof row?.value === 'number' ? row.value : 1), 0);
-  const reportCards = reports.map(({ title, rows, icon: Icon }) => ({
+  const reportCards = reports.map(({ title, rows, icon: Icon, tone = 'neutral' }) => ({
     title,
     rows,
     Icon,
+    tone,
     count: Array.isArray(rows) ? reportCount(rows) : 0,
   }));
   const technicalTables = [
@@ -4472,8 +4437,8 @@ function ReportsPage({
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {reportCards.map(({ title, rows, Icon, count }) => (
-          <article key={title} className="surface-card p-5">
+        {reportCards.map(({ title, rows, Icon, count, tone }) => (
+          <article key={title} className={`surface-card p-5 ${getMetricPanelToneClass(tone)}`}>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-black text-slate-900 dark:text-gray-100">{title}</p>
@@ -4482,7 +4447,7 @@ function ReportsPage({
                   {count === 1 ? '1 registro neste recorte' : `${formatNumber(count)} registros neste recorte`}
                 </p>
               </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-brand-blue dark:bg-gray-800 dark:text-blue-300">
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-white/90 shadow-sm dark:border-gray-600 dark:bg-gray-800/90 ${chipClass(tone)}`}>
                 <Icon size={19} aria-hidden="true" />
               </span>
             </div>
