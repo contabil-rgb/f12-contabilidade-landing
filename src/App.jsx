@@ -144,7 +144,6 @@ const INITIAL_METADATA = Object.freeze({
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
   { key: 'clientes', label: 'Base de Clientes', icon: Users },
-  { key: 'pendencias', label: 'Pendências', icon: ShieldAlert },
   { key: 'reinf', label: 'REINF', icon: FileSpreadsheet },
   { key: 'ecd', label: 'ECD / ECF', icon: BookOpenCheck },
   { key: 'relatorios', label: 'Relatórios', icon: FileDown },
@@ -155,7 +154,6 @@ const NAV_ITEMS = [
 const PAGE_DESCRIPTIONS = {
   dashboard: 'Visão geral da carteira contábil',
   clientes: 'Controle dos clientes, competências e obrigações',
-  pendencias: 'Acompanhamento de pendências operacionais',
   reinf: 'Acompanhamento de recibos e envio da REINF',
   ecd: 'Controle das obrigações anuais e responsáveis',
   relatorios: 'Relatórios operacionais e exportação',
@@ -166,7 +164,7 @@ const PAGE_DESCRIPTIONS = {
 
 const NAV_GROUPS = [
   { title: 'Visão Geral', keys: ['dashboard'] },
-  { title: 'Clientes', keys: ['clientes', 'pendencias', 'historico'] },
+  { title: 'Clientes', keys: ['clientes', 'historico'] },
   { title: 'Obrigações', keys: ['reinf', 'ecd'] },
   { title: 'Relatórios', keys: ['relatorios'] },
   { title: 'Configurações', keys: ['usuarios'] },
@@ -1903,10 +1901,8 @@ function AppShell({
   searchHistory = [],
   onOpenClient,
   onOpenHistoryPage,
-  onOpenPendenciasSearch,
 }) {
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.permission || can(currentUser, item.permission));
-  const canSearchPendencias = visibleNavItems.some((item) => item.key === 'pendencias');
   const canSearchHistorico = visibleNavItems.some((item) => item.key === 'historico');
   const profile = getProfile(currentUser);
   const currentTitle = NAV_ITEMS.find((item) => item.key === page)?.label ?? 'Cliente';
@@ -1975,39 +1971,6 @@ function AppShell({
       if (results.length >= 8) break;
     }
 
-    if (canSearchPendencias && results.length < 12) {
-      for (const client of searchClients) {
-        if (!client?.id) continue;
-        if (!hasPendenciaAtiva(client)) continue;
-
-        const id = String(client.id);
-        const seenKey = `pendencia:${id}`;
-        if (seen.has(seenKey)) continue;
-
-        const nome = String(client.nome_identificacao ?? '');
-        const razao = String(client.razao_social ?? '');
-        const cnpj = String(client.cnpj ?? '');
-        const alertsText = getClientAlerts(client).map((item) => item.label).join(' ');
-        const stack = normalizeText(`${nome} ${razao} ${cnpj} ${client.situacao ?? ''} ${client.responsavel ?? ''} ${alertsText}`);
-        const cnpjDigits = normalizeCnpj(cnpj);
-        const byText = queryNorm && stack.includes(queryNorm);
-        const byCnpj = queryDigits && cnpjDigits.includes(queryDigits);
-        if (!byText && !byCnpj) continue;
-
-        seen.add(seenKey);
-        results.push({
-          kind: 'pendencia',
-          id,
-          nome: nome || razao || 'Cliente sem identificação',
-          razao: razao || 'Razão social não informada',
-          cnpj: cnpj || '-',
-          subtitle: 'Pendência',
-        });
-
-        if (results.length >= 12) break;
-      }
-    }
-
     if (canSearchHistorico && results.length < 15) {
       for (const item of searchHistory) {
         const historyId = String(item?.id ?? '');
@@ -2038,7 +2001,7 @@ function AppShell({
     }
 
     return results;
-  }, [canSearchHistorico, canSearchPendencias, clientsById, globalQuery, searchClients, searchHistory]);
+  }, [canSearchHistorico, clientsById, globalQuery, searchClients, searchHistory]);
 
   useEffect(() => {
     function onOutsideClick(event) {
@@ -2055,8 +2018,6 @@ function AppShell({
     if (!result?.id) return;
     if (result.kind === 'historico') {
       onOpenHistoryPage?.();
-    } else if (result.kind === 'pendencia') {
-      onOpenPendenciasSearch?.({ clientId: result.id, query: globalQuery });
     } else {
       onOpenClient?.(result.id);
     }
@@ -2174,7 +2135,7 @@ function AppShell({
                     <div className="absolute right-0 z-50 mt-2 max-h-80 w-[34rem] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft dark:border-gray-700 dark:bg-gray-800">
                       {!globalQuery.trim() ? (
                         <p className="px-2 py-2 text-sm font-semibold text-slate-500">
-                          Digite para buscar clientes, pendências e histórico.
+                          Digite para buscar clientes e histórico.
                         </p>
                       ) : globalResults.length ? (
                         <div className="space-y-1">
@@ -3485,256 +3446,6 @@ function DetailPage({
         onSuccess={(tipoAnexo, anexo) => onAnexoSuccess?.(client.id, tipoAnexo, anexo)}
         onError={onAnexoError}
       />
-    </div>
-  );
-}
-
-function PendenciasPage({
-  clients,
-  onView,
-  onGoReinf,
-  onGoEcd,
-  searchContext,
-  onClearSearchContext,
-  supabaseStatus,
-  metadata,
-  statusLabel,
-  statusTone = 'neutral',
-  onRefresh,
-  loading = false,
-}) {
-  const [attachmentFilter, setAttachmentFilter] = useState('all');
-  const [expandedPrioritySections, setExpandedPrioritySections] = useState({});
-  const searchClientId = String(searchContext?.clientId ?? '');
-  const searchQuery = normalizeText(searchContext?.query ?? '');
-  const hasSearchContext = Boolean(searchClientId || searchQuery);
-
-  function matchesSearchContext(client) {
-    if (!hasSearchContext) return true;
-    if (searchClientId) return String(client.id ?? '') === searchClientId;
-    const alerts = getClientAlerts(client).map((item) => item.label).join(' ');
-    const responsavelOperacional = getResponsavelOperacional(client);
-    const searchable = normalizeText(
-      `${client.cnpj} ${client.nome_identificacao} ${client.razao_social} ${client.responsavel} ${responsavelOperacional} ${client.situacao} ${alerts}`,
-    );
-    return searchable.includes(searchQuery);
-  }
-
-  const buckets = [
-    { key: 'reinf', label: 'Pendências REINF', value: countWhere(clients, (client) => hasPendenciaObrigacaoReinf(client)), tone: 'warning' },
-    { key: 'ecd', label: 'Pendências ECD', value: countWhere(clients, (client) => hasPendenciaObrigacaoEcd(client)), tone: 'warning' },
-    { key: 'ecf', label: 'Pendências ECF', value: countWhere(clients, (client) => hasPendenciaObrigacaoEcf(client)), tone: 'warning' },
-    { key: 'comunicacao', label: 'Comunicação e retorno', value: countWhere(clients, (client) => hasComunicacaoOuRetornoPendente(client)), tone: 'info' },
-    { key: 'critico', label: 'Pendências críticas', value: countWhere(clients, (client) => isPendenciaCritica(client)), tone: 'danger' },
-  ];
-
-  function getPendenciasOperacionais(client) {
-    return getClientAlertSignals(client)
-      .filter((alert) => alert.key in PENDENCIA_ACTION_BY_SIGNAL)
-      .map((alert) => {
-        const config = PENDENCIA_ACTION_BY_SIGNAL[alert.key];
-        return {
-          ...alert,
-          ...config,
-          nextAction: config.nextAction,
-          signalKey: alert.key,
-          label: alert.key === 'comunicacao' ? 'Cliente não notificado' : alert.label,
-        };
-      });
-  }
-
-  function getPendenciaActionItems(client) {
-    return getPendenciasOperacionais(client);
-  }
-
-  const allActionRows = clients.flatMap((client) =>
-    getPendenciaActionItems(client).map((item, index) => ({ client, item, rowId: `${client.id}-${item.key}-${index}` })),
-  );
-
-  function matchesAttachmentFilter(row, filterKey) {
-    if (filterKey === 'all') return true;
-    if (filterKey === 'critico') return isPendenciaCritica(row.client);
-    if (filterKey === 'reinf') return row.item.key === 'reinf';
-    if (filterKey === 'ecd') return row.item.key === 'ecd';
-    if (filterKey === 'ecf') return row.item.key === 'ecf';
-    if (filterKey === 'comunicacao') return ['comunicacao', 'retorno'].includes(row.item.signalKey);
-    return true;
-  }
-
-  function prioritizeRows(rows) {
-    const byClient = new Map();
-    rows.forEach((row) => {
-      const current = byClient.get(row.client.id);
-      const rowPriority = row.item.priority + (isPendenciaCritica(row.client) ? 100 : 0);
-      const currentPriority = current ? current.item.priority + (isPendenciaCritica(current.client) ? 100 : 0) : -1;
-      if (!current || rowPriority > currentPriority) byClient.set(row.client.id, row);
-    });
-
-    return Array.from(byClient.values()).sort((left, right) => {
-      const leftPriority = left.item.priority + (isPendenciaCritica(left.client) ? 100 : 0);
-      const rightPriority = right.item.priority + (isPendenciaCritica(right.client) ? 100 : 0);
-      if (rightPriority !== leftPriority) return rightPriority - leftPriority;
-      return String(left.client.nome_identificacao || left.client.razao_social || '').localeCompare(
-        String(right.client.nome_identificacao || right.client.razao_social || ''),
-        'pt-BR',
-      );
-    });
-  }
-
-  const visibleActionRows = allActionRows.filter(({ client, item }) => matchesSearchContext(client) && matchesAttachmentFilter({ client, item }, attachmentFilter));
-  const actionRows = prioritizeRows(visibleActionRows);
-  const selectedBucket = buckets.find((bucket) => bucket.key === attachmentFilter) || { key: 'all', label: 'Todas as pendências', tone: 'info', value: actionRows.length };
-
-  const attachmentBuckets = [
-    { key: 'all', label: 'Todas', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client))).length, tone: 'info' },
-    { key: 'reinf', label: 'REINF', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'reinf'))).length, tone: 'warning' },
-    { key: 'ecd', label: 'ECD', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecd'))).length, tone: 'warning' },
-    { key: 'ecf', label: 'ECF', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'ecf'))).length, tone: 'warning' },
-    { key: 'comunicacao', label: 'Comunicação e retorno', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'comunicacao'))).length, tone: 'info' },
-    { key: 'critico', label: 'Críticas', value: prioritizeRows(allActionRows.filter((row) => matchesSearchContext(row.client) && matchesAttachmentFilter(row, 'critico'))).length, tone: 'danger' },
-  ];
-
-  function uniqueClientCount(rows, predicate) {
-    return new Set(rows.filter(predicate).map((row) => String(row.client.id))).size;
-  }
-
-  function getPriorityGroup(row) {
-    if (isPendenciaCritica(row.client) || row.item.priority >= 90) return 'critical';
-    if (row.item.priority >= 80) return 'high';
-    return 'medium';
-  }
-
-  const prioritySections = [
-    { key: 'critical', title: 'Críticas e vencidas', description: 'Itens que merecem atenção imediata ou podem impactar o prazo da obrigação.', tone: 'danger' },
-    { key: 'high', title: 'Alta prioridade', description: 'Pendências importantes que já pedem ação do time nas próximas movimentações.', tone: 'warning' },
-    { key: 'medium', title: 'Acompanhamento', description: 'Casos que seguem pendentes, mas sem o mesmo nível de urgência operacional.', tone: 'info' },
-  ].map((section) => ({
-    ...section,
-    rows: actionRows.filter((row) => getPriorityGroup(row) === section.key),
-    previewCount: section.key === 'critical' ? 5 : 4,
-  }));
-
-  function getPendenciaBucketIcon(key) {
-    if (key === 'reinf') return AlertTriangle;
-    if (key === 'ecd') return ClipboardList;
-    if (key === 'ecf') return FolderClock;
-    if (key === 'comunicacao') return BellRing;
-    return ShieldAlert;
-  }
-
-  function getBucketDescription(key) {
-    if (key === 'reinf') return 'Clientes com recibo, envio ou comprovante pendente na REINF.';
-    if (key === 'ecd') return 'Carteira que pede entrega, recibo ou responsável da ECD.';
-    if (key === 'ecf') return 'Pendências ligadas à entrega e comprovação da ECF.';
-    if (key === 'comunicacao') return 'Casos que ainda dependem de comunicação enviada ou retorno do cliente.';
-    return 'Itens com maior impacto operacional imediato ou com prazo mais sensível.';
-  }
-
-  function getPrioritySectionVisual(key) {
-    if (key === 'critical') return { icon: ShieldAlert, panelClass: 'surface-tone-danger', headerClass: 'bg-rose-50/90 dark:bg-rose-500/10', dividerClass: 'border-rose-100 dark:border-rose-500/20', textClass: 'text-rose-700 dark:text-rose-200' };
-    if (key === 'high') return { icon: AlertTriangle, panelClass: 'surface-tone-warning', headerClass: 'bg-amber-50/90 dark:bg-amber-500/10', dividerClass: 'border-amber-100 dark:border-amber-500/20', textClass: 'text-amber-700 dark:text-amber-200' };
-    return { icon: CheckCircle2, panelClass: 'surface-tone-info', headerClass: 'bg-sky-50/90 dark:bg-sky-500/10', dividerClass: 'border-sky-100 dark:border-sky-500/20', textClass: 'text-sky-700 dark:text-sky-200' };
-  }
-
-  const criticalCount = uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'critical');
-  const highCount = uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'high');
-  const mediumCount = uniqueClientCount(actionRows, (row) => getPriorityGroup(row) === 'medium');
-
-  return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="Painel de Pendências"
-        description="Central de prioridades para o coordenador e o time atacarem primeiro o que exige ação."
-        right={(
-          <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>{statusLabel}</span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">Fonte: {getMetadataSourceDisplay(metadata?.source)}</span>
-            <button type="button" onClick={onRefresh} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300">
-              <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Atualizando...' : 'Atualizar dados'}
-            </button>
-          </>
-        )}
-      />
-
-      <section className="grid gap-4">
-        <SurfacePanel className="min-w-0 p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Central de triagem</p>
-              <h2 className="mt-2 text-xl font-black text-slate-950 dark:text-gray-100 sm:text-[1.4rem]">Leitura priorizada da operação</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Organize rapidamente o que está crítico, o que pede retorno e o que ainda depende de comprovante ou envio.</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtro atual</p>
-              <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">{selectedBucket.label}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">{formatNumber(actionRows.length)} cliente(s) priorizado(s) nesta visão.</p>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4 dark:border-rose-500/20 dark:bg-rose-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-700 dark:text-rose-200">Ação imediata</p><p className="mt-2 text-3xl font-black text-rose-700 dark:text-rose-100">{formatNumber(criticalCount)}</p><p className="mt-2 text-xs font-semibold text-rose-700/80 dark:text-rose-200/80">Clientes com urgência operacional alta.</p></div>
-            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">Alta prioridade</p><p className="mt-2 text-3xl font-black text-amber-700 dark:text-amber-100">{formatNumber(highCount)}</p><p className="mt-2 text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">Pendências que já pedem atuação do time.</p></div>
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">Acompanhamento</p><p className="mt-2 text-3xl font-black text-sky-700 dark:text-sky-100">{formatNumber(mediumCount)}</p><p className="mt-2 text-xs font-semibold text-sky-700/80 dark:text-sky-200/80">Itens que seguem ativos, mas com menor urgência.</p></div>
-          </div>
-          <div className="mt-6 border-t border-slate-200/80 pt-6 dark:border-gray-800">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="max-w-2xl">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Frentes operacionais</p>
-                <h2 className="mt-2 text-lg font-black text-slate-950 dark:text-gray-100">Triagem rápida por obrigação</h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Escolha a frente que você quer atacar primeiro e a lista abaixo se reorganiza automaticamente.</p>
-              </div>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                {formatNumber(buckets.reduce((total, bucket) => total + bucket.value, 0))} sinais ativos
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {buckets.map((bucket) => {
-                const Icon = getPendenciaBucketIcon(bucket.key);
-                const selected = attachmentFilter === bucket.key;
-                return (
-                  <button
-                    key={bucket.label}
-                    type="button"
-                    onClick={() => setAttachmentFilter(bucket.key)}
-                    className={`w-full rounded-2xl border p-4 text-left shadow-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-md ${getMetricPanelToneClass(bucket.tone)} ${selected ? 'ring-2 ring-brand-blue/20' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-700/80 dark:text-gray-100/85">{bucket.label}</p>
-                          <span className="rounded-full border border-current/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] opacity-70">
-                            {selected ? 'Ativo' : 'Filtrar'}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(bucket.value)}</p>
-                        <p className="mt-2 text-xs font-semibold leading-5 text-slate-700/80 dark:text-gray-200/85">{getBucketDescription(bucket.key)}</p>
-                      </div>
-                      <span className={`rounded-xl border border-current/15 bg-white/70 p-2.5 dark:bg-gray-900/90 ${chipClass(bucket.tone)}`}>
-                        <Icon size={16} aria-hidden="true" />
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </SurfacePanel>
-      </section>
-
-      {hasSearchContext ? (<section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-700 dark:text-gray-200">Filtro aplicado pela busca global <span className="font-black text-slate-900 dark:text-gray-100">{searchContext?.query || 'cliente selecionado'}</span></p><button type="button" onClick={onClearSearchContext} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300">Limpar filtro da busca</button></div></section>) : null}
-
-      <section className="min-w-0 surface-card">
-        <div className="border-b border-slate-200 p-5 dark:border-gray-800"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Pendências por obrigação</h2><p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">Mostramos a pendência mais urgente de cada cliente para facilitar a triagem e a próxima ação.</p></div><div className="flex max-w-full flex-wrap items-center gap-2.5">{attachmentBuckets.map((bucket) => (<button key={bucket.key} type="button" onClick={() => setAttachmentFilter(bucket.key)} className={`rounded-lg border px-3 py-1.5 text-xs font-black transition ${attachmentFilter === bucket.key ? chipClass(bucket.tone) : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600'}`}>{bucket.label}: {formatNumber(bucket.value)}</button>))}</div></div></div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/70"><p className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Exibindo {formatNumber(actionRows.length)} cliente(s) priorizado(s) nesta visão.</p><span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">{selectedBucket.label}</span></div>
-        <div className="space-y-4 p-4">{actionRows.length ? prioritySections.map((section) => (section.rows.length ? (() => {
-          const isExpanded = Boolean(expandedPrioritySections[section.key]);
-          const visibleRows = isExpanded ? section.rows : section.rows.slice(0, section.previewCount);
-          const hiddenCount = Math.max(section.rows.length - visibleRows.length, 0);
-          const visual = getPrioritySectionVisual(section.key);
-          const SectionIcon = visual.icon;
-          return (<section key={section.key} className={`min-w-0 overflow-hidden rounded-2xl border shadow-sm ${visual.panelClass}`}><div className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5 ${visual.headerClass} ${visual.dividerClass}`}><div className="flex items-start gap-3"><span className={`rounded-xl border border-current/10 bg-white/80 p-2.5 shadow-sm dark:bg-gray-900/90 ${visual.textClass}`}><SectionIcon size={16} aria-hidden="true" /></span><div><h3 className="text-sm font-black text-slate-950 dark:text-gray-100">{section.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{section.description}</p></div></div><span className={`rounded-full border px-3 py-1 text-xs font-black ${chipClass(section.tone)}`}>{formatNumber(section.rows.length)} cliente(s)</span></div><div className="w-full max-w-full overflow-auto overflow-soft bg-white dark:bg-gray-900/96"><table className="w-full min-w-[960px] xl:min-w-[1180px] text-left text-sm"><thead className="bg-slate-50 dark:bg-gray-800/95"><tr>{['Cliente', 'CNPJ', 'Obrigação', 'Pendência', 'Responsável', 'Próxima ação', 'Ação'].map((header) => (<th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">{header}</th>))}</tr></thead><tbody>{visibleRows.map(({ client, item, rowId }) => (<tr key={rowId} className="bg-white align-top transition hover:bg-slate-50 dark:bg-gray-900/96 dark:hover:bg-gray-800/70"><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">{getDashboardInitials(client.nome_identificacao || client.razao_social || 'CL')}</span><div className="min-w-0"><p className="font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">{client.razao_social}</p></div></div></td><td className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">{client.cnpj || '-'}</td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.key === 'comunicacao' ? 'info' : 'warning')}`}>{item.area}</span></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass(item.tone)}`}>{item.label}</span></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><p className="text-sm font-semibold text-slate-700 dark:text-gray-200">{getObrigacaoResponsavel(client) || 'Não informado'}</p></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><p className="max-w-sm text-sm font-semibold leading-6 text-slate-600 dark:text-gray-300">{item.nextAction}</p></td><td className="border-b border-slate-100 px-4 py-3 dark:border-gray-800"><div className="inline-flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 dark:border-gray-700 dark:bg-gray-800/90"><button type="button" onClick={() => { if (item.route === 'reinf') { onGoReinf?.({ clientId: client.id, query: client.nome_identificacao || client.razao_social || client.cnpj || '' }); return; } if (item.route === 'ecd') { onGoEcd?.({ clientId: client.id, query: client.nome_identificacao || client.razao_social || client.cnpj || '' }); return; } onView(client.id); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"><ChevronRight size={14} aria-hidden="true" />{item.route === 'reinf' ? 'Abrir REINF do cliente' : item.route === 'ecd' ? 'Abrir ECD/ECF do cliente' : 'Abrir cliente'}</button><button type="button" onClick={() => onView(client.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"><Eye size={14} aria-hidden="true" />Ver cliente</button></div></td></tr>))}</tbody></table></div><div className={`flex flex-wrap items-center justify-between gap-3 border-t bg-white px-4 py-3 dark:bg-gray-900/96 ${visual.dividerClass}`}><p className="text-xs font-semibold text-slate-500 dark:text-gray-300">Mostrando {formatNumber(visibleRows.length)} de {formatNumber(section.rows.length)} cliente(s) neste bloco.</p>{section.rows.length > section.previewCount ? (<button type="button" onClick={() => setExpandedPrioritySections((current) => ({ ...current, [section.key]: !current[section.key] }))} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300">{isExpanded ? 'Mostrar menos' : `Ver mais ${formatNumber(hiddenCount)}`}</button>) : null}</div></section>);
-        })() : null)) : (<div className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma pendência operacional para o filtro selecionado.</div>)}</div>
-      </section>
     </div>
   );
 }
@@ -5280,7 +4991,6 @@ export default function App() {
   const [session, setSession] = useState(initialSessionState.session);
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
   const [page, setPage] = useState('dashboard');
-  const [pendenciasSearchContext, setPendenciasSearchContext] = useState(null);
   const [reinfSearchContext, setReinfSearchContext] = useState(null);
   const [ecdSearchContext, setEcdSearchContext] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -6729,36 +6439,6 @@ export default function App() {
         historicoLoading={historicoClienteLoading}
       />
     ),
-    pendencias: can(currentUserFull, PERMISSIONS.PENDENCIAS_VIEW)
-      ? (
-        <PendenciasPage
-          clients={enrichedClients}
-          onView={openClient}
-          onGoReinf={(payload) => {
-            setReinfSearchContext(payload ? {
-              clientId: payload?.clientId ?? '',
-              query: payload?.query ?? '',
-            } : null);
-            setPage('reinf');
-          }}
-          onGoEcd={(payload) => {
-            setEcdSearchContext(payload ? {
-              clientId: payload?.clientId ?? '',
-              query: payload?.query ?? '',
-            } : null);
-            setPage('ecd');
-          }}
-          searchContext={pendenciasSearchContext}
-          onClearSearchContext={() => setPendenciasSearchContext(null)}
-          supabaseStatus={supabaseStatus}
-          metadata={metadata}
-          statusLabel={supabaseStatusLabel}
-          statusTone={supabaseStatusTone}
-          onRefresh={refreshSupabaseData}
-          loading={supabaseRefreshing || supabaseBootstrapping}
-        />
-      )
-      : <AccessDeniedPage />,
     reinf: (
       <ReinfPage
         clients={enrichedClients}
@@ -6882,13 +6562,6 @@ export default function App() {
         searchHistory={can(currentUserFull, PERMISSIONS.HISTORY_VIEW) ? security.historico_alteracoes : []}
         onOpenClient={openClient}
         onOpenHistoryPage={() => setPage('historico')}
-        onOpenPendenciasSearch={(payload) => {
-          setPendenciasSearchContext({
-            clientId: payload?.clientId ?? '',
-            query: payload?.query ?? '',
-          });
-          setPage('pendencias');
-        }}
       >
         <PageContentErrorBoundary
           resetKey={page}

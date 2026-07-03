@@ -1,4 +1,4 @@
-export const AUTH_SESSION_KEY = 'portal-contabilidade-f12-session-v4';
+﻿export const AUTH_SESSION_KEY = 'portal-contabilidade-f12-session-v4';
 
 export const RESET_TOKEN_MINUTES = 15;
 export const LOGIN_LOCK_MINUTES = 15;
@@ -22,7 +22,6 @@ export const PERMISSIONS = {
   CLIENTS_INACTIVATE: 'clients_inactivate',
   CHANGE_RESPONSIBLES: 'change_responsibles',
   DASHBOARDS_VIEW: 'dashboards_view',
-  PENDENCIAS_VIEW: 'pendencias_view',
   REPORTS_VIEW: 'reports_view',
   REPORTS_EXPORT: 'reports_export',
   HISTORY_VIEW: 'history_view',
@@ -31,18 +30,17 @@ export const PERMISSIONS = {
 export const ACCESS_PROFILES = {
   [ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN]: {
     label: 'Coordenador / Administrador',
-    description: 'Acesso completo ao portal, clientes, importação, relatórios, histórico e configurações principais.',
+    description: 'Acesso completo ao portal, clientes, importaÃ§Ã£o, relatÃ³rios, histÃ³rico e configuraÃ§Ãµes principais.',
     permissions: Object.values(PERMISSIONS),
   },
   [ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL]: {
     label: 'Setor Contabil / Operacional',
-    description: 'Acesso operacional compartilhado para consultar a base e atualizar competências, pendências e obrigações.',
+    description: 'Acesso operacional compartilhado para consultar a base e atualizar competências e obrigações.',
     permissions: [
       PERMISSIONS.CLIENTS_VIEW_ALL,
       PERMISSIONS.CLIENTS_EDIT_STATUS,
       PERMISSIONS.CLIENTS_EDIT_OPERATIONAL,
       PERMISSIONS.DASHBOARDS_VIEW,
-      PERMISSIONS.PENDENCIAS_VIEW,
       PERMISSIONS.REPORTS_VIEW,
     ],
   },
@@ -172,3 +170,4 @@ export const COMMON_PASSWORDS = [
   'contabilidade123',
   'password',
 ];
+
