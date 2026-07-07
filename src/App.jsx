@@ -3578,7 +3578,7 @@ function ReinfPage({
         <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
-              REINF aberto a partir de Pendências:
+              REINF aberto a partir da triagem operacional:
               {' '}
               <span className="font-black text-slate-900 dark:text-gray-100">{focusedClientLabel || 'cliente selecionado'}</span>
             </p>
