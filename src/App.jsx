@@ -1682,6 +1682,64 @@ function ReinfAttachmentSentDateCell({ client }) {
   return <span className="font-semibold text-slate-700">{formatDateDisplay(rawDate)}</span>;
 }
 
+function getEcdEcfDeliveryDateValue(client) {
+  return client?.data_entrega_ecd || '';
+}
+
+function getEcdEcfSentDateValue(client) {
+  const reciboEcd = parseAttachment(client.anexo_recibo_ecd);
+  const reciboEcf = parseAttachment(client.anexo_recibo_ecf);
+  const candidates = [
+    client?.data_envio_ecd || '',
+    reciboEcd.attachedAt || '',
+    reciboEcf.attachedAt || '',
+  ]
+    .map((value) => normalizeDateInputValue(value))
+    .filter(Boolean);
+
+  if (!candidates.length) return '';
+  return candidates.reduce((latest, current) => (current > latest ? current : latest));
+}
+
+function EcdEcfDeliveryDateCell({ client, disabled, onSave }) {
+  const [value, setValue] = useState(() => normalizeDateInputValue(getEcdEcfDeliveryDateValue(client)));
+
+  useEffect(() => {
+    setValue(normalizeDateInputValue(getEcdEcfDeliveryDateValue(client)));
+  }, [client.data_entrega_ecd]);
+
+  if (disabled) {
+    return <span className="font-semibold text-slate-700 dark:text-gray-200">{formatDateDisplay(getEcdEcfDeliveryDateValue(client))}</span>;
+  }
+
+  return (
+    <div className="min-w-40" onClick={(event) => event.stopPropagation()}>
+      <input
+        type="date"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => {
+          const nextValue = value || '';
+          const currentValue = normalizeDateInputValue(getEcdEcfDeliveryDateValue(client));
+          if (nextValue === currentValue) return;
+          onSave?.(client.id, { data_entrega_ecd: nextValue });
+        }}
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+      />
+    </div>
+  );
+}
+
+function EcdEcfSentDateCell({ client }) {
+  const rawDate = getEcdEcfSentDateValue(client);
+
+  if (!rawDate) {
+    return <span className="text-sm font-semibold text-slate-400 dark:text-gray-500">Nao informado</span>;
+  }
+
+  return <span className="font-semibold text-slate-700 dark:text-gray-200">{formatDateDisplay(rawDate)}</span>;
+}
+
 function getReinfObrigacaoStatus(client) {
   if (hasObrigacoesPersistidas(client)) {
     const persistedCode = getPersistedReinfStatusCode(client);
@@ -3703,7 +3761,7 @@ function ReinfPage({
   );
 }
 
-function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
+function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate, onQuickUpdate, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -3717,6 +3775,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
   const [focusedClientId, setFocusedClientId] = useState('');
   const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
+  const allowedRegimes = ['lucro presumido', 'lucro real'];
   const modeOptions = [
     { value: 'todos', label: 'Todos' },
     { value: 'ecd-pendente', label: 'ECD pendente' },
@@ -3726,6 +3785,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
     { value: 'comprovante-pendente', label: 'Comprovante pendente' },
   ];
   const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
+  const scopedClients = clients.filter((client) => allowedRegimes.includes(normalizeText(client.regime_tributario)));
 
   useEffect(() => {
     const nextClientId = String(searchContext?.clientId ?? '');
@@ -3737,7 +3797,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
     onClearSearchContext?.();
   }, [searchContext?.clientId, searchContext?.query]);
 
-  const rows = clients.filter((client) => {
+  const rows = scopedClients.filter((client) => {
     if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
     const reciboEcfPendente = isReciboEcfPendente(client);
@@ -3789,10 +3849,10 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
         )}
       />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="ECD obrigatoria" value={countWhere(clients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
-        <MetricCard title="Pendências ECD" value={countWhere(clients, (client) => hasPendenciaObrigacaoEcd(client))} icon={AlertTriangle} tone="warning" />
-        <MetricCard title="Pendências ECF" value={countWhere(clients, (client) => hasPendenciaObrigacaoEcf(client))} icon={FolderClock} tone="warning" />
-        <MetricCard title="Comprovantes pendentes" value={countWhere(clients, (client) => hasComprovanteObrigacaoPendente(client))} icon={Paperclip} tone="warning" />
+        <MetricCard title="ECD obrigatoria" value={countWhere(scopedClients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
+        <MetricCard title="Pendências ECD" value={countWhere(scopedClients, (client) => hasPendenciaObrigacaoEcd(client))} icon={AlertTriangle} tone="warning" />
+        <MetricCard title="Pendências ECF" value={countWhere(scopedClients, (client) => hasPendenciaObrigacaoEcf(client))} icon={FolderClock} tone="warning" />
+        <MetricCard title="Comprovantes pendentes" value={countWhere(scopedClients, (client) => hasComprovanteObrigacaoPendente(client))} icon={Paperclip} tone="warning" />
       </section>
 
       <section className="surface-card p-5">
@@ -3825,8 +3885,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
           </label>
-          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
-          <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(clients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
+          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
+          <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(scopedClients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
           <FilterSelect label="Anexo recibo ECD" value={filters.anexo_recibo_ecd} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecd: value })} includeBlank={false} />
           <FilterSelect label="Anexo recibo ECF" value={filters.anexo_recibo_ecf} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecf: value })} includeBlank={false} />
         </div>
@@ -3842,6 +3902,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             'responsavel_ecd',
             'ultima_ecd_entregue',
             'ultima_ecf_entregue',
+            'data_entrega_ecd',
+            'data_envio_ecd',
             'anexo_recibo_ecd',
             'anexo_recibo_ecf',
           ]}
@@ -3851,6 +3913,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
             responsavel_ecd: 'Responsável',
             ultima_ecd_entregue: 'Última ECD entregue',
             ultima_ecf_entregue: 'Última ECF entregue',
+            data_entrega_ecd: 'Data de entrega ECD / ECF',
+            data_envio_ecd: 'Data enviada',
             anexo_recibo_ecd: 'Recibo ECD',
             anexo_recibo_ecf: 'Recibo ECF',
           }}
@@ -3858,6 +3922,18 @@ function EcdEcfPage({ clients, onView, canManageAttachments, onAnexoSuccess, onA
           renderCell={(client, column) => {
             if (column === 'responsavel_ecd') {
               return renderFieldValue(getObrigacaoResponsavel(client));
+            }
+            if (column === 'data_entrega_ecd') {
+              return (
+                <EcdEcfDeliveryDateCell
+                  client={client}
+                  disabled={!canEditDeliveryDate?.(client)}
+                  onSave={onQuickUpdate}
+                />
+              );
+            }
+            if (column === 'data_envio_ecd') {
+              return <EcdEcfSentDateCell client={client} />;
             }
             if (column === 'anexo_recibo_ecd') {
               return (
@@ -6463,6 +6539,8 @@ export default function App() {
         clients={enrichedClients}
         onView={openClient}
         canManageAttachments={canManageAttachment}
+        canEditDeliveryDate={(client) => canWritePortalData && isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'data_entrega_ecd')}
+        onQuickUpdate={quickUpdateClient}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoError={handleAnexoError}
         supabaseStatus={supabaseStatus}
