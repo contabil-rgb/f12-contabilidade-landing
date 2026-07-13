@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
-import { clientesContabeis } from '../src/data/baseContabilidade.js';
 import { normalizeClienteRowForSync } from '../src/lib/clientes-sync.js';
 
 const ROOT = process.cwd();
 const ENV_PATH = path.join(ROOT, '.env.local');
+const SNAPSHOT_PATH = path.join(ROOT, 'local-data', 'baseContabilidade.js');
 const APPLY_MODE = process.argv.includes('--apply');
 const BATCH_SIZE = 200;
 
@@ -44,6 +45,10 @@ function chunk(array, size) {
 }
 
 async function run() {
+  if (!fs.existsSync(SNAPSHOT_PATH)) {
+    throw new Error(`Snapshot local nao encontrado em ${SNAPSHOT_PATH}. Gere o arquivo com: node scripts/import-base-contabilidade.mjs`);
+  }
+
   const env = readEnvLocal();
   const urlRaw = env.NEXT_PUBLIC_SUPABASE_URL;
   const key = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -52,6 +57,7 @@ async function run() {
   }
   const url = String(urlRaw).replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const supabase = createClient(url, key);
+  const { clientesContabeis = [] } = await import(pathToFileURL(SNAPSHOT_PATH).href);
 
   const rows = uniqueByCnpj(clientesContabeis.map((row) => normalizeClienteRowForSync(row)).filter(Boolean));
   console.log(`[sync-clientes] clientes validos para upsert: ${rows.length}`);

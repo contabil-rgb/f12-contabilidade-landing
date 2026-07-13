@@ -1,7 +1,9 @@
 node_modules
 dist
+local-data
 .DS_Store
 vite-dev*.log
+vite-live*.log
 .vite-dev*.log
 .codex-vite*.log
 

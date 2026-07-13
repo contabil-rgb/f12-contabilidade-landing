@@ -8,7 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const defaultInput = 'C:/Users/F12 CONTABILIDADE 13/Downloads/Base Contabilidade Oficial.xlsx';
 const input = process.argv[2] || defaultInput;
-const output = path.join(projectRoot, 'src', 'data', 'baseContabilidade.js');
+const outputDir = path.join(projectRoot, 'local-data');
+const output = path.join(outputDir, 'baseContabilidade.js');
 
 if (!fs.existsSync(input)) {
   console.error(`Arquivo não encontrado: ${input}`);
@@ -33,6 +34,7 @@ export const listasBase = ${JSON.stringify(payload.listagens, null, 2)};
 export const importMetadata = ${JSON.stringify({ ...payload.metadata, generatedAt }, null, 2)};
 `;
 
+fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(output, content, 'utf8');
 console.log(
   JSON.stringify(

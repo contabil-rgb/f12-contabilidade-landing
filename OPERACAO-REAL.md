@@ -67,15 +67,16 @@ Confirmar:
 
 ### Reaplicar snapshot local
 
-O botao administrativo de reaplicacao:
+A reaplicacao do snapshot local nao deve passar pelo frontend publicado. Ela deve ser executada apenas por script local:
 
-- exige `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true` no `.env.local`;
-- exige ambiente local (`localhost`, `127.0.0.1` ou `::1`);
+- `node scripts/import-base-contabilidade.mjs`, quando for necessario gerar `local-data/baseContabilidade.js`;
+- `npm run supabase:sync:clientes`, para dry-run;
+- `npm run supabase:sync:clientes:apply`, para aplicar no Supabase;
 - nao faz reset completo do portal;
 - nao remove clientes extras do banco;
 - nao remove nem recompõe anexos;
 - nao recompõe historico;
-- existe apenas como ferramenta administrativa isolada;
+- existe apenas como ferramenta administrativa local;
 - deve ser usado com consciencia administrativa.
 
 ### Importacao Excel
@@ -129,7 +130,7 @@ Antes de considerar o portal pronto para uso real, fechar este gate:
   - leitura liberada com ultima sincronizacao;
   - gravacoes bloqueadas durante indisponibilidade;
   - reconexao limpando o estado de contingencia;
-- `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false` no ambiente normal de operacao.
+- build validado sem asset `baseContabilidade-*.js` em `dist/assets`.
 
 Se algum item acima falhar, a liberacao deve ser adiada ate o ajuste.
 
@@ -138,7 +139,7 @@ Se algum item acima falhar, a liberacao deve ser adiada ate o ajuste.
 Ao publicar em dominio ou hospedagem real, confirmar:
 
 - variaveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` configuradas no host;
-- `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false` no ambiente publicado;
+- build publicado sem `local-data/baseContabilidade.js` e sem asset `baseContabilidade-*.js`;
 - URL final do portal configurada corretamente no Supabase Auth;
 - URL de redirecionamento de recuperacao de senha configurada no Supabase Auth;
 - build publicado sem depender de `localhost`;

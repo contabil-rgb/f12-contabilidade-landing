@@ -56,19 +56,33 @@ function normalizeOptionValue(value: unknown) {
   return raw;
 }
 
-export async function listarTodasListagens() {
-  const { data, error } = await supabase
+function normalizeListagemRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    categoria: normalizeCategory(row.categoria),
+    valor: normalizeOptionValue(row.valor),
+    ativo: row.ativo !== false,
+  };
+}
+
+export async function listarTodasListagens({ incluirInativos = false } = {}) {
+  let query = supabase
     .from('listagens')
-    .select('categoria, valor, ordem')
-    .eq('ativo', true)
+    .select('id, categoria, valor, ordem, ativo')
     .order('ordem', { ascending: true })
     .order('valor', { ascending: true });
+
+  if (!incluirInativos) {
+    query = query.eq('ativo', true);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Não foi possível carregar listagens do Supabase: ${error.message}`);
   }
 
-  return data ?? [];
+  return (data ?? []).map((row) => normalizeListagemRow(row));
 }
 
 export async function listarListagensAgrupadas() {
@@ -84,4 +98,75 @@ export async function listarListagensAgrupadas() {
     return acc;
   }, {});
   return grouped;
+}
+
+export async function listarValoresListagemPorCategoria(categoria: unknown, { incluirInativos = false } = {}) {
+  const categoriaNormalizada = normalizeCategory(categoria);
+  const rows = await listarTodasListagens({ incluirInativos });
+  return rows.filter((item) => normalizeCategory(item.categoria) === categoriaNormalizada);
+}
+
+export async function criarValorListagem(categoria: unknown, valor: unknown, { ordem = null, ativo = true } = {}) {
+  const categoriaNormalizada = normalizeCategory(categoria);
+  const valorNormalizado = normalizeOptionValue(valor);
+
+  if (!valorNormalizado) {
+    throw new Error('Informe um valor válido para a listagem.');
+  }
+
+  const payload: Record<string, unknown> = {
+    categoria: categoriaNormalizada,
+    valor: valorNormalizado,
+    ativo,
+  };
+  if (ordem !== null && ordem !== undefined) {
+    payload.ordem = ordem;
+  }
+
+  const { data, error } = await supabase
+    .from('listagens')
+    .insert(payload)
+    .select('id, categoria, valor, ordem, ativo')
+    .single();
+
+  if (error) {
+    throw new Error(`Não foi possível criar o valor da listagem: ${error.message}`);
+  }
+
+  return normalizeListagemRow(data);
+}
+
+export async function atualizarValorListagem(id: string, patch: Record<string, unknown> = {}) {
+  if (!id) {
+    throw new Error('Identificador da listagem não informado.');
+  }
+
+  const nextPatch = { ...patch };
+  if ('categoria' in nextPatch) {
+    nextPatch.categoria = normalizeCategory(nextPatch.categoria);
+  }
+  if ('valor' in nextPatch) {
+    nextPatch.valor = normalizeOptionValue(nextPatch.valor);
+  }
+
+  const { data, error } = await supabase
+    .from('listagens')
+    .update(nextPatch)
+    .eq('id', id)
+    .select('id, categoria, valor, ordem, ativo')
+    .single();
+
+  if (error) {
+    throw new Error(`Não foi possível atualizar o valor da listagem: ${error.message}`);
+  }
+
+  return normalizeListagemRow(data);
+}
+
+export function inativarValorListagem(id: string) {
+  return atualizarValorListagem(id, { ativo: false });
+}
+
+export function reativarValorListagem(id: string) {
+  return atualizarValorListagem(id, { ativo: true });
 }

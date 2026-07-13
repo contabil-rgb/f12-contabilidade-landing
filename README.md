@@ -32,7 +32,6 @@ Observacoes importantes:
 - [src/services/clientes.service.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/clientes.service.ts)
 - [src/services/listagens.service.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/listagens.service.ts)
 - [src/services/importacao.service.js](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/importacao.service.js)
-- [src/services/snapshot-clientes.service.js](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/services/snapshot-clientes.service.js)
 - [supabase/README.md](C:/Users/F12 CONTABILIDADE 13/Documents/New project/supabase/README.md)
 - [OPERACAO-REAL.md](C:/Users/F12 CONTABILIDADE 13/Documents/New project/OPERACAO-REAL.md)
 
@@ -43,11 +42,10 @@ Crie ou ajuste [\.env.local](C:/Users/F12 CONTABILIDADE 13/Documents/New project
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=false
 ```
 
 O frontend valida essas variaveis em [src/lib/supabase.ts](C:/Users/F12 CONTABILIDADE 13/Documents/New project/src/lib/supabase.ts).
-O snapshot local administrativo fica desabilitado por padrao e so deve ser habilitado manualmente em manutencao local.
+O snapshot local administrativo fica fora do frontend, em `local-data/baseContabilidade.js`, e nao deve ser publicado.
 
 ## Tema claro e escuro
 
@@ -123,17 +121,34 @@ Fluxo principal:
 
 ## Reaplicacao do snapshot local
 
-O portal possui um fluxo administrativo isolado para reaplicar os clientes do snapshot local no Supabase.
+O portal nao carrega mais o snapshot local pelo navegador. A reaplicacao controlada deve ser feita apenas por script local.
 
 Esse fluxo:
 
-- exige `VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true`;
-- exige host local (`localhost`, `127.0.0.1` ou `::1`);
+- usa `local-data/baseContabilidade.js`, fora de `src`;
 - atualiza ou recria os registros do snapshot;
 - nao remove clientes extras existentes no banco;
 - nao recompõe anexos;
 - nao recompõe historico;
 - nao deve ser tratado como reset completo do portal.
+
+Se o arquivo local nao existir, gere novamente a partir da planilha oficial:
+
+```bash
+node scripts/import-base-contabilidade.mjs
+```
+
+Depois valide em dry-run:
+
+```bash
+npm run supabase:sync:clientes
+```
+
+Para aplicar no Supabase:
+
+```bash
+npm run supabase:sync:clientes:apply
+```
 
 ## Uso real
 

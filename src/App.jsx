@@ -98,7 +98,13 @@ import {
   inativarCliente as inativarClienteSupabase,
   listarClientes as listarClientesSupabase,
 } from './services/clientes.service';
-import { listarListagensAgrupadas } from './services/listagens.service';
+import {
+  criarValorListagem,
+  inativarValorListagem,
+  listarListagensAgrupadas,
+  listarValoresListagemPorCategoria,
+  reativarValorListagem,
+} from './services/listagens.service';
 import {
   listarHistoricoPortal as listarHistoricoPortalSupabase,
   listarHistoricoPorCliente as listarHistoricoPorClienteSupabase,
@@ -109,7 +115,6 @@ import {
   importarClientesExcel,
   previsualizarImportacaoExcel,
 } from './services/importacao.service';
-import { reaplicarSnapshotClientesLocal } from './services/snapshot-clientes.service';
 import {
   indexarStatusObrigacoes,
   listarStatusObrigacoesClientes,
@@ -293,7 +298,6 @@ const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
 const TRANSIENT_SIGNED_OUT_GRACE_MS = 1600;
 const AUTH_RESTORE_VISUAL_DELAY_MS = TRANSIENT_SIGNED_OUT_GRACE_MS + 250;
 const CONNECTION_WARNING_VISUAL_DELAY_MS = 1200;
-const ENABLE_LOCAL_SNAPSHOT_TOOLS = String(import.meta.env.VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS ?? '').trim().toLowerCase() === 'true';
 
 async function loginSupabase(email, senha) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -650,6 +654,14 @@ function mergeListagensFromClients(baseListagens, clients) {
   return merged;
 }
 
+function getResponsaveisAtivosCatalogo(rows) {
+  return uniqueValues(
+    (rows ?? [])
+      .filter((item) => item?.ativo !== false)
+      .map((item) => normalizeTeamMemberDisplayName(item?.valor)),
+  );
+}
+
 function loadSecurityState() {
   return {
     ...createEmptySecurityState(),
@@ -746,15 +758,6 @@ function shouldOpenResetViewFromUrl() {
     hash.includes('type=recovery') ||
     hash.startsWith('#reset')
   );
-}
-
-function isLocalPortalHost() {
-  const hostname = String(window.location.hostname ?? '').trim().toLowerCase();
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-}
-
-function canUseLocalSnapshotTools() {
-  return ENABLE_LOCAL_SNAPSHOT_TOOLS && isLocalPortalHost();
 }
 
 function getMetadataSourceDisplay(source) {
@@ -4072,11 +4075,7 @@ function ReportsPage({
   filteredClients,
   onExportXlsx,
   onExportCsv,
-  onResetBase,
   canExport,
-  canResetBase,
-  canResetBaseEnabled = true,
-  resetBaseDisabledReason = '',
   supabaseStatus,
   metadata,
   statusLabel,
@@ -4206,18 +4205,6 @@ function ReportsPage({
                   Exportação bloqueada
                 </span>
               )}
-              {canResetBase ? (
-                <button
-                  type="button"
-                  onClick={onResetBase}
-                  disabled={!canResetBaseEnabled}
-                  title={!canResetBaseEnabled ? resetBaseDisabledReason : ''}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-red-200 px-4 py-2.5 text-sm font-black text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10"
-                >
-                  <RefreshCcw size={16} aria-hidden="true" />
-                  Reaplicar snapshot local
-                </button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -5062,6 +5049,8 @@ export default function App() {
   const initialSessionState = useMemo(loadInitialSessionState, []);
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
+  const [responsavelCatalogo, setResponsavelCatalogo] = useState([]);
+  const [responsavelCatalogoBusy, setResponsavelCatalogoBusy] = useState(false);
   const [metadata, setMetadata] = useState(initialState.metadata ?? { ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(initialSessionState.session);
@@ -5465,6 +5454,21 @@ export default function App() {
     );
   }
 
+  function atualizarResponsavelCatalogoLocal(item) {
+    if (!item?.id) return;
+    setResponsavelCatalogo((current) => {
+      const exists = current.some((row) => row.id === item.id);
+      const nextCatalogo = exists
+        ? current.map((row) => (row.id === item.id ? item : row))
+        : [...current, item];
+      setListagens((currentListagens) => ({
+        ...currentListagens,
+        responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
+      }));
+      return nextCatalogo;
+    });
+  }
+
   function sincronizarPerfilUsuario(perfil) {
     if (!perfil?.id) return;
     setSessionProfile((current) => ({
@@ -5558,9 +5562,12 @@ export default function App() {
         || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
       const shouldLoadHistoricoPortal = can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
 
-      const [clientesSupabase, listagensSupabase, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
+        listarValoresListagemPorCategoria('responsavel', { incluirInativos: true })
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
         listarStatusObrigacoesClientes()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
@@ -5594,6 +5601,15 @@ export default function App() {
         mergeListagensFromSupabase(createRuntimeListBase(), listagensSupabase),
         clientesComAcompanhamento,
       );
+      if (responsaveisResult.ok) {
+        setResponsavelCatalogo(responsaveisResult.rows);
+        const responsaveisAtivos = getResponsaveisAtivosCatalogo(responsaveisResult.rows);
+        if (responsaveisResult.rows.length) {
+          nextListagens.responsavel = responsaveisAtivos;
+        }
+      } else {
+        console.warn('[listagens] Falha ao carregar responsaveis do Supabase:', responsaveisResult.error);
+      }
       persist(clientesComAcompanhamento, nextListagens, {
         ...metadata,
         source: 'Supabase',
@@ -6265,56 +6281,82 @@ export default function App() {
     }
   }
 
-  async function resetBase() {
-    if (!isAdmin(currentUserFull)) {
-      setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode reaplicar o snapshot local de clientes.' });
-      return;
+  async function createResponsavelCatalogo(valorInput) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
+      return false;
     }
-    if (!canUseLocalSnapshotTools()) {
-      setToast({
-        title: 'Ferramenta local apenas',
-        message: 'A reaplicação de snapshot local fica disponível apenas no ambiente local de manutenção com a ferramenta explicitamente habilitada.',
-      });
-      return;
+    if (!ensureSupabaseWriteReady('cadastrar o responsável')) return false;
+
+    const valor = String(valorInput ?? '').trim();
+    if (!valor) {
+      setToast({ title: 'Responsável obrigatório', message: 'Informe um nome antes de cadastrar.' });
+      return false;
     }
-    if (!confirm('Reaplicar os clientes do snapshot administrativo local no Supabase? Isso atualiza ou recria esses registros, mas não remove clientes extras, anexos ou histórico.')) return;
 
-    if (!ensureSupabaseWriteReady('reaplicar o snapshot local')) return;
+    const existente = responsavelCatalogo.find((item) => normalizeText(item.valor) === normalizeText(valor));
+    if (existente?.ativo) {
+      setToast({ title: 'Responsável já cadastrado', message: existente.valor });
+      return false;
+    }
+    if (existente && !existente.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar este responsável.' });
+      return false;
+    }
 
-    let sync;
+    setResponsavelCatalogoBusy(true);
     try {
-      sync = await reaplicarSnapshotClientesLocal({ transformRow: withClientDefaults });
+      const saved = existente
+        ? await reativarValorListagem(existente.id)
+        : await criarValorListagem('responsavel', valor);
+      atualizarResponsavelCatalogoLocal(saved);
+      setToast({
+        title: existente ? 'Responsável reativado' : 'Responsável cadastrado',
+        message: saved.valor,
+      });
+      return true;
     } catch (error) {
-      setSupabaseStatus({ connected: false, message: 'Falha ao carregar snapshot local' });
       setToast({
-        title: 'Falha ao carregar snapshot local',
-        message: error.message || 'Não foi possível carregar o snapshot local de clientes.',
+        title: 'Falha ao cadastrar responsável',
+        message: error.message || 'Não foi possível salvar o responsável no Supabase.',
       });
-      return;
+      return false;
+    } finally {
+      setResponsavelCatalogoBusy(false);
+    }
+  }
+
+  async function toggleResponsavelCatalogo(item) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('alterar o responsável')) return false;
+    if (!item?.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar este responsável.' });
+      return false;
     }
 
-    if (!sync?.ok) {
-      setSupabaseStatus({ connected: false, message: 'Falha ao sincronizar snapshot no Supabase' });
+    setResponsavelCatalogoBusy(true);
+    try {
+      const saved = item.ativo
+        ? await inativarValorListagem(item.id)
+        : await reativarValorListagem(item.id);
+      atualizarResponsavelCatalogoLocal(saved);
       setToast({
-        title: 'Falha ao reaplicar snapshot',
-        message: sync?.errors?.[0] ?? 'Não foi possível reaplicar o snapshot local de clientes.',
+        title: saved.ativo ? 'Responsável reativado' : 'Responsável inativado',
+        message: saved.valor,
       });
-      return;
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao atualizar responsável',
+        message: error.message || 'Não foi possível atualizar o responsável no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelCatalogoBusy(false);
     }
-
-    setSupabaseStatus({
-      connected: true,
-      message: `Snapshot reaplicado (${formatNumber(sync.summary?.totalConsideradas ?? 0)} registro(s))`,
-    });
-    const recarregado = await carregarDadosSupabase({ silent: true });
-    setToast({
-      title: 'Snapshot reaplicado',
-      message: recarregado
-        ? (sync.summary
-            ? `Snapshot local reaplicado | Linhas: ${sync.summary.totalLinhasLidas} | Criados: ${sync.summary.criados} | Atualizados: ${sync.summary.atualizados} | Ignorados: ${sync.summary.ignorados}`
-            : 'Snapshot local reaplicado com sucesso.')
-        : 'A reaplicação no Supabase foi concluída, mas a interface não conseguiu recarregar automaticamente.',
-    });
   }
 
   async function saveUser(userValues) {
@@ -6430,7 +6472,6 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
-  const canUseLocalSnapshot = canUseLocalSnapshotTools();
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -6560,11 +6601,7 @@ export default function App() {
           filteredClients={filteredClients}
           onExportXlsx={exportXlsx}
           onExportCsv={exportCsv}
-          onResetBase={resetBase}
           canExport={canExportReports}
-          canResetBase={isAdmin(currentUserFull) && canUseLocalSnapshot}
-          canResetBaseEnabled={isAdmin(currentUserFull) && canUseLocalSnapshot && canWritePortalData}
-          resetBaseDisabledReason={!canUseLocalSnapshot ? 'Disponível apenas no ambiente local de manutenção com VITE_ENABLE_LOCAL_SNAPSHOT_TOOLS=true.' : writeBlockedReason}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           statusLabel={supabaseStatusLabel}
@@ -6584,6 +6621,10 @@ export default function App() {
               setEditingUser(security.usuarios.find((item) => item.id === user.id));
             }}
             onToggleStatus={toggleUserStatus}
+            responsavelOptions={responsavelCatalogo}
+            responsavelBusy={responsavelCatalogoBusy}
+            onCreateResponsavel={createResponsavelCatalogo}
+            onToggleResponsavel={toggleResponsavelCatalogo}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
             )}
