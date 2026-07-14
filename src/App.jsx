@@ -5,8 +5,9 @@ import {
   BarChart3,
   BellRing,
   BookOpenCheck,
-  Building2,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Download,
@@ -30,7 +31,6 @@ import {
   ShieldAlert,
   Trash2,
   Upload,
-  UserCheck,
   UserCog,
   Users,
   X,
@@ -680,6 +680,10 @@ function normalizeFieldDisplayValue(fieldKey, value) {
     return normalizeTeamMemberDisplayName(value);
   }
   return String(value ?? '').trim();
+}
+
+function normalizeFilterComparableValue(fieldKey, value) {
+  return normalizeText(normalizeFieldDisplayValue(fieldKey, value)) || normalizeText('Não informado');
 }
 
 function normalizeSessionProfileSnapshot(profile) {
@@ -1856,7 +1860,7 @@ function filterClients(clients, filters) {
       if (field === 'competencia_em_dia') {
         return normalizeText(isCompetenciaEmDia(client) ? 'Sim' : 'Não') === normalizeText(filterValue);
       }
-      return normalizeText(normalizeFieldDisplayValue(field, client[field])) === normalizeText(normalizeFieldDisplayValue(field, filterValue));
+      return normalizeFilterComparableValue(field, client[field]) === normalizeFilterComparableValue(field, filterValue);
     });
 
     if (!matchesBaseFilters) return false;
@@ -1927,9 +1931,15 @@ function getNormalizedBreakdownRows(clients, fieldKey) {
   );
 }
 
-function getFilterOptionsForField(listagens, field, currentValue = '') {
+function getFilterOptionsForField(listagens, field, currentValue = '', clientsForOptions = []) {
+  const canIncludeUninformedOption = Boolean(field?.key) && field.key !== 'competencia_em_dia';
+  const hasUninformedClients = canIncludeUninformedOption && (clientsForOptions ?? []).some((client) => {
+    return !normalizeFieldDisplayValue(field?.key, client?.[field?.key]);
+  });
+
   return uniqueValues([
     ...(getOptions(listagens, field) ?? []),
+    hasUninformedClients ? 'Não informado' : '',
     currentValue,
   ].map((value) => normalizeFieldDisplayValue(field?.key, value)));
 }
@@ -2914,40 +2924,27 @@ function SearchAndFilters({
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
-          <label className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400">
-            Alertas e acompanhamento
-            <select
-              value={filters.alerta}
-              onChange={(event) => updateFilter({ alerta: event.target.value })}
-              className="select-shell mt-2 normal-case"
-            >
-              <option value="">Todos</option>
-              {alertOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <DropdownFilterSelect
+            label="Alertas e acompanhamento"
+            value={filters.alerta}
+            options={alertOptions}
+            onChange={(value) => updateFilter({ alerta: value })}
+            labelClassName="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
+            buttonClassName="select-shell mt-2 normal-case"
+          />
           {FILTER_FIELDS.map((fieldKey) => {
             const field = FIELD_DEFINITIONS.find((item) => item.key === fieldKey);
-            const options = getFilterOptionsForField(listagens, field, filters[fieldKey]);
+            const options = getFilterOptionsForField(listagens, field, filters[fieldKey], clientsForOptions);
             return (
-              <label key={fieldKey} className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400">
-                {field?.label ?? fieldKey}
-                <select
-                  value={filters[fieldKey]}
-                  onChange={(event) => updateFilter({ [fieldKey]: event.target.value })}
-                  className="select-shell mt-2 normal-case"
-                >
-                  <option value="">Todos</option>
-                  {options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <DropdownFilterSelect
+                key={fieldKey}
+                label={field?.label ?? fieldKey}
+                value={filters[fieldKey]}
+                options={options}
+                onChange={(value) => updateFilter({ [fieldKey]: value })}
+                labelClassName="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
+                buttonClassName="select-shell mt-2 normal-case"
+              />
             );
           })}
         </div>
@@ -3127,13 +3124,34 @@ function getDetailObrigacoesSummary(client) {
   };
 }
 
-function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, canEditRow, canInactivateRow, renderClientCell }) {
+function ClientsTable({
+  clients,
+  sort,
+  setSort,
+  onView,
+  onEdit,
+  onInactivate,
+  canEditRow,
+  canInactivateRow,
+  renderClientCell,
+  selectedClientIds = [],
+  onToggleSelect,
+  onToggleSelectVisible,
+  onOpenBatchResponsavel,
+  canSelectRow,
+}) {
   function sortColumn(key) {
     setSort((current) => ({
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
     }));
   }
+
+  const selectedIdsSet = new Set(selectedClientIds);
+  const selectableClients = clients.filter((client) => canSelectRow?.(client));
+  const selectedVisibleCount = selectableClients.filter((client) => selectedIdsSet.has(client.id)).length;
+  const allVisibleSelected = selectableClients.length > 0 && selectedVisibleCount === selectableClients.length;
+  const hasSelection = selectedClientIds.length > 0;
 
   return (
     <section className="min-w-0 surface-card">
@@ -3144,16 +3162,44 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
             {formatNumber(clients.length)} cliente(s) visível(is) nesta consulta.
           </p>
         </div>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          Role a tabela no bloco, se precisar.
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasSelection ? (
+            <>
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                {formatNumber(selectedClientIds.length)} selecionado(s)
+              </span>
+              <button
+                type="button"
+                onClick={onOpenBatchResponsavel}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-3 py-2 text-xs font-black text-white transition hover:bg-[#0056d6]"
+              >
+                <UserCog size={14} aria-hidden="true" />
+                Alterar responsável
+              </button>
+            </>
+          ) : null}
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            Role a tabela no bloco, se precisar.
+          </span>
+        </div>
       </div>
       <div className="w-full max-w-full overflow-auto overflow-soft">
         <table className="w-full min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px] border-separate border-spacing-0 text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
             <tr>
               <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                Cliente
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    disabled={!selectableClients.length}
+                    aria-label="Selecionar clientes visíveis"
+                    aria-checked={selectedVisibleCount > 0 && !allVisibleSelected ? 'mixed' : allVisibleSelected}
+                    onChange={(event) => onToggleSelectVisible?.(event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <span>Cliente</span>
+                </div>
               </th>
               <th className="w-48 border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
                 Alertas
@@ -3187,6 +3233,15 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
                 >
                   <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
                     <div className="flex max-w-80 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIdsSet.has(client.id)}
+                        disabled={!canSelectRow?.(client)}
+                        aria-label={`Selecionar ${client.nome_identificacao || client.razao_social || 'cliente'}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => onToggleSelect?.(client.id, event.target.checked)}
+                        className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                         {getDashboardInitials(client.nome_identificacao || client.razao_social || 'CL')}
                       </div>
@@ -3263,6 +3318,10 @@ function ClientsTable({ clients, sort, setSort, onView, onEdit, onInactivate, ca
 }
 
 function BaseClientesPage(props) {
+  const [selectedClientIds, setSelectedClientIds] = useState([]);
+  const [batchResponsavelOpen, setBatchResponsavelOpen] = useState(false);
+  const [batchResponsavelValue, setBatchResponsavelValue] = useState('');
+  const [batchResponsavelBusy, setBatchResponsavelBusy] = useState(false);
   const acompanhamentoMetrics = [
     {
       key: 'comunicacao',
@@ -3299,6 +3358,53 @@ function BaseClientesPage(props) {
       ...patch,
     }));
     props.onManualFilter?.();
+  }
+
+  const canSelectClientForBatch = (client) => Boolean(props.canBatchUpdateResponsavel?.(client));
+  const selectedClientIdSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
+  const selectedClients = useMemo(
+    () => (props.allClients ?? props.clients).filter((client) => selectedClientIdSet.has(client.id)),
+    [props.allClients, props.clients, selectedClientIdSet],
+  );
+  const activeResponsavelOptions = props.responsavelOptions ?? [];
+
+  useEffect(() => {
+    setSelectedClientIds((current) => current.filter((id) => props.clients.some((client) => client.id === id && canSelectClientForBatch(client))));
+  }, [props.clients]);
+
+  function toggleClientSelection(clientId, checked) {
+    setSelectedClientIds((current) => {
+      if (checked) return current.includes(clientId) ? current : [...current, clientId];
+      return current.filter((id) => id !== clientId);
+    });
+  }
+
+  function toggleVisibleSelection(checked) {
+    const visibleSelectableIds = props.clients.filter(canSelectClientForBatch).map((client) => client.id);
+    setSelectedClientIds((current) => {
+      if (!checked) return current.filter((id) => !visibleSelectableIds.includes(id));
+      return [...new Set([...current, ...visibleSelectableIds])];
+    });
+  }
+
+  function openBatchResponsavelModal() {
+    setBatchResponsavelValue('');
+    setBatchResponsavelOpen(true);
+  }
+
+  async function confirmBatchResponsavel() {
+    if (!props.onBatchUpdateResponsavel || !selectedClientIds.length || !batchResponsavelValue) return;
+    setBatchResponsavelBusy(true);
+    try {
+      const ok = await props.onBatchUpdateResponsavel(selectedClientIds, batchResponsavelValue);
+      if (ok) {
+        setSelectedClientIds([]);
+        setBatchResponsavelOpen(false);
+        setBatchResponsavelValue('');
+      }
+    } finally {
+      setBatchResponsavelBusy(false);
+    }
   }
 
   return (
@@ -3346,7 +3452,76 @@ function BaseClientesPage(props) {
         canEditRow={props.canEditRow}
         canInactivateRow={props.canInactivateRow}
         renderClientCell={props.renderClientCell}
+        selectedClientIds={selectedClientIds}
+        onToggleSelect={toggleClientSelection}
+        onToggleSelectVisible={toggleVisibleSelection}
+        onOpenBatchResponsavel={openBatchResponsavelModal}
+        canSelectRow={canSelectClientForBatch}
       />
+      {batchResponsavelOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-panel dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Alteração em lote</p>
+                <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Alterar responsável</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
+                  {formatNumber(selectedClients.length)} cliente(s) selecionado(s). Escolha um responsável ativo para receber essa carteira.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBatchResponsavelOpen(false)}
+                disabled={batchResponsavelBusy}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <label className="mt-5 block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+              Novo responsável
+              <select
+                value={batchResponsavelValue}
+                onChange={(event) => setBatchResponsavelValue(event.target.value)}
+                disabled={batchResponsavelBusy}
+                className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              >
+                <option value="">Selecione um responsável ativo</option>
+                {activeResponsavelOptions.map((responsavel) => (
+                  <option key={responsavel} value={responsavel}>
+                    {responsavel}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              A alteração atualiza somente o campo responsável dos clientes selecionados e registra histórico para auditoria.
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBatchResponsavelOpen(false)}
+                disabled={batchResponsavelBusy}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmBatchResponsavel}
+                disabled={batchResponsavelBusy || !batchResponsavelValue || !selectedClients.length}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-black text-white transition hover:bg-[#0056d6] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {batchResponsavelBusy ? <RefreshCcw size={16} className="animate-spin" aria-hidden="true" /> : <UserCog size={16} aria-hidden="true" />}
+                {batchResponsavelBusy ? 'Alterando...' : 'Confirmar alteração'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3511,26 +3686,101 @@ function DetailPage({
   );
 }
 
+function DropdownFilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  includeBlank = true,
+  labelClassName = 'text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400',
+  buttonClassName = 'mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100',
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const normalizedOptions = [
+    ...(includeBlank ? [{ value: '', label: 'Todos' }] : []),
+    ...options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option)),
+  ];
+  const selectedOption = normalizedOptions.find((option) => option.value === value);
+  const selectedLabel = selectedOption?.label ?? 'Todos';
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event) {
+      if (!containerRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  function handleSelect(nextValue) {
+    onChange(nextValue);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className={`relative ${labelClassName}`}>
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={`${buttonClassName} flex items-center justify-between gap-2 text-left`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+        >
+          {normalizedOptions.map((option) => {
+            const selected = option.value === value;
+            return (
+              <button
+                key={`${option.value}-${option.label}`}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => handleSelect(option.value)}
+                className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
+              >
+                <span className="truncate">{option.label}</span>
+                {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FilterSelect({ label, value, options, onChange, includeBlank = true }) {
   return (
-    <label className="text-xs font-bold uppercase tracking-normal text-slate-500">
-      {label}
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-      >
-        {includeBlank ? <option value="">Todos</option> : null}
-        {options.map((option) => {
-          const item = typeof option === 'string' ? { value: option, label: option } : option;
-          return (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          );
-        })}
-      </select>
-    </label>
+    <DropdownFilterSelect
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      includeBlank={includeBlank}
+    />
   );
 }
 
@@ -4031,7 +4281,7 @@ function StaticBreakdownPanel({ title, rows, total, icon: Icon = BarChart3 }) {
           </p>
           <h2 className="mt-1 text-base font-black text-slate-950 dark:text-gray-100">{title}</h2>
           <p className="mt-1 text-sm font-medium text-slate-500 dark:text-gray-400">
-            Distribuicao resumida para apoiar a leitura operacional da base.
+            Distribuição resumida para apoiar a leitura operacional da base.
           </p>
         </div>
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-brand-blue shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-blue-300">
@@ -4083,43 +4333,43 @@ function ReportsPage({
   onRefresh,
   loading = false,
 }) {
-  const clientesComPendencias = clients.filter((client) => hasPendenciaAtiva(client));
-  const clientesAguardandoRetorno = clients.filter((client) => isAguardandoRetorno(client));
-  const clientesAcompanhamentoPendente = clients.filter((client) => hasAcompanhamentoPendente(client));
-  const clientesSemRetorno = clients.filter((client) => isSemRetorno(client));
-  const clientesSemNotificacao = clients.filter((client) => !isClienteNotificado(client));
+  const reportScope = Array.isArray(filteredClients) ? filteredClients : clients;
+  const clientesComAtraso = reportScope.filter((client) => hasPendenciaAtrasada(client));
+  const clientesComPendencias = reportScope.filter((client) => hasPendenciaAtiva(client));
+  const clientesAguardandoRetorno = reportScope.filter((client) => isAguardandoRetorno(client));
+  const clientesAcompanhamentoPendente = reportScope.filter((client) => hasAcompanhamentoPendente(client));
+  const clientesSemRetorno = reportScope.filter((client) => isSemRetorno(client));
+  const clientesSemNotificacao = reportScope.filter((client) => !isClienteNotificado(client));
+  const clientesRetornoRecebido = reportScope.filter((client) => hasRetornoConcluido(client));
+  const clientesReinfPendente = reportScope.filter((client) => hasPendenciaObrigacaoReinf(client));
+  const clientesEcdEcfObrigatoria = reportScope.filter((client) => hasObrigacaoAnual(client));
+  const clientesRetornoSeteDias = clientesAguardandoRetorno.filter((client) => (getDiasSemRetorno(client) ?? 0) >= 7);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
     { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
     { label: 'Sem retorno', value: clientesSemRetorno.length },
     { label: 'Sem notificação', value: clientesSemNotificacao.length },
-    { label: 'Retorno recebido', value: clients.filter((client) => hasRetornoConcluido(client)).length },
+    { label: 'Retorno recebido', value: clientesRetornoRecebido.length },
   ].filter((row) => row.value > 0);
-  const acompanhamentoPrazoRows = [
-    {
-      label: 'Média de dias sem retorno',
-      value: clientesAguardandoRetorno.length
-        ? Number(
-          (
-            clientesAguardandoRetorno.reduce((sum, client) => sum + Math.max(getDiasSemRetorno(client) ?? 0, 0), 0)
-            / clientesAguardandoRetorno.length
-          ).toFixed(1),
-        )
-        : 0,
-    },
+  const retornoRows = [
+    { label: 'Aguardando retorno', value: clientesAguardandoRetorno.length },
+    { label: 'Sem retorno', value: clientesSemRetorno.length },
+    { label: 'Retorno recebido', value: clientesRetornoRecebido.length },
+    { label: '7+ dias sem retorno', value: clientesRetornoSeteDias.length },
+  ].filter((row) => row.value > 0);
+  const pendenciasEAtrasosRows = [
+    { label: 'Clientes com pendências', value: clientesComPendencias.length },
+    { label: 'Clientes com atraso', value: clientesComAtraso.length },
+    { label: 'REINF pendente', value: clientesReinfPendente.length },
+    { label: 'ECD/ECF obrigatória', value: clientesEcdEcfObrigatoria.length },
   ].filter((row) => row.value > 0);
   const reports = [
-    { title: 'Clientes por responsável', rows: getNormalizedBreakdownRows(clients, 'responsavel'), icon: UserCheck, tone: 'info' },
-    { title: 'Clientes por regime tributário', rows: normalizeBreakdownRows(toBreakdown(clients, 'regime_tributario')), icon: Building2, tone: 'info' },
-    { title: 'Clientes com atraso', rows: clients.filter((client) => hasPendenciaAtrasada(client)), icon: FolderClock, tone: 'danger' },
+    { title: 'Clientes com atraso', rows: clientesComAtraso, icon: FolderClock, tone: 'danger' },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert, tone: 'warning' },
-    { title: 'Acompanhamento pendente', rows: clientesAcompanhamentoPendente, icon: Mail, tone: 'info' },
+    { title: 'REINF pendente', rows: clientesReinfPendente, icon: FileSpreadsheet, tone: 'warning' },
+    { title: 'ECD/ECF obrigatória', rows: clientesEcdEcfObrigatoria, icon: BookOpenCheck, tone: 'info' },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail, tone: 'warning' },
     { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle, tone: 'danger' },
-    { title: 'Sem notificação', rows: clientesSemNotificacao, icon: EyeOff, tone: 'muted' },
-    { title: 'REINF pendente', rows: clients.filter((client) => hasPendenciaObrigacaoReinf(client)), icon: FileSpreadsheet, tone: 'warning' },
-    { title: 'ECD/ECF obrigatória', rows: clients.filter((client) => hasObrigacaoAnual(client)), icon: BookOpenCheck, tone: 'info' },
-    { title: 'Clientes por dificuldade', rows: normalizeBreakdownRows(toBreakdown(clients, 'dificuldade')), icon: AlertTriangle, tone: 'warning' },
   ];
   const reportCount = (rows) =>
     rows.reduce((acc, row) => acc + (typeof row?.value === 'number' ? row.value : 1), 0);
@@ -4130,30 +4380,17 @@ function ReportsPage({
     tone,
     count: Array.isArray(rows) ? reportCount(rows) : 0,
   }));
-  const technicalTables = [
-    'clientes_contabeis',
-    'tipos_cliente',
-    'regimes_tributarios',
-    'atividades',
-    'responsaveis',
-    'revisores',
-    'situacoes',
-    'modos_entrega',
-    'motivos_atraso',
-    'dificuldades',
-  ];
-
   return (
     <div className="min-w-0 space-y-5">
       <section className="surface-card p-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Relatorios operacionais
+              Exportação da base
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Exportação da base</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Base filtrada para saída</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
-              {formatNumber(filteredClients.length)} registros filtrados, {formatNumber(clients.length)} registros na base.
+              {formatNumber(reportScope.length)} registros no recorte atual, {formatNumber(clients.length)} registros na base completa.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className={`rounded-full border px-3 py-1.5 text-xs font-black ${chipClass(statusTone)}`}>
@@ -4163,7 +4400,7 @@ function ReportsPage({
                 Fonte: {getMetadataSourceDisplay(metadata?.source)}
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                Base total: {formatNumber(clients.length)}
+                Recorte atual: {formatNumber(reportScope.length)}
               </span>
             </div>
           </div>
@@ -4185,7 +4422,7 @@ function ReportsPage({
                 <>
                   <button
                     type="button"
-                    onClick={() => onExportXlsx(filteredClients, 'clientes-contabeis-filtrados.xlsx')}
+                    onClick={() => onExportXlsx(reportScope, 'clientes-contabeis-filtrados.xlsx')}
                     className="inline-flex items-center gap-2 rounded-2xl bg-brand-blue px-4 py-2.5 text-sm font-black text-white transition hover:bg-[#0056d6]"
                   >
                     <Download size={16} aria-hidden="true" />
@@ -4193,7 +4430,7 @@ function ReportsPage({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onExportCsv(filteredClients, 'clientes-contabeis-filtrados.csv')}
+                    onClick={() => onExportCsv(reportScope, 'clientes-contabeis-filtrados.csv')}
                     className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                   >
                     <FileDown size={16} aria-hidden="true" />
@@ -4210,85 +4447,93 @@ function ReportsPage({
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {reportCards.map(({ title, rows, Icon, count, tone }) => (
-          <article key={title} className={`surface-card p-5 ${getMetricPanelToneClass(tone)}`}>
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-gray-100">{title}</p>
-                <p className="mt-3 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(count)}</p>
-                <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                  {count === 1 ? '1 registro neste recorte' : `${formatNumber(count)} registros neste recorte`}
-                </p>
-              </div>
-              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-white/90 shadow-sm dark:border-gray-600 dark:bg-gray-800/90 ${chipClass(tone)}`}>
-                <Icon size={19} aria-hidden="true" />
-              </span>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {canExport ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onExportXlsx(rows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                  >
-                    Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onExportCsv(rows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                  >
-                    CSV
-                  </button>
-                </>
-              ) : (
-                <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                  Exportação bloqueada
-                </span>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-2">
-        <StaticBreakdownPanel
-          title="Status do acompanhamento"
-          rows={acompanhamentoStatusRows}
-          total={clients.length}
-          icon={Mail}
-        />
-        <StaticBreakdownPanel
-          title="Prazos e retorno"
-          rows={acompanhamentoPrazoRows}
-          total={clients.length}
-          icon={ClipboardList}
-        />
-      </section>
-
-      <section className="surface-card p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <section>
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Mapa tecnico
+              Relatórios prontos
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Estrutura técnica preparada</h2>
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Recortes operacionais úteis</h2>
           </div>
-          <span className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            Base de apoio para futuras automacoes
-          </span>
+          <p className="max-w-xl text-sm font-semibold text-slate-500 dark:text-gray-400">
+            Cards focados em pendências, obrigações e retorno do cliente.
+          </p>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {technicalTables.map((table) => (
-            <div
-              key={table}
-              className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/45"
-            >
-              <p className="text-sm font-black text-slate-800 dark:text-gray-100">{table}</p>
-            </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {reportCards.map(({ title, rows, Icon, count, tone }) => (
+            <article key={title} className={`surface-card p-5 ${getMetricPanelToneClass(tone)}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-slate-900 dark:text-gray-100">{title}</p>
+                  <p className="mt-3 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(count)}</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                    {count === 1 ? '1 registro neste recorte' : `${formatNumber(count)} registros neste recorte`}
+                  </p>
+                </div>
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-white/90 shadow-sm dark:border-gray-600 dark:bg-gray-800/90 ${chipClass(tone)}`}>
+                  <Icon size={19} aria-hidden="true" />
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {canExport ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onExportXlsx(rows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
+                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onExportCsv(rows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
+                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                    >
+                      CSV
+                    </button>
+                  </>
+                ) : (
+                  <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
+                    Exportação bloqueada
+                  </span>
+                )}
+              </div>
+            </article>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
+              Indicadores de acompanhamento
+            </p>
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Status, retorno, pendências e atrasos</h2>
+          </div>
+          <p className="max-w-xl text-sm font-semibold text-slate-500 dark:text-gray-400">
+            Leitura complementar do mesmo recorte usado nas exportações.
+          </p>
+        </div>
+        <div className="grid gap-5 xl:grid-cols-3">
+          <StaticBreakdownPanel
+            title="Status do acompanhamento"
+            rows={acompanhamentoStatusRows}
+            total={reportScope.length}
+            icon={Mail}
+          />
+          <StaticBreakdownPanel
+            title="Retorno do cliente"
+            rows={retornoRows}
+            total={reportScope.length}
+            icon={ClipboardList}
+          />
+          <StaticBreakdownPanel
+            title="Pendências e atrasos"
+            rows={pendenciasEAtrasosRows}
+            total={reportScope.length}
+            icon={ShieldAlert}
+          />
         </div>
       </section>
     </div>
@@ -6052,6 +6297,118 @@ export default function App() {
     }
   }
 
+  async function batchUpdateResponsavel(clientIds, novoResponsavelInput) {
+    if (!currentUserFull) return false;
+    if (!ensureSupabaseWriteReady('alterar responsáveis em lote')) return false;
+    if (!canEditClientField(currentUserFull, 'responsavel')) {
+      setToast({ title: 'Acesso negado', message: deniedReasonForField(currentUserFull, 'responsavel') });
+      return false;
+    }
+
+    const novoResponsavel = normalizeTeamMemberDisplayName(novoResponsavelInput);
+    const responsaveisAtivos = getResponsaveisAtivosCatalogo(responsavelCatalogo);
+    const responsaveisValidos = responsaveisAtivos.length ? responsaveisAtivos : uniqueValues(listagens.responsavel ?? []);
+    const responsavelAtivo = responsaveisValidos.some((responsavel) => normalizeText(responsavel) === normalizeText(novoResponsavel));
+    if (!novoResponsavel || !responsavelAtivo) {
+      setToast({ title: 'Responsável inválido', message: 'Selecione um responsável ativo antes de confirmar.' });
+      return false;
+    }
+
+    const idsSelecionados = new Set((clientIds ?? []).filter(Boolean));
+    const clientesSelecionados = clients.filter((client) => idsSelecionados.has(client.id));
+    if (!clientesSelecionados.length) {
+      setToast({ title: 'Nenhum cliente selecionado', message: 'Selecione ao menos um cliente antes de alterar o responsável.' });
+      return false;
+    }
+
+    const clienteSemPermissao = clientesSelecionados.find((client) => !canViewClient(currentUserFull, client) || !canEditClientField(currentUserFull, 'responsavel'));
+    if (clienteSemPermissao) {
+      setToast({
+        title: 'Acesso negado',
+        message: `Seu perfil não pode alterar o responsável de ${clienteSemPermissao.nome_identificacao || clienteSemPermissao.razao_social || 'um dos clientes selecionados'}.`,
+      });
+      return false;
+    }
+
+    const clientesParaAtualizar = clientesSelecionados.filter((client) => {
+      return normalizeText(normalizeTeamMemberDisplayName(client.responsavel)) !== normalizeText(novoResponsavel);
+    });
+    if (!clientesParaAtualizar.length) {
+      setToast({ title: 'Nenhuma alteração necessária', message: 'Os clientes selecionados já estão com esse responsável.' });
+      return true;
+    }
+
+    const atualizados = new Map();
+    const falhas = [];
+
+    for (const client of clientesParaAtualizar) {
+      if (!isUuid(client.id)) {
+        falhas.push(client);
+        continue;
+      }
+
+      let previousForHistory = client;
+      try {
+        const previousFromDb = await buscarClientePorIdSupabase(client.id);
+        if (previousFromDb) previousForHistory = previousFromDb;
+      } catch (error) {
+        console.warn('[historico] Falha ao buscar cliente atual para alteracao em lote:', error);
+      }
+
+      try {
+        const patch = applyResponsavelEcdFallback(previousForHistory ?? client, { responsavel: novoResponsavel });
+        const saved = await atualizarClienteSupabase(client.id, patch);
+        const nextClient = withClientDefaults({
+          ...client,
+          ...patch,
+          ...saved,
+        });
+        const historicoResult = await registrarHistoricoPersistente({
+          clienteId: client.id,
+          valoresAntigos: previousForHistory ?? client,
+          valoresNovos: nextClient,
+          tipoAcao: 'alteracao_responsavel_lote',
+          origem: 'Base de Clientes - Alteração em lote',
+          notifyOnError: true,
+        });
+        if (historicoResult?.ok) {
+          await recarregarHistoricoClienteAtivo(client.id);
+        }
+        atualizados.set(client.id, clearPersistedObrigacoes(nextClient));
+      } catch (error) {
+        console.warn('[clientes] Falha ao alterar responsavel em lote:', error);
+        falhas.push({ ...client, _batchError: error });
+      }
+    }
+
+    if (atualizados.size) {
+      updateClientsPersisted((current) =>
+        current.map((client) => atualizados.get(client.id) ?? client),
+      );
+      setSupabaseStatus({
+        connected: true,
+        message: `${formatNumber(atualizados.size)} responsável(is) atualizado(s) no Supabase`,
+      });
+      void resyncSupabaseAfterMutation('alteracao de responsavel em lote');
+    }
+
+    if (falhas.length) {
+      setToast({
+        title: atualizados.size ? 'Alteração parcial' : 'Falha ao alterar responsáveis',
+        message: atualizados.size
+          ? `${formatNumber(atualizados.size)} cliente(s) atualizado(s), ${formatNumber(falhas.length)} não confirmado(s). Revise a carteira antes de tentar novamente.`
+          : 'Nenhum cliente foi atualizado. Revise a conexão e tente novamente.',
+      });
+      return false;
+    }
+
+    setToast({
+      title: 'Responsável alterado',
+      message: `${formatNumber(atualizados.size)} cliente(s) transferido(s) para ${novoResponsavel}.`,
+    });
+    return true;
+  }
+
   async function handleAnexoSuccess(clientId, tipoAnexo, anexo) {
     const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
     const fieldIsTrackedInClientBase = FIELD_DEFINITIONS.some((field) => field.key === fieldKey);
@@ -6518,6 +6875,9 @@ export default function App() {
         allClients={enrichedClients}
         canEditRow={(client) => canWritePortalData && canEditClient(currentUserFull, client)}
         canInactivateRow={(client) => canWritePortalData && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
+        canBatchUpdateResponsavel={(client) => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'responsavel')}
+        responsavelOptions={getResponsaveisAtivosCatalogo(responsavelCatalogo)}
+        onBatchUpdateResponsavel={batchUpdateResponsavel}
         renderClientCell={(client, fieldKey) => {
           if (fieldKey === 'responsavel') {
             return renderFieldValue(getResponsavelOperacional(client));
