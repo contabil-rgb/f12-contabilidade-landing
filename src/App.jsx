@@ -97,9 +97,11 @@ import {
   criarCliente as criarClienteSupabase,
   inativarCliente as inativarClienteSupabase,
   listarClientes as listarClientesSupabase,
+  listarClientesVinculadosResponsavel,
 } from './services/clientes.service';
 import {
   criarValorListagem,
+  excluirValorListagem,
   inativarValorListagem,
   listarListagensAgrupadas,
   listarValoresListagemPorCategoria,
@@ -6716,6 +6718,62 @@ export default function App() {
     }
   }
 
+  async function deleteResponsavelCatalogo(item) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('excluir o responsável')) return false;
+    if (!item?.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de excluir este responsável.' });
+      return false;
+    }
+    if (item.ativo) {
+      setToast({ title: 'Inative antes de excluir', message: 'A exclusão definitiva só fica disponível para responsáveis inativos.' });
+      return false;
+    }
+
+    setResponsavelCatalogoBusy(true);
+    try {
+      const vinculados = await listarClientesVinculadosResponsavel(item.valor);
+      if (vinculados.length) {
+        const exemplo = vinculados[0]?.nome_identificacao || vinculados[0]?.razao_social || 'cliente vinculado';
+        setToast({
+          title: 'Exclusão bloqueada',
+          message: `${item.valor} ainda está vinculado a ${formatNumber(vinculados.length)} cliente(s) ativo(s), incluindo ${exemplo}. Transfira ou limpe esses vínculos antes de excluir.`,
+        });
+        return false;
+      }
+
+      if (!confirm(`Excluir definitivamente o responsável ${item.valor}? Essa ação não poderá ser desfeita.`)) {
+        return false;
+      }
+
+      const deleted = await excluirValorListagem(item.id, 'responsavel');
+      setResponsavelCatalogo((current) => {
+        const nextCatalogo = current.filter((row) => row.id !== item.id);
+        setListagens((currentListagens) => ({
+          ...currentListagens,
+          responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
+        }));
+        return nextCatalogo;
+      });
+      setToast({
+        title: 'Responsável excluído',
+        message: deleted.valor || item.valor,
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao excluir responsável',
+        message: error.message || 'Não foi possível excluir o responsável no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelCatalogoBusy(false);
+    }
+  }
+
   async function saveUser(userValues) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) return;
     if (!ensureSupabaseWriteReady('salvar o usuário')) return;
@@ -6985,6 +7043,7 @@ export default function App() {
             responsavelBusy={responsavelCatalogoBusy}
             onCreateResponsavel={createResponsavelCatalogo}
             onToggleResponsavel={toggleResponsavelCatalogo}
+            onDeleteResponsavel={deleteResponsavelCatalogo}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
             )}

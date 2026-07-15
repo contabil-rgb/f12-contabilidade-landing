@@ -1,7 +1,7 @@
 -- Portal de Gestao Contabil - Gestao do catalogo de responsaveis
 -- Execute depois de auth-rls.sql. Pode ser executado mais de uma vez com seguranca.
 
-grant select, insert, update on table public.listagens to authenticated;
+grant select, insert, update, delete on table public.listagens to authenticated;
 
 insert into public.listagens (categoria, valor, ordem)
 select
@@ -35,6 +35,16 @@ using (
   and categoria = 'responsavel'
 )
 with check (
+  public.is_portal_coordenador()
+  and categoria = 'responsavel'
+);
+
+drop policy if exists "listagens_delete_responsavel_coordenador" on public.listagens;
+create policy "listagens_delete_responsavel_coordenador"
+on public.listagens
+for delete
+to authenticated
+using (
   public.is_portal_coordenador()
   and categoria = 'responsavel'
 );

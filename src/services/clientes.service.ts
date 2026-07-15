@@ -72,6 +72,14 @@ function formatCnpjDigits(value: string) {
   return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 
+function normalizeText(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function toIsoDate(value: unknown) {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -182,6 +190,32 @@ export async function buscarClientePorCnpj(cnpj: string) {
   }
 
   return null;
+}
+
+export async function listarClientesVinculadosResponsavel(valor: string, { incluirInativos = false } = {}) {
+  const alvo = normalizeText(String(valor ?? ''));
+  if (!alvo) return [];
+
+  let query = supabase
+    .from('clientes')
+    .select('id, cnpj, nome_identificacao, razao_social, responsavel, responsavel_ecd, status, situacao');
+
+  if (!incluirInativos) {
+    query = query.or('status.is.null,status.eq.Ativo,status.neq.Inativo');
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Não foi possível verificar vínculos do responsável: ${error.message}`);
+  }
+
+  return (data ?? [])
+    .map((row) => normalizeRow(row as Record<string, unknown>))
+    .filter((row) =>
+      normalizeText(String(row.responsavel ?? '')) === alvo
+      || normalizeText(String(row.responsavel_ecd ?? '')) === alvo,
+    );
 }
 
 export async function criarCliente(cliente: Record<string, unknown>) {

@@ -163,6 +163,27 @@ export async function atualizarValorListagem(id: string, patch: Record<string, u
   return normalizeListagemRow(data);
 }
 
+export async function excluirValorListagem(id: string, categoria: unknown = 'responsavel') {
+  if (!id) {
+    throw new Error('Identificador da listagem não informado.');
+  }
+
+  const categoriaNormalizada = normalizeCategory(categoria);
+  const { data, error } = await supabase
+    .from('listagens')
+    .delete()
+    .eq('id', id)
+    .eq('categoria', categoriaNormalizada)
+    .select('id, categoria, valor, ordem, ativo')
+    .single();
+
+  if (error) {
+    throw new Error(`Não foi possível excluir o valor da listagem: ${error.message}`);
+  }
+
+  return normalizeListagemRow(data);
+}
+
 export function inativarValorListagem(id: string) {
   return atualizarValorListagem(id, { ativo: false });
 }

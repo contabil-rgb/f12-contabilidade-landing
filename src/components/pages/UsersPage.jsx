@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Edit3, Plus, RefreshCcw } from 'lucide-react';
+import { Edit3, Plus, RefreshCcw, Trash2 } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import DataTableShell from '../ui/DataTableShell';
 import StatusBadge from '../ui/StatusBadge';
@@ -16,6 +16,7 @@ export default function UsersPage({
   responsavelBusy = false,
   onCreateResponsavel,
   onToggleResponsavel,
+  onDeleteResponsavel,
 }) {
   const [novoResponsavel, setNovoResponsavel] = useState('');
 
@@ -131,15 +132,28 @@ export default function UsersPage({
                   </StatusBadge>
                 </td>
                 <td className="border-b border-slate-100 px-4 py-4">
-                  <ActionButton
-                    type="button"
-                    variant={item.ativo ? 'danger' : 'secondary'}
-                    onClick={() => onToggleResponsavel?.(item)}
-                    disabled={responsavelBusy}
-                  >
-                    <RefreshCcw size={16} aria-hidden="true" />
-                    {item.ativo ? 'Inativar' : 'Reativar'}
-                  </ActionButton>
+                  <div className="flex flex-wrap gap-2">
+                    <ActionButton
+                      type="button"
+                      variant={item.ativo ? 'danger' : 'secondary'}
+                      onClick={() => onToggleResponsavel?.(item)}
+                      disabled={responsavelBusy}
+                    >
+                      <RefreshCcw size={16} aria-hidden="true" />
+                      {item.ativo ? 'Inativar' : 'Reativar'}
+                    </ActionButton>
+                    {!item.ativo ? (
+                      <ActionButton
+                        type="button"
+                        variant="danger"
+                        onClick={() => onDeleteResponsavel?.(item)}
+                        disabled={responsavelBusy}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                        Excluir
+                      </ActionButton>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
