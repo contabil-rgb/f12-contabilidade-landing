@@ -46,6 +46,7 @@ import {
   YES_NO_OPTIONS,
 } from './data/schema.js';
 import { analyzeClient, enrichClients, toBreakdown } from './lib/statusRules.js';
+import { isRegimeEcdEcfAplicavel, sanitizeResponsavelEcdByRegime } from './lib/ecdRules.js';
 import {
   formatCnpj,
   formatCnpjInput,
@@ -913,7 +914,30 @@ function fieldValueToAnexo(value, tipoAnexo, client) {
 }
 
 function applyResponsavelEcdFallback(base, patch) {
-  if (!patch || !Object.prototype.hasOwnProperty.call(patch, 'responsavel')) {
+  if (!patch) {
+    return patch;
+  }
+
+  const regimeTributario = Object.prototype.hasOwnProperty.call(patch, 'regime_tributario')
+    ? patch.regime_tributario
+    : base?.regime_tributario;
+
+  if (!isRegimeEcdEcfAplicavel(regimeTributario)) {
+    const responsavelEcdAtual = String(base?.responsavel_ecd ?? '').trim();
+    const patchTemResponsavelEcd = Object.prototype.hasOwnProperty.call(patch, 'responsavel_ecd');
+    const patchResponsavelEcd = String(patch?.responsavel_ecd ?? '').trim();
+
+    if (responsavelEcdAtual || patchTemResponsavelEcd || patchResponsavelEcd) {
+      return {
+        ...patch,
+        responsavel_ecd: null,
+      };
+    }
+
+    return patch;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(patch, 'responsavel')) {
     return patch;
   }
 
@@ -6179,6 +6203,7 @@ export default function App() {
     } else {
       nextClient = { ...nextClient, criado_em: mutationTimestamp };
     }
+    nextClient = sanitizeResponsavelEcdByRegime(nextClient);
 
     if (index >= 0) {
       let mergedClient = { ...previous, ...nextClient };

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { sanitizeResponsavelEcdByRegime } from '../lib/ecdRules.js';
 
 const DATE_FIELDS = new Set([
   'data_enviada_reinf',
@@ -128,6 +129,10 @@ function normalizePatch(data: Record<string, unknown>) {
       out[key] = value ?? null;
     }
   }
+  if (Object.prototype.hasOwnProperty.call(out, 'regime_tributario')) {
+    return sanitizeResponsavelEcdByRegime(out);
+  }
+
   return out;
 }
 

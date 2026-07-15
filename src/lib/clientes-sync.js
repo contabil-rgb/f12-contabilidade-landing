@@ -1,4 +1,5 @@
 import { formatCnpj, normalizeCnpj } from './formatters.js';
+import { sanitizeResponsavelEcdByRegime } from './ecdRules.js';
 
 export const CLIENT_SYNC_DB_FIELDS = [
   'cnpj',
@@ -78,7 +79,7 @@ export function normalizeClienteRowForSync(input, options = {}) {
 
   if (!cnpj || !razaoSocial) return null;
 
-  const payload = {
+  const payload = sanitizeResponsavelEcdByRegime({
     cnpj,
     razao_social: razaoSocial,
     nome_identificacao: normalizeNullableText(input?.nome_identificacao),
@@ -125,7 +126,7 @@ export function normalizeClienteRowForSync(input, options = {}) {
     data_retorno_cliente: toIsoDate(input?.data_retorno_cliente),
     status: normalizeNullableText(input?.status) || options.defaultStatus || 'Ativo',
     atualizado_em: options.updatedAt ?? new Date().toISOString(),
-  };
+  });
 
   const sanitized = {};
   CLIENT_SYNC_DB_FIELDS.forEach((field) => {
