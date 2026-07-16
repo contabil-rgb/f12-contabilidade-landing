@@ -45,7 +45,7 @@ export default function MetricTile({
           {detail ? <p className="mt-3 max-w-[30ch] text-sm font-semibold leading-6 text-slate-500 dark:text-gray-200/90">{detail}</p> : null}
         </div>
         {Icon ? (
-          <span className={classNames('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white/90 shadow-sm dark:border-gray-600 dark:bg-gray-800/90', toneClass)}>
+          <span className={classNames('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-slate-50/95 shadow-sm dark:border-gray-600 dark:bg-gray-800/90', toneClass)}>
             <Icon size={21} aria-hidden="true" />
           </span>
         ) : null}
