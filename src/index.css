@@ -201,20 +201,29 @@
 
   .input-shell {
     height: 44px;
+    min-height: 44px;
     width: 100%;
     border-radius: 8px;
-    border: 1px solid rgba(226, 232, 240, 0.95);
-    background: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    background: rgba(248, 250, 252, 0.96);
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     padding-left: 0.875rem;
     padding-right: 0.875rem;
     color: #334155;
     font-size: 0.925rem;
     font-weight: 600;
+    line-height: 1.35;
     outline: none;
     transition:
       border-color 150ms ease,
       box-shadow 150ms ease,
       background-color 150ms ease;
+  }
+
+  .input-shell:hover {
+    border-color: rgba(148, 163, 184, 0.95);
+    background: #fff;
   }
 
   .input-shell::placeholder {
@@ -227,10 +236,22 @@
     box-shadow: 0 0 0 4px rgba(11, 102, 255, 0.08);
   }
 
+  .input-shell:disabled {
+    cursor: not-allowed;
+    border-color: rgba(226, 232, 240, 0.9);
+    background: rgba(241, 245, 249, 0.95);
+    color: #94a3b8;
+  }
+
   .dark .input-shell {
     border-color: rgba(75, 85, 99, 0.96);
     background: rgba(55, 65, 81, 0.96);
     color: #f3f4f6;
+  }
+
+  .dark .input-shell:hover {
+    border-color: rgba(107, 114, 128, 0.98);
+    background: rgba(55, 65, 81, 0.98);
   }
 
   .dark .input-shell::placeholder {
@@ -243,12 +264,18 @@
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
   }
 
+  .dark .input-shell:disabled {
+    border-color: rgba(55, 65, 81, 0.92);
+    background: rgba(31, 41, 55, 0.86);
+    color: #6b7280;
+  }
+
   .select-shell {
     height: 40px;
     width: 100%;
     border-radius: 8px;
-    border: 1px solid rgba(226, 232, 240, 0.95);
-    background: #fff;
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    background: rgba(255, 255, 255, 0.96);
     padding-left: 0.875rem;
     padding-right: 2.25rem;
     color: #334155;
@@ -261,8 +288,19 @@
       background-color 150ms ease;
   }
 
+  .select-shell:hover {
+    border-color: rgba(148, 163, 184, 0.95);
+    background: #fff;
+  }
+
   .select-shell:focus {
     border-color: rgba(11, 102, 255, 0.42);
+    box-shadow: 0 0 0 4px rgba(11, 102, 255, 0.08);
+  }
+
+  .select-shell[aria-expanded='true'] {
+    border-color: rgba(11, 102, 255, 0.48);
+    background: #fff;
     box-shadow: 0 0 0 4px rgba(11, 102, 255, 0.08);
   }
 
@@ -272,9 +310,71 @@
     color: #f3f4f6;
   }
 
+  .dark .select-shell:hover,
+  .dark .select-shell[aria-expanded='true'] {
+    border-color: rgba(96, 165, 250, 0.56);
+    background: rgba(55, 65, 81, 0.98);
+  }
+
   .dark .select-shell:focus {
     border-color: rgba(96, 165, 250, 0.7);
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+  }
+
+  .form-control-shell {
+    min-height: 42px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    background: rgba(255, 255, 255, 0.96);
+    padding: 0.625rem 0.875rem;
+    color: #1e293b;
+    font-size: 0.875rem;
+    font-weight: 600;
+    outline: none;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background-color 150ms ease;
+  }
+
+  .form-control-shell:hover {
+    border-color: rgba(148, 163, 184, 0.95);
+    background: #fff;
+  }
+
+  .form-control-shell:focus {
+    border-color: rgba(11, 102, 255, 0.42);
+    box-shadow: 0 0 0 4px rgba(11, 102, 255, 0.08);
+  }
+
+  .form-control-shell:disabled {
+    cursor: not-allowed;
+    border-color: rgba(226, 232, 240, 0.9);
+    background: rgba(241, 245, 249, 0.95);
+    color: #94a3b8;
+  }
+
+  .dark .form-control-shell {
+    border-color: rgba(75, 85, 99, 0.96);
+    background: rgba(55, 65, 81, 0.96);
+    color: #f3f4f6;
+  }
+
+  .dark .form-control-shell:hover {
+    border-color: rgba(107, 114, 128, 0.98);
+    background: rgba(55, 65, 81, 0.98);
+  }
+
+  .dark .form-control-shell:focus {
+    border-color: rgba(96, 165, 250, 0.7);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+  }
+
+  .dark .form-control-shell:disabled {
+    border-color: rgba(55, 65, 81, 0.92);
+    background: rgba(31, 41, 55, 0.86);
+    color: #6b7280;
   }
 
   .pill-shell {

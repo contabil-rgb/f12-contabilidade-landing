@@ -100,7 +100,7 @@ export default function UsersPage({
             onChange={(event) => setNovoResponsavel(event.target.value)}
             placeholder="Novo responsável"
             disabled={responsavelBusy}
-            className="h-11 flex-1 scroll-mt-[35rem] rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100 lg:scroll-mt-28"
+            className="input-shell h-11 flex-1 scroll-mt-[35rem] px-4 lg:scroll-mt-28"
           />
           <ActionButton
             type="submit"

@@ -3719,7 +3719,7 @@ function DropdownFilterSelect({
   onChange,
   includeBlank = true,
   labelClassName = 'text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400',
-  buttonClassName = 'mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-700 outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100',
+  buttonClassName = 'select-shell mt-1 normal-case',
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -3774,7 +3774,7 @@ function DropdownFilterSelect({
       {open ? (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel ring-1 ring-slate-900/5 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:ring-white/5"
         >
           {normalizedOptions.map((option) => {
             const selected = option.value === value;
@@ -3967,11 +3967,11 @@ function ReinfPage({
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
-            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
+            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             CNPJ
-            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
+            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label="Envio de REINF" value={filters.envio_reinf} options={YES_NO_OPTIONS} onChange={(value) => updateFilter({ envio_reinf: value })} />
@@ -4158,11 +4158,11 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
           <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
-            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
+            <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             CNPJ
-            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" />
+            <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(scopedClients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
@@ -5079,7 +5079,7 @@ function FormField({
   onAttachmentError,
 }) {
   const baseClass =
-    'mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10';
+    'form-control-shell mt-1';
   const isAtaEntregueField = field.key === 'ata_entregue';
   const isDataEntregaAtaField = field.key === 'data_entrega_ata';
   const ataNotRequired = (isAtaEntregueField || isDataEntregaAtaField) && !isYes(cliente?.precisa_ata);
