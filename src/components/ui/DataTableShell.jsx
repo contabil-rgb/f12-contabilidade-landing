@@ -14,12 +14,12 @@ export default function DataTableShell({
 }) {
   return (
     <>
-      <div className={classNames('w-full max-w-full overflow-auto overflow-soft rounded-xl border border-slate-100/80 dark:border-gray-800', className)}>
-        <table className={classNames('w-full border-separate border-spacing-0 text-left text-sm', minWidth, tableClassName)}>
-          <thead className="bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
+      <div className={classNames('table-scroll-shell overflow-soft', className)}>
+        <table className={classNames('table-base', minWidth, tableClassName)}>
+          <thead className="table-head">
             <tr>
               {headers.map((header, index) => (
-                <th key={`${header}-${index}`} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
+                <th key={`${header}-${index}`} className="table-head-cell">
                   {renderHeadCell ? renderHeadCell(header, index) : header}
                 </th>
               ))}
@@ -30,7 +30,7 @@ export default function DataTableShell({
       </div>
 
       {!hasRows ? (
-        <div className="flex min-h-56 flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="empty-state">
           <Search className="text-slate-300 dark:text-gray-600" size={40} aria-hidden="true" />
           <p className="text-base font-black text-slate-800 dark:text-gray-100">{emptyTitle}</p>
           {emptyDescription ? <p className="max-w-md text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{emptyDescription}</p> : null}

@@ -26,14 +26,14 @@ export default function HistoryPage({
       >
         <tbody>
           {history.map((item) => (
-            <tr key={item.id} className="transition even:bg-slate-50/40 hover:bg-sky-50/60 dark:hover:bg-slate-800/80">
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-600 dark:text-gray-300">{formatDateTime(item.data_alteracao)}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{usersById.get(item.usuario_id)?.nome ?? item.usuario_nome ?? 'Usuário removido'}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-bold text-slate-900 dark:text-gray-100">{item.cliente_nome}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{getFieldLabel(fieldDefinitions, item.campo_alterado)}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{valueOrDash(item.valor_anterior)}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{valueOrDash(item.valor_novo)}</td>
-              <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{item.tipo_acao}</td>
+            <tr key={item.id} className="table-row">
+              <td className="table-cell table-cell-muted">{formatDateTime(item.data_alteracao)}</td>
+              <td className="table-cell">{usersById.get(item.usuario_id)?.nome ?? item.usuario_nome ?? 'Usuário removido'}</td>
+              <td className="table-cell table-cell-strong">{item.cliente_nome}</td>
+              <td className="table-cell">{getFieldLabel(fieldDefinitions, item.campo_alterado)}</td>
+              <td className="table-cell">{valueOrDash(item.valor_anterior)}</td>
+              <td className="table-cell">{valueOrDash(item.valor_novo)}</td>
+              <td className="table-cell">{item.tipo_acao}</td>
             </tr>
           ))}
         </tbody>

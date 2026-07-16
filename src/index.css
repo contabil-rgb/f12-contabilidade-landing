@@ -416,6 +416,226 @@
     background: #4b5563;
   }
 
+  .table-scroll-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid rgba(226, 232, 240, 0.88);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .table-scroll-shell {
+    border-color: rgba(55, 65, 81, 0.92);
+    background: rgba(17, 24, 39, 0.28);
+  }
+
+  .table-base {
+    width: 100%;
+    border-spacing: 0;
+    border-collapse: separate;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+
+  .table-head {
+    background: rgba(248, 250, 252, 0.96);
+    backdrop-filter: blur(10px);
+  }
+
+  .dark .table-head {
+    background: rgba(31, 41, 55, 0.96);
+  }
+
+  .table-head-cell {
+    border-bottom: 1px solid rgba(203, 213, 225, 0.92);
+    padding: 0.875rem 1rem;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1.25;
+    text-transform: uppercase;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .dark .table-head-cell {
+    border-bottom-color: rgba(75, 85, 99, 0.92);
+    color: #d1d5db;
+  }
+
+  .table-row {
+    transition:
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .table-row:nth-child(even) {
+    background: rgba(248, 250, 252, 0.48);
+  }
+
+  .table-row:hover {
+    background: rgba(239, 246, 255, 0.74);
+  }
+
+  .dark .table-row:nth-child(even) {
+    background: rgba(31, 41, 55, 0.34);
+  }
+
+  .dark .table-row:hover {
+    background: rgba(31, 41, 55, 0.82);
+  }
+
+  .table-cell {
+    border-bottom: 1px solid rgba(226, 232, 240, 0.86);
+    padding: 0.875rem 1rem;
+    color: #334155;
+    font-weight: 650;
+    line-height: 1.45;
+    vertical-align: top;
+  }
+
+  .dark .table-cell {
+    border-bottom-color: rgba(31, 41, 55, 0.96);
+    color: #e5e7eb;
+  }
+
+  .table-cell-compact {
+    padding: 0.625rem 0.75rem;
+  }
+
+  .table-cell-muted {
+    color: #64748b;
+  }
+
+  .dark .table-cell-muted {
+    color: #d1d5db;
+  }
+
+  .table-cell-strong {
+    color: #0f172a;
+    font-weight: 900;
+  }
+
+  .dark .table-cell-strong {
+    color: #f9fafb;
+  }
+
+  .table-sticky-left {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #fff;
+  }
+
+  .table-sticky-right {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    background: #fff;
+  }
+
+  .table-head .table-sticky-left,
+  .table-head .table-sticky-right {
+    z-index: 20;
+    background: rgba(248, 250, 252, 0.98);
+  }
+
+  .table-row:nth-child(even) .table-sticky-left,
+  .table-row:nth-child(even) .table-sticky-right {
+    background: #f8fafc;
+  }
+
+  .table-row:hover .table-sticky-left,
+  .table-row:hover .table-sticky-right {
+    background: #eff6ff;
+  }
+
+  .dark .table-sticky-left,
+  .dark .table-sticky-right,
+  .dark .table-head .table-sticky-left,
+  .dark .table-head .table-sticky-right {
+    background: #1f2937;
+  }
+
+  .dark .table-row:nth-child(even) .table-sticky-left,
+  .dark .table-row:nth-child(even) .table-sticky-right,
+  .dark .table-row:hover .table-sticky-left,
+  .dark .table-row:hover .table-sticky-right {
+    background: #1f2937;
+  }
+
+  .table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 10px;
+    background: rgba(248, 250, 252, 0.92);
+    padding: 0.375rem;
+  }
+
+  .dark .table-actions {
+    border-color: rgba(75, 85, 99, 0.92);
+    background: rgba(31, 41, 55, 0.92);
+  }
+
+  .table-icon-action {
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    border-radius: 8px;
+    color: #475569;
+    transition:
+      border-color 150ms ease,
+      color 150ms ease,
+      background-color 150ms ease;
+  }
+
+  .table-icon-action:hover {
+    border-color: rgba(37, 99, 235, 0.5);
+    background: rgba(239, 246, 255, 0.9);
+    color: #0b66ff;
+  }
+
+  .table-icon-action-danger:hover {
+    border-color: rgba(248, 113, 113, 0.55);
+    background: rgba(254, 242, 242, 0.94);
+    color: #dc2626;
+  }
+
+  .dark .table-icon-action {
+    border-color: rgba(75, 85, 99, 0.92);
+    color: #d1d5db;
+  }
+
+  .dark .table-icon-action:hover {
+    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(30, 64, 175, 0.16);
+    color: #93c5fd;
+  }
+
+  .dark .table-icon-action-danger:hover {
+    border-color: rgba(248, 113, 113, 0.5);
+    background: rgba(127, 29, 29, 0.18);
+    color: #fca5a5;
+  }
+
+  .empty-state {
+    display: flex;
+    min-height: 14rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    text-align: center;
+  }
+
   .hero-lines {
     background-image:
       linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),

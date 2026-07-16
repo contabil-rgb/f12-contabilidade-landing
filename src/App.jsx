@@ -3209,11 +3209,11 @@ function ClientsTable({
           </span>
         </div>
       </div>
-      <div className="w-full max-w-full overflow-auto overflow-soft">
-        <table className="w-full min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-gray-800/95">
+      <div className="table-scroll-shell overflow-soft border-x-0 border-b-0 rounded-none">
+        <table className="table-base min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px]">
+          <thead className="table-head sticky top-0 z-10">
             <tr>
-              <th className="sticky left-0 z-20 w-80 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <th className="table-head-cell table-sticky-left w-80 px-5">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -3227,11 +3227,11 @@ function ClientsTable({
                   <span>Cliente</span>
                 </div>
               </th>
-              <th className="w-48 border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
+              <th className="table-head-cell w-48">
                 Alertas
               </th>
               {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                <th key={field.key} className="border-b border-slate-200 px-4 py-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:text-gray-300">
+                <th key={field.key} className="table-head-cell">
                   <button
                     type="button"
                     onClick={() => sortColumn(field.key)}
@@ -3242,7 +3242,7 @@ function ClientsTable({
                   </button>
                 </th>
               ))}
-              <th className="sticky right-0 z-20 w-36 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <th className="table-head-cell table-sticky-right w-36">
                 Ações
               </th>
             </tr>
@@ -3255,9 +3255,9 @@ function ClientsTable({
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
-                  className="cursor-pointer transition duration-150 even:bg-slate-50/40 hover:bg-sky-50/70 dark:even:bg-gray-800/35 dark:hover:bg-gray-800/80"
+                  className="table-row cursor-pointer"
                 >
-                  <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
+                  <td className="table-cell table-sticky-left px-5">
                     <div className="flex max-w-80 items-start gap-3">
                       <input
                         type="checkbox"
@@ -3278,13 +3278,13 @@ function ClientsTable({
                       </div>
                     </div>
                   </td>
-                  <td className="border-b border-slate-100 px-4 py-4 align-top dark:border-gray-800">
+                  <td className="table-cell">
                     <div className="max-w-56">
                       <AlertsList alerts={alerts} />
                     </div>
                   </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
-                  <td key={field.key} className="border-b border-slate-100 px-4 py-4 align-top text-sm font-semibold text-slate-700 dark:border-gray-800 dark:text-gray-200">
+                  <td key={field.key} className="table-cell">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
                         {valueOrDash(getResolvedFieldValue(client, field.key))}
@@ -3294,8 +3294,8 @@ function ClientsTable({
                     ))}
                   </td>
                   ))}
-                  <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-4 align-top dark:border-gray-800 dark:bg-gray-900">
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 dark:border-gray-700 dark:bg-gray-800/90">
+                  <td className="table-cell table-sticky-right">
+                    <div className="table-actions">
                       {canEditRow(client) ? (
                         <button
                           type="button"
@@ -3304,7 +3304,7 @@ function ClientsTable({
                           event.stopPropagation();
                           onEdit(client);
                         }}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                        className="table-icon-action"
                       >
                         <Edit3 size={16} aria-hidden="true" />
                       </button>
@@ -3317,7 +3317,7 @@ function ClientsTable({
                           event.stopPropagation();
                           onInactivate(client);
                         }}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-red-200 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
+                        className="table-icon-action table-icon-action-danger"
                       >
                         <Trash2 size={16} aria-hidden="true" />
                       </button>
@@ -3333,8 +3333,8 @@ function ClientsTable({
       </div>
 
       {!clients.length ? (
-        <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
-          <Search className="text-slate-300" size={42} aria-hidden="true" />
+        <div className="empty-state min-h-64">
+          <Search className="text-slate-300 dark:text-gray-600" size={42} aria-hidden="true" />
           <p className="text-lg font-black text-slate-800 dark:text-gray-100">Nenhum cliente encontrado para os filtros selecionados.</p>
           <p className="text-sm font-semibold text-slate-500 dark:text-gray-300">Revise os filtros aplicados ou limpe a busca para voltar a ver a carteira.</p>
         </div>
@@ -3656,12 +3656,12 @@ function DetailPage({
         ) : !historicoRows.length ? (
           <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma alteração registrada para este cliente.</p>
         ) : (
-          <div className="mt-4 w-full max-w-full overflow-auto overflow-soft">
-            <table className="w-full min-w-[860px] lg:min-w-[980px] text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-gray-800/95">
+          <div className="table-scroll-shell mt-4 overflow-soft">
+            <table className="table-base min-w-[860px] lg:min-w-[980px]">
+              <thead className="table-head">
                 <tr>
                   {['Data/hora', 'Usuário', 'Campo', 'Anterior', 'Novo', 'Tipo', 'Origem'].map((header) => (
-                    <th key={header} className="border-b border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
+                    <th key={header} className="table-head-cell table-cell-compact">
                       {header}
                     </th>
                   ))}
@@ -3669,29 +3669,29 @@ function DetailPage({
               </thead>
               <tbody>
                 {historicoRows.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-gray-800/70">
-                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">
+                  <tr key={item.id} className="table-row">
+                    <td className="table-cell table-cell-compact table-cell-muted">
                       {formatDateTime(item.data_alteracao)}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 dark:border-gray-800">
+                    <td className="table-cell table-cell-compact">
                       <p className="font-black text-slate-900 dark:text-gray-100">{item.usuario_nome || 'Usuário'}</p>
                       <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">{item.usuario_email || '-'}</p>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-700 dark:border-gray-800 dark:text-gray-200">
+                    <td className="table-cell table-cell-compact text-xs font-black">
                       {item.campo_alterado}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600 dark:border-gray-800 dark:text-gray-300">
+                    <td className="table-cell table-cell-compact table-cell-muted">
                       {valueOrDash(item.valor_anterior, 'text')}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 font-semibold text-slate-800 dark:border-gray-800 dark:text-gray-100">
+                    <td className="table-cell table-cell-compact table-cell-strong">
                       {valueOrDash(item.valor_novo, 'text')}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 dark:border-gray-800">
+                    <td className="table-cell table-cell-compact">
                       <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass('info')}`}>
                         {item.tipo_acao || '-'}
                       </span>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-slate-600 dark:border-gray-800 dark:text-gray-300">
+                    <td className="table-cell table-cell-compact table-cell-muted">
                       {item.origem || '-'}
                     </td>
                   </tr>
@@ -4250,25 +4250,25 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
 function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels = {} }) {
   return (
     <>
-      <div className="w-full max-w-full overflow-auto overflow-soft">
-        <table className="w-full min-w-[920px] xl:min-w-[1080px] text-left text-sm">
-          <thead className="bg-slate-50 dark:bg-gray-800/95">
+      <div className="table-scroll-shell overflow-soft">
+        <table className="table-base min-w-[920px] xl:min-w-[1080px]">
+          <thead className="table-head">
             <tr>
               {columns.map((column) => (
-                <th key={column} className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
+                <th key={column} className="table-head-cell">
                   {columnLabels[column] ?? getFieldLabel(FIELD_DEFINITIONS, column)}
                 </th>
               ))}
-              <th className="border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-normal text-slate-500 dark:border-gray-700 dark:text-gray-300">
+              <th className="table-head-cell">
                 Status da obrigação
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((client) => (
-              <tr key={client.id} className="hover:bg-slate-50 dark:hover:bg-gray-800/70">
+              <tr key={client.id} className="table-row">
                 {columns.map((column) => (
-                  <td key={column} className="border-b border-slate-100 px-4 py-3 align-top dark:border-gray-800 dark:text-gray-200">
+                  <td key={column} className="table-cell">
                     {renderCell?.(client, column) ?? (column === 'nome_identificacao' ? (
                       <button type="button" onClick={() => onView(client.id)} className="text-left font-black text-slate-950 hover:text-brand-blue dark:text-gray-100 dark:hover:text-blue-300">
                         {client[column] || client.razao_social}
@@ -4278,15 +4278,15 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
                     ))}
                   </td>
                 ))}
-                <td className="border-b border-slate-100 px-4 py-3 align-top dark:border-gray-800">{trailing(client)}</td>
+                <td className="table-cell">{trailing(client)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       {!rows.length ? (
-        <div className="flex min-h-56 flex-col items-center justify-center gap-3 p-8 text-center">
-          <Search className="text-slate-300" size={40} aria-hidden="true" />
+        <div className="empty-state">
+          <Search className="text-slate-300 dark:text-gray-600" size={40} aria-hidden="true" />
           <p className="text-base font-black text-slate-800 dark:text-gray-100">Nenhum cliente encontrado para os filtros selecionados.</p>
         </div>
       ) : null}

@@ -53,19 +53,19 @@ export default function UsersPage({
         >
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="transition even:bg-slate-50/40 hover:bg-sky-50/60 dark:hover:bg-slate-800/80">
-                <td className="border-b border-slate-100 px-4 py-4 font-black text-slate-950 dark:text-gray-100">{user.nome}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.email}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.cargo || 'Não informado'}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{user.setor || 'Não informado'}</td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-700 dark:text-gray-200">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
-                <td className="border-b border-slate-100 px-4 py-4">
+              <tr key={user.id} className="table-row">
+                <td className="table-cell table-cell-strong">{user.nome}</td>
+                <td className="table-cell">{user.email}</td>
+                <td className="table-cell">{user.cargo || 'Não informado'}</td>
+                <td className="table-cell">{user.setor || 'Não informado'}</td>
+                <td className="table-cell">{profileLabelByKey[user.perfil_acesso] ?? user.perfil_acesso}</td>
+                <td className="table-cell">
                   <StatusBadge toneClass={chipClass(user.status === 'Ativo' ? 'success' : 'muted')}>
                     {user.status}
                   </StatusBadge>
                 </td>
-                <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-600 dark:text-gray-300">{formatDateTime(user.ultimo_acesso)}</td>
-                <td className="border-b border-slate-100 px-4 py-4">
+                <td className="table-cell table-cell-muted">{formatDateTime(user.ultimo_acesso)}</td>
+                <td className="table-cell">
                   <div className="flex gap-2">
                     <ActionButton type="button" variant="icon" size="icon" onClick={() => onEdit(user)} aria-label="Editar usuário">
                       <Edit3 size={16} aria-hidden="true" />
@@ -122,16 +122,16 @@ export default function UsersPage({
         >
           <tbody>
             {responsaveisOrdenados.map((item) => (
-              <tr key={item.id ?? item.valor} className="transition even:bg-slate-50/40 hover:bg-sky-50/60 dark:hover:bg-slate-800/80">
-                <td className="border-b border-slate-100 px-4 py-4 font-black text-slate-950 dark:text-gray-100">
+              <tr key={item.id ?? item.valor} className="table-row">
+                <td className="table-cell table-cell-strong">
                   {item.valor}
                 </td>
-                <td className="border-b border-slate-100 px-4 py-4">
+                <td className="table-cell">
                   <StatusBadge toneClass={chipClass(item.ativo ? 'success' : 'muted')}>
                     {item.ativo ? 'Ativo' : 'Inativo'}
                   </StatusBadge>
                 </td>
-                <td className="border-b border-slate-100 px-4 py-4">
+                <td className="table-cell">
                   <div className="flex flex-wrap gap-2">
                     <ActionButton
                       type="button"
