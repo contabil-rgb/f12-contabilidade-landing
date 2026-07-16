@@ -2165,7 +2165,7 @@ function AppShell({
                     type="button"
                     onClick={() => setPage(key)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition ${
-                      page === key ? 'bg-white text-slate-950 shadow-sm dark:bg-gray-100 dark:text-gray-950' : 'text-slate-300 hover:bg-white/10 hover:text-white dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
+                      page === key ? 'bg-brand-blue text-white shadow-sm shadow-blue-950/20' : 'text-slate-300 hover:bg-white/10 hover:text-white dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
                     }`}
                   >
                     <Icon size={18} aria-hidden="true" />
