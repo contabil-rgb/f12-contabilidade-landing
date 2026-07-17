@@ -32,6 +32,7 @@ export const CAMPOS_HISTORICO_RELEVANTES = [
   'curva_envio',
   'ultima_competencia_enviada',
   'data_envio_documentos',
+  'pendencias_observacoes',
   'revisado_coordenador',
   'lancamentos_padrao',
   'motivo_atraso',

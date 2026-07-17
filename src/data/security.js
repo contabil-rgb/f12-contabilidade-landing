@@ -42,6 +42,7 @@ export const ACCESS_PROFILES = {
       PERMISSIONS.CLIENTS_EDIT_OPERATIONAL,
       PERMISSIONS.DASHBOARDS_VIEW,
       PERMISSIONS.REPORTS_VIEW,
+      PERMISSIONS.REPORTS_EXPORT,
     ],
   },
 };
@@ -82,6 +83,7 @@ export const HISTORY_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
+  'pendencias_observacoes',
 ];
 
 export const SENSITIVE_CLIENT_FIELDS = [
@@ -129,6 +131,7 @@ export const OPERATIONAL_CLIENT_FIELDS = [
   'curva_envio',
   'ultima_competencia_enviada',
   'data_envio_documentos',
+  'pendencias_observacoes',
   'lancamentos_padrao',
   'motivo_atraso',
   'pendencia_tecnica',
@@ -155,6 +158,7 @@ export const SIMPLE_OPERATIONAL_CLIENT_FIELDS = [
   'enviam_documentos',
   'ultima_competencia_enviada',
   'data_envio_documentos',
+  'pendencias_observacoes',
   'motivo_atraso',
   'cliente_notificado',
   'data_notificacao_cliente',

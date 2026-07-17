@@ -241,6 +241,7 @@ const CLIENT_FIELD_DEFAULTS = {
   data_entrega_ecd: '',
   data_envio_ecd: '',
   responsavel_ecd: '',
+  pendencias_observacoes: '',
 };
 
 const ATTACHMENT_FIELD_BY_TYPE = {
@@ -292,6 +293,7 @@ const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
   ata_entregue: 'Ata entregue',
   data_entrega_ata: 'Data de entrega da ata',
   enviam_documentos: 'Envia documentos',
+  pendencias_observacoes: 'Pendências/Observações',
   motivo_atraso: 'Motivo do atraso',
 };
 
@@ -4346,11 +4348,29 @@ function StaticBreakdownPanel({ title, rows, total, icon: Icon = BarChart3 }) {
   );
 }
 
+function hasPendenciasObservacoes(client) {
+  return !isBlank(client?.pendencias_observacoes);
+}
+
+function buildPendenciasObservacoesRows(clients) {
+  return (clients ?? [])
+    .filter(hasPendenciasObservacoes)
+    .map((client) => ({
+      Cliente: client.nome_identificacao || client.razao_social || '',
+      'Razão Social': client.razao_social || '',
+      CNPJ: client.cnpj || '',
+      Responsável: client.responsavel || '',
+      Revisor: client.revisor || '',
+      'Pendências/Observações': client.pendencias_observacoes || '',
+    }));
+}
+
 function ReportsPage({
   clients,
   filteredClients,
   onExportXlsx,
   onExportCsv,
+  onExportPdf,
   canExport,
   supabaseStatus,
   metadata,
@@ -4369,6 +4389,8 @@ function ReportsPage({
   const clientesRetornoRecebido = reportScope.filter((client) => hasRetornoConcluido(client));
   const clientesReinfPendente = reportScope.filter((client) => hasPendenciaObrigacaoReinf(client));
   const clientesEcdEcfObrigatoria = reportScope.filter((client) => hasObrigacaoAnual(client));
+  const clientesComObservacoes = reportScope.filter((client) => hasPendenciasObservacoes(client));
+  const pendenciasObservacoesRows = buildPendenciasObservacoesRows(reportScope);
   const clientesRetornoSeteDias = clientesAguardandoRetorno.filter((client) => (getDiasSemRetorno(client) ?? 0) >= 7);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
@@ -4396,14 +4418,24 @@ function ReportsPage({
     { title: 'ECD/ECF obrigatória', rows: clientesEcdEcfObrigatoria, icon: BookOpenCheck, tone: 'info' },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail, tone: 'warning' },
     { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle, tone: 'danger' },
+    {
+      title: 'Pendências/Observações',
+      rows: clientesComObservacoes,
+      exportRows: pendenciasObservacoesRows,
+      icon: ClipboardList,
+      tone: 'info',
+      pdf: true,
+    },
   ];
   const reportCount = (rows) =>
     rows.reduce((acc, row) => acc + (typeof row?.value === 'number' ? row.value : 1), 0);
-  const reportCards = reports.map(({ title, rows, icon: Icon, tone = 'neutral' }) => ({
+  const reportCards = reports.map(({ title, rows, exportRows, icon: Icon, tone = 'neutral', pdf = false }) => ({
     title,
     rows,
+    exportRows: exportRows ?? rows,
     Icon,
     tone,
+    pdf,
     count: Array.isArray(rows) ? reportCount(rows) : 0,
   }));
   return (
@@ -4486,7 +4518,7 @@ function ReportsPage({
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {reportCards.map(({ title, rows, Icon, count, tone }) => (
+          {reportCards.map(({ title, exportRows, Icon, count, tone, pdf }) => (
             <article key={title} className={`surface-card p-5 ${getMetricPanelToneClass(tone)}`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -4505,18 +4537,27 @@ function ReportsPage({
                   <>
                     <button
                       type="button"
-                      onClick={() => onExportXlsx(rows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
+                      onClick={() => onExportXlsx(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
                       className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                     >
                       Excel
                     </button>
                     <button
                       type="button"
-                      onClick={() => onExportCsv(rows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
+                      onClick={() => onExportCsv(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
                       className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                     >
                       CSV
                     </button>
+                    {pdf ? (
+                      <button
+                        type="button"
+                        onClick={() => onExportPdf(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.pdf`, title)}
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                      >
+                        PDF
+                      </button>
+                    ) : null}
                   </>
                 ) : (
                   <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
@@ -6665,6 +6706,15 @@ export default function App() {
     }
   }
 
+  async function exportPdf(rows, filename, title = 'Relatório') {
+    if (!can(currentUserFull, PERMISSIONS.REPORTS_EXPORT)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode exportar relatórios.' });
+      return;
+    }
+    const { exportRowsToPdf } = await import('./lib/pdf.js');
+    exportRowsToPdf(rows, filename, title);
+  }
+
   async function createResponsavelCatalogo(valorInput) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
@@ -7044,6 +7094,7 @@ export default function App() {
           filteredClients={filteredClients}
           onExportXlsx={exportXlsx}
           onExportCsv={exportCsv}
+          onExportPdf={exportPdf}
           canExport={canExportReports}
           supabaseStatus={supabaseStatus}
           metadata={metadata}

@@ -45,6 +45,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'curva_envio', label: 'Curva de Envio', group: 'Documentação', type: 'select', listKey: 'curva_envio' },
   { key: 'ultima_competencia_enviada', label: 'Última competência enviada', group: 'Documentação', type: 'text' },
   { key: 'data_envio_documentos', label: 'Data de Envio', group: 'Documentação', type: 'date' },
+  { key: 'pendencias_observacoes', label: 'Pendências/Observações', group: 'Documentação', type: 'textarea' },
 
   { key: 'revisado_coordenador', label: 'Revisado pelo Coordenador', group: 'Execução e Revisão', type: 'select', listKey: 'revisado_coordenador' },
   { key: 'lancamentos_padrao', label: 'Lançamentos Padrão', group: 'Execução e Revisão', type: 'select', listKey: 'lancamentos_padrao' },
@@ -118,6 +119,8 @@ export const EXCEL_HEADER_MAP = {
   'Curva de Envio': 'curva_envio',
   'Última competência enviada': 'ultima_competencia_enviada',
   'Data de Envio': 'data_envio_documentos',
+  'Pendências/Observações': 'pendencias_observacoes',
+  'Pendencias/Observacoes': 'pendencias_observacoes',
   'Revisado pelo Coordenador (Analistas)': 'revisado_coordenador',
   'Revisado Pelo Coordenador': 'revisado_coordenador',
   'Lançamentos Padrão': 'lancamentos_padrao',
