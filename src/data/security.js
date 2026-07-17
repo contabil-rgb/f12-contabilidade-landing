@@ -59,6 +59,7 @@ export const ACCESS_PROFILE_OPTIONS = Object.entries(ACCESS_PROFILES).map(([valu
 
 export const HISTORY_FIELDS = [
   'anexo_cartao_cnpj',
+  'anexo_cartao_qsa',
   'regime_tributario',
   'responsavel',
   'revisor',
@@ -117,6 +118,7 @@ export const STATUS_CLIENT_FIELDS = [
 export const OPERATIONAL_CLIENT_FIELDS = [
   'cnpj',
   'anexo_cartao_cnpj',
+  'anexo_cartao_qsa',
   'razao_social',
   'nome_identificacao',
   'tipo_cliente',

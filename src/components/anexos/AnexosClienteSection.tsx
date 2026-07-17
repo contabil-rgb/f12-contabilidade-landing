@@ -21,6 +21,7 @@ type Props = {
 const EMPTY_ANEXOS: AnexoCliente[] = [];
 const ATTACHMENT_FIELD_BY_TYPE: Record<TipoAnexo, string> = {
   [TIPOS_ANEXO.CARTAO_CNPJ]: 'anexo_cartao_cnpj',
+  [TIPOS_ANEXO.CARTAO_QSA]: 'anexo_cartao_qsa',
   [TIPOS_ANEXO.RECIBO_REINF]: 'anexo_recibo_reinf',
   [TIPOS_ANEXO.RECIBO_LUCROS]: 'anexo_recibo_lucros',
   [TIPOS_ANEXO.RECIBO_ECD]: 'anexo_recibo_ecd',

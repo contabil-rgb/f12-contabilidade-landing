@@ -1,5 +1,6 @@
 export const FIELD_DEFINITIONS = [
   { key: 'anexo_cartao_cnpj', label: 'Cartão CNPJ', group: 'Identificação', type: 'attachment' },
+  { key: 'anexo_cartao_qsa', label: 'Cartão QSA', group: 'Identificação', type: 'attachment' },
   { key: 'cnpj', label: 'CNPJ', group: 'Identificação', type: 'cnpj', required: true },
   { key: 'razao_social', label: 'Razão Social', group: 'Identificação', type: 'text', required: true },
   { key: 'nome_identificacao', label: 'Nome / Identificação', group: 'Identificação', type: 'text', required: true },
@@ -79,6 +80,8 @@ export const FIELD_GROUPS = [
 ];
 
 export const EXCEL_HEADER_MAP = {
+  'Cartão QSA': 'anexo_cartao_qsa',
+  'Cartao QSA': 'anexo_cartao_qsa',
   CNPJ: 'cnpj',
   'Razão Social': 'razao_social',
   Nome: 'nome_identificacao',
@@ -213,7 +216,7 @@ export const TABLE_COLUMNS = FIELD_DEFINITIONS.filter(
 export const DETAIL_SECTIONS = [
   {
     title: 'Identificação',
-    fields: ['cnpj', 'anexo_cartao_cnpj', 'razao_social', 'nome_identificacao', 'tipo_cliente', 'regime_tributario', 'atividades', 'dificuldade'],
+    fields: ['cnpj', 'anexo_cartao_cnpj', 'anexo_cartao_qsa', 'razao_social', 'nome_identificacao', 'tipo_cliente', 'regime_tributario', 'atividades', 'dificuldade'],
   },
   {
     title: 'Obrigações e Escrituração',
