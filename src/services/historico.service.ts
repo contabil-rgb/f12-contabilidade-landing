@@ -27,6 +27,8 @@ export const CAMPOS_HISTORICO_RELEVANTES = [
   'responsavel_ecd',
   'ecf',
   'ultima_ecf_entregue',
+  'data_entrega_ecf',
+  'data_envio_ecf',
   'enviam_documentos',
   'modo_entrega',
   'curva_envio',

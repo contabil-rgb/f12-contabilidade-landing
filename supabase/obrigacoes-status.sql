@@ -20,7 +20,9 @@ as $$
   select nullif(trim(coalesce(value, '')), '') is null;
 $$;
 
-create or replace view public.vw_clientes_obrigacoes_status
+drop view if exists public.vw_clientes_obrigacoes_status;
+
+create view public.vw_clientes_obrigacoes_status
 with (security_invoker = true)
 as
 with anexos_mais_recentes as (
@@ -50,6 +52,8 @@ base as (
     c.data_enviada_reinf as reinf_data_entrega,
     c.data_entrega_ecd,
     c.data_envio_ecd,
+    c.data_entrega_ecf,
+    c.data_envio_ecf,
     c.ultima_ecd_entregue,
     c.ultima_ecf_entregue,
     c.ecd,
@@ -82,6 +86,7 @@ flags as (
     public.is_text_yes(b.ecd) and public.is_text_blank(b.responsavel_ecd) and public.is_text_blank(b.responsavel) as ecd_responsavel_pendente,
     public.is_text_yes(b.ecd) and b.ecd_anexo_id is null as recibo_ecd_pendente,
     public.is_text_yes(b.ecf) and public.is_text_blank(b.ultima_ecf_entregue) as ecf_pendente,
+    public.is_text_yes(b.ecf) and b.data_entrega_ecf is not null and b.data_envio_ecf is null as ecf_aguardando_envio,
     public.is_text_yes(b.ecf) and b.ecf_anexo_id is null as recibo_ecf_pendente,
     (lower(coalesce(b.situacao, '')) like '%critic%' or public.is_text_yes(b.pendencia_tecnica) or lower(coalesce(b.pendencia_tecnica, '')) like '%pend%') as pendencia_critica
   from base b
@@ -132,30 +137,33 @@ select
     else 'Nao aplicavel'
   end as ecd_status_label,
   f.ecf_pendente,
+  f.ecf_aguardando_envio,
   f.recibo_ecf_pendente,
   (f.ecf_anexo_id is not null) as ecf_comprovante_anexado,
   case
     when f.ecf_pendente then 'obrigacao_pendente'
+    when f.ecf_aguardando_envio then 'aguardando_envio'
     when f.recibo_ecf_pendente then 'comprovante_pendente'
     when public.is_text_yes(f.ecf) then 'em_dia'
     else 'nao_aplicavel'
   end as ecf_status_codigo,
   case
     when f.ecf_pendente then 'Obrigacao pendente'
+    when f.ecf_aguardando_envio then 'Aguardando envio'
     when f.recibo_ecf_pendente then 'Comprovante pendente'
     when public.is_text_yes(f.ecf) then 'Em dia'
     else 'Nao aplicavel'
   end as ecf_status_label,
   case
     when f.ecd_pendente or f.ecf_pendente then 'obrigacao_pendente'
-    when f.ecd_aguardando_envio then 'aguardando_envio'
+    when f.ecd_aguardando_envio or f.ecf_aguardando_envio then 'aguardando_envio'
     when f.ecd_responsavel_pendente then 'responsavel_pendente'
     when f.recibo_ecd_pendente or f.recibo_ecf_pendente then 'comprovante_pendente'
     else 'em_dia'
   end as obrigacoes_status_codigo,
   case
     when f.ecd_pendente or f.ecf_pendente then 'Obrigacao pendente'
-    when f.ecd_aguardando_envio then 'Aguardando envio'
+    when f.ecd_aguardando_envio or f.ecf_aguardando_envio then 'Aguardando envio'
     when f.ecd_responsavel_pendente then 'Responsavel pendente'
     when f.recibo_ecd_pendente or f.recibo_ecf_pendente then 'Comprovante pendente'
     else 'Em dia'
@@ -168,6 +176,7 @@ select
     f.ecd_responsavel_pendente or
     f.recibo_ecd_pendente or
     f.ecf_pendente or
+    f.ecf_aguardando_envio or
     f.recibo_ecf_pendente
   ) as possui_pendencia_obrigacao,
   (
@@ -179,6 +188,7 @@ select
       f.ecd_responsavel_pendente or
       f.recibo_ecd_pendente or
       f.ecf_pendente or
+      f.ecf_aguardando_envio or
       f.recibo_ecf_pendente
     )
     and not public.is_text_yes(f.cliente_notificado)
@@ -192,6 +202,7 @@ select
     case when f.ecd_responsavel_pendente then 1 else 0 end +
     case when f.recibo_ecd_pendente then 1 else 0 end +
     case when f.ecf_pendente then 1 else 0 end +
+    case when f.ecf_aguardando_envio then 1 else 0 end +
     case when f.recibo_ecf_pendente then 1 else 0 end
   ) as pendencias_obrigacoes_total
 from flags f;

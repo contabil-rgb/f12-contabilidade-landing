@@ -50,6 +50,7 @@ with base as (
     o.ecd_responsavel_pendente,
     o.recibo_ecd_pendente,
     o.ecf_pendente,
+    o.ecf_aguardando_envio,
     o.recibo_ecf_pendente,
     o.comunicacao_pendente,
     o.pendencia_critica,

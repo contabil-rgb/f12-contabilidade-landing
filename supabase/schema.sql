@@ -38,6 +38,8 @@ create table if not exists public.clientes (
   responsavel_ecd text,
   ecf text,
   ultima_ecf_entregue text,
+  data_entrega_ecf date,
+  data_envio_ecf date,
   enviam_documentos text,
   modo_entrega text,
   curva_envio text,

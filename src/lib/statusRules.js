@@ -51,6 +51,7 @@ export function analyzeClient(client) {
     obrigacoes.ecf_pendente,
     isYes(client.ecf) && isBlank(client.ultima_ecf_entregue),
   );
+  const ecfAguardandoEnvio = !isBlank(client.data_entrega_ecf) && isBlank(client.data_envio_ecf);
   const reciboEcfPendente = preferBoolean(
     obrigacoes.recibo_ecf_pendente,
     isYes(client.ecf) && isBlank(client.anexo_recibo_ecf),
@@ -67,6 +68,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente ||
     reciboEcdPendente ||
     ecfPendente ||
+    ecfAguardandoEnvio ||
     reciboEcfPendente ||
     pendenciaTecnica ||
     documentosAtrasados;
@@ -90,6 +92,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
     reciboEcdPendente && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
     ecfPendente && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
+    ecfAguardandoEnvio && { key: 'ecf_envio', label: 'Aguardando envio da ECF', tone: 'warning' },
     reciboEcfPendente && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
     pendenciaTecnica && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
     documentosAtrasados && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
@@ -107,6 +110,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente ||
     reciboEcdPendente ||
     ecfPendente ||
+    ecfAguardandoEnvio ||
     reciboEcfPendente ||
     documentosAtrasados
   ) {
@@ -127,6 +131,7 @@ export function analyzeClient(client) {
     ecdResponsavelPendente,
     reciboEcdPendente,
     ecfPendente,
+    ecfAguardandoEnvio,
     reciboEcfPendente,
     pendenciaTecnica,
     documentosAtrasados,

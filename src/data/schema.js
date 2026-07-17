@@ -27,6 +27,8 @@ export const FIELD_DEFINITIONS = [
   { key: 'anexo_recibo_ecd', label: 'Anexo do recibo da ECD', group: 'ECD / ECF', type: 'attachment' },
   { key: 'ecf', label: 'ECF', group: 'ECD / ECF', type: 'yesno' },
   { key: 'ultima_ecf_entregue', label: 'Última ECF entregue', group: 'ECD / ECF', type: 'text' },
+  { key: 'data_entrega_ecf', label: 'Data de entrega da ECF', group: 'ECD / ECF', type: 'date' },
+  { key: 'data_envio_ecf', label: 'Data enviada da ECF', group: 'ECD / ECF', type: 'date' },
   { key: 'anexo_recibo_ecf', label: 'Anexo do recibo da ECF', group: 'ECD / ECF', type: 'attachment' },
 
   { key: 'responsavel', label: 'Responsável', group: 'Responsáveis', type: 'select', listKey: 'responsavel' },
@@ -99,6 +101,8 @@ export const EXCEL_HEADER_MAP = {
   'Anexo do recibo da ECD': 'anexo_recibo_ecd',
   ECF: 'ecf',
   'Última ECF entregue': 'ultima_ecf_entregue',
+  'Data de entrega da ECF': 'data_entrega_ecf',
+  'Data enviada da ECF': 'data_envio_ecf',
   'Anexo do recibo da ECF': 'anexo_recibo_ecf',
   Responsável: 'responsavel',
   Revisor: 'revisor',
@@ -213,7 +217,7 @@ export const DETAIL_SECTIONS = [
   },
   {
     title: 'Obrigações e Escrituração',
-    fields: ['ecf', 'ultima_ecf_entregue', 'primeira_competencia', 'ultima_competencia_entregue', 'competencia_em_dia', 'dias_atraso', 'situacao'],
+    fields: ['ecf', 'ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'primeira_competencia', 'ultima_competencia_entregue', 'competencia_em_dia', 'dias_atraso', 'situacao'],
   },
   {
     title: 'ECD',

@@ -76,6 +76,8 @@ export const HISTORY_FIELDS = [
   'anexo_recibo_ecd',
   'ecf',
   'ultima_ecf_entregue',
+  'data_entrega_ecf',
+  'data_envio_ecf',
   'anexo_recibo_ecf',
   'precisa_ata',
   'ata_entregue',
@@ -151,6 +153,8 @@ export const OPERATIONAL_CLIENT_FIELDS = [
   'anexo_recibo_ecf',
   'ultima_ecd_entregue',
   'ultima_ecf_entregue',
+  'data_entrega_ecf',
+  'data_envio_ecf',
   'ata_entregue',
   'data_entrega_ata',
 ];
