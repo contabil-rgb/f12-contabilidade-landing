@@ -15,6 +15,7 @@ export const PERMISSIONS = {
   IMPORT_EXCEL: 'import_excel',
   CLIENTS_VIEW_ALL: 'clients_view_all',
   CLIENTS_VIEW_ASSIGNED: 'clients_view_assigned',
+  CLIENTS_CREATE: 'clients_create',
   CLIENTS_EDIT_ALL: 'clients_edit_all',
   CLIENTS_EDIT_STATUS: 'clients_edit_status',
   CLIENTS_EDIT_OPERATIONAL: 'clients_edit_operational',
@@ -39,8 +40,10 @@ export const ACCESS_PROFILES = {
     description: 'Acesso operacional compartilhado para consultar a base e atualizar competências e obrigações.',
     permissions: [
       PERMISSIONS.CLIENTS_VIEW_ALL,
+      PERMISSIONS.CLIENTS_CREATE,
       PERMISSIONS.CLIENTS_EDIT_STATUS,
       PERMISSIONS.CLIENTS_EDIT_OPERATIONAL,
+      PERMISSIONS.CLIENTS_INACTIVATE,
       PERMISSIONS.DASHBOARDS_VIEW,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.REPORTS_EXPORT,

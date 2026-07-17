@@ -6244,7 +6244,7 @@ export default function App() {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode editar este cliente.' });
       return;
     }
-    if (!previous && !can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL)) {
+    if (!previous && !can(currentUserFull, PERMISSIONS.CLIENTS_CREATE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode cadastrar clientes.' });
       return;
     }
@@ -7016,7 +7016,7 @@ export default function App() {
     );
   }
 
-  const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
+  const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_CREATE);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
   const canDeleteHistory = can(currentUserFull, PERMISSIONS.HISTORY_DELETE);
 
