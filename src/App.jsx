@@ -109,6 +109,7 @@ import {
   reativarValorListagem,
 } from './services/listagens.service';
 import {
+  excluirHistoricoPorIds as excluirHistoricoPorIdsSupabase,
   listarHistoricoPortal as listarHistoricoPortalSupabase,
   listarHistoricoPorCliente as listarHistoricoPorClienteSupabase,
   registrarEventoHistorico as registrarEventoHistoricoSupabase,
@@ -6715,6 +6716,46 @@ export default function App() {
     exportRowsToPdf(rows, filename, title);
   }
 
+  async function deleteHistoricoSelecionado(ids) {
+    const idsValidos = [...new Set((ids ?? []).filter(Boolean))];
+    if (!idsValidos.length) return false;
+    if (!can(currentUserFull, PERMISSIONS.HISTORY_DELETE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode excluir registros do histórico.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('excluir registros do histórico')) return false;
+
+    try {
+      const result = await excluirHistoricoPorIdsSupabase(idsValidos);
+      const deletedIds = result.deleted ?? [];
+      if (!deletedIds.length) {
+        setToast({
+          title: 'Nenhum histórico excluído',
+          message: 'Verifique se a policy de DELETE do histórico já foi aplicada no Supabase.',
+        });
+        return false;
+      }
+
+      const deletedSet = new Set(deletedIds);
+      persistSecurity((current) => ({
+        ...current,
+        historico_alteracoes: (current.historico_alteracoes ?? []).filter((item) => !deletedSet.has(item.id)),
+      }));
+      setHistoricoCliente((current) => current.filter((item) => !deletedSet.has(item.id)));
+      setToast({
+        title: deletedIds.length === 1 ? 'Histórico excluído' : 'Históricos excluídos',
+        message: `${formatNumber(deletedIds.length)} registro(s) removido(s).`,
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao excluir histórico',
+        message: error.message || 'Não foi possível excluir os registros selecionados.',
+      });
+      return false;
+    }
+  }
+
   async function createResponsavelCatalogo(valorInput) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
@@ -6962,6 +7003,7 @@ export default function App() {
 
   const canCreateClient = can(currentUserFull, PERMISSIONS.CLIENTS_EDIT_ALL);
   const canExportReports = can(currentUserFull, PERMISSIONS.REPORTS_EXPORT);
+  const canDeleteHistory = can(currentUserFull, PERMISSIONS.HISTORY_DELETE);
 
   const content = {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
@@ -7139,6 +7181,8 @@ export default function App() {
             getFieldLabel={getFieldLabel}
             valueOrDash={valueOrDash}
             fieldDefinitions={FIELD_DEFINITIONS}
+            canDelete={canDeleteHistory && canWritePortalData}
+            onDeleteSelected={deleteHistoricoSelecionado}
           />
         </Suspense>
       )

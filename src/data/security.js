@@ -25,6 +25,7 @@ export const PERMISSIONS = {
   REPORTS_VIEW: 'reports_view',
   REPORTS_EXPORT: 'reports_export',
   HISTORY_VIEW: 'history_view',
+  HISTORY_DELETE: 'history_delete',
 };
 
 export const ACCESS_PROFILES = {

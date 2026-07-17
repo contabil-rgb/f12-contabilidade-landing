@@ -182,6 +182,25 @@ export async function listarHistoricoPortal(limit = 200) {
   return (data ?? []).map((row) => normalizeHistoricoRow(row as Record<string, unknown>));
 }
 
+export async function excluirHistoricoPorIds(ids: string[]) {
+  const idsValidos = [...new Set((ids ?? []).filter(Boolean))];
+  if (!idsValidos.length) {
+    return { ok: true, deleted: [] };
+  }
+
+  const { data, error } = await supabase
+    .from('historico_alteracoes')
+    .delete()
+    .in('id', idsValidos)
+    .select('id');
+
+  if (error) {
+    throw new Error(`Não foi possível excluir o histórico: ${error.message}`);
+  }
+
+  return { ok: true, deleted: (data ?? []).map((row) => row.id as string) };
+}
+
 export async function registrarEventoHistorico({
   clienteId,
   usuarioLogado,
