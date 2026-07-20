@@ -2518,16 +2518,16 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     : '';
 
   return (
-    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className={`p-6 sm:p-7 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Carteira por regime tributário</h2>
         </div>
       </div>
-      <div className="mt-8 grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
+      <div className="mt-7 grid gap-6">
         <div className="flex justify-center">
           <div
-            className="relative flex h-44 w-44 items-center justify-center rounded-full"
+            className="relative flex h-40 w-40 items-center justify-center rounded-full sm:h-44 sm:w-44"
             style={{
               background: gradient || 'conic-gradient(#2563eb 0% 100%)',
             }}
@@ -2538,7 +2538,7 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
             </div>
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {displayRows.map((row, index) => {
             const percentage = total ? ((row.value / total) * 100).toFixed(1).replace('.', ',') : '0,0';
             return (
@@ -2552,8 +2552,8 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
                   className="h-3 w-3 rounded-full"
                   style={{ backgroundColor: DASHBOARD_DONUT_COLORS[index % DASHBOARD_DONUT_COLORS.length] }}
                 />
-                <span className="min-w-0 flex-1 text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
-                <span className="text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
+                <span className="shrink-0 text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
                   {formatNumber(row.value)} ({percentage}%)
                 </span>
               </button>
@@ -2581,14 +2581,14 @@ function DashboardSituationCard({ values, total }) {
   const lastPoint = points[points.length - 1];
 
   return (
-    <SurfacePanel className={`overflow-hidden p-8 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className={`overflow-hidden p-6 sm:p-7 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Situação da carteira</h2>
         <span className="inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-lg font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           {formatNumber(total)}
         </span>
       </div>
-      <div className="mt-8 flex gap-5">
+      <div className="mt-7 flex gap-4 sm:gap-5">
         <div className="hidden w-12 shrink-0 flex-col justify-between text-xs font-semibold text-slate-500 dark:text-gray-400 md:flex" style={{ height: `${height}px` }}>
           {ticks.map((tick) => (
             <span key={tick.position}>{formatNumber(tick.label)}</span>
@@ -2638,7 +2638,7 @@ function DashboardSituationCard({ values, total }) {
               </div>
             ) : null}
           </div>
-          <div className="mt-5 grid grid-cols-6 gap-2 text-center text-sm font-semibold text-slate-600 dark:text-gray-300">
+          <div className="mt-5 grid grid-cols-6 gap-1 text-center text-xs font-semibold text-slate-600 dark:text-gray-300 sm:gap-2 sm:text-sm">
             {DASHBOARD_MONTH_LABELS.map((label) => (
               <span key={label}>{label}</span>
             ))}
@@ -2712,7 +2712,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Ações rápidas</h2>
       </div>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-4">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
@@ -2774,7 +2774,7 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="min-w-0 grid gap-6 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.5fr)_minmax(0,1.4fr)]">
+      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-6">
         <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
         <DashboardRegimeCard
           rows={regimeRows}
@@ -2785,7 +2785,7 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
         <DashboardSituationCard values={situationValues} total={total} />
       </section>
 
-      <section className="min-w-0 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(300px,0.9fr)]">
+      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-6">
         <DashboardRankingPanel
           title="Clientes por responsável"
           rows={responsavelRows}
