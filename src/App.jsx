@@ -90,6 +90,7 @@ import MetricTile, { getMetricPanelToneClass } from './components/ui/MetricTile'
 import StatusBadge from './components/ui/StatusBadge';
 import SurfacePanel from './components/ui/SurfacePanel';
 import ThemeToggle from './components/ui/ThemeToggle.jsx';
+import f12Logo from './assets/logo-f12.png';
 import { TIPOS_ANEXO } from './types/anexo';
 import { listarUltimosAnexosPorClientes } from './services/anexos.service';
 import {
@@ -2159,10 +2160,14 @@ function AppShell({
         <div className="flex h-full flex-col">
           <div className="border-b border-white/10 px-6 py-6 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-lg font-black text-[#0f172a] shadow-sm dark:bg-gray-100 dark:text-[#0f172a]">F12</span>
-              <div>
-                <p className="text-base font-black">Portal Contábil</p>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gestão interna</p>
+              <img
+                src={f12Logo}
+                alt="F12 Contabilidade Estratégica"
+                className="h-14 w-40 rounded-lg bg-[#080c2b] object-contain object-left"
+              />
+              <div className="sr-only">
+                <p>Portal Contábil</p>
+                <p>Gestão interna</p>
               </div>
             </div>
           </div>
@@ -2221,6 +2226,11 @@ function AppShell({
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
+              <img
+                src={f12Logo}
+                alt="F12 Contabilidade Estratégica"
+                className="mb-4 h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left lg:hidden"
+              />
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
               <h1 className={`mt-1 font-black tracking-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
               <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
@@ -4632,14 +4642,13 @@ function AuthShell({ title, description, children }) {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
         <section className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="bg-[#0b1427] p-8 text-white sm:p-10">
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-lg font-black text-[#0f172a] dark:text-[#0f172a]">
-                F12
-              </span>
-              <div>
-                <p className="text-xl font-black">Portal Contábil</p>
-                <p className="text-sm font-semibold text-slate-400">Acesso seguro</p>
-              </div>
+            <div>
+              <img
+                src={f12Logo}
+                alt="F12 Contabilidade Estratégica"
+                className="h-24 w-72 rounded-xl bg-[#080c2b] object-contain object-left"
+              />
+              <p className="mt-3 text-sm font-semibold text-slate-400">Acesso seguro</p>
             </div>
             <h1 className="mt-12 text-3xl font-black leading-tight sm:text-4xl">{title}</h1>
             <p className="mt-4 max-w-md text-base leading-7 text-slate-300">{description}</p>
