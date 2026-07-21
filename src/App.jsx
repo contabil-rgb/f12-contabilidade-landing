@@ -4087,8 +4087,8 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
     { value: 'comprovante-pendente', label: 'Comprovante pendente' },
   ];
   const dateViewOptions = [
-    { value: 'ecd', label: 'Datas e recibo da ECD' },
-    { value: 'ecf', label: 'Datas e recibo da ECF' },
+    { value: 'ecd', label: 'Datas e anexo da ECD' },
+    { value: 'ecf', label: 'Datas e anexo da ECF' },
   ];
   const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
   const scopedClients = clients.filter((client) => allowedRegimes.includes(normalizeText(client.regime_tributario)));
