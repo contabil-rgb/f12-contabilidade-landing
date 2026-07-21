@@ -4394,6 +4394,19 @@ function buildPendenciasObservacoesRows(clients) {
     }));
 }
 
+function buildBaseCompletaClientesRows(clients) {
+  return (clients ?? []).map((client) => ({
+    CNPJ: client.cnpj || '',
+    'Razão Social': client.razao_social || '',
+    'Nome/Identificação': client.nome_identificacao || '',
+    Responsável: client.responsavel || '',
+    Revisor: client.revisor || '',
+    'Tipo de Cliente': client.tipo_cliente || '',
+    'Regime Tributário': client.regime_tributario || '',
+    Atividade: client.atividades || '',
+  }));
+}
+
 function ReportsPage({
   clients,
   filteredClients,
@@ -4420,6 +4433,7 @@ function ReportsPage({
   const clientesEcdEcfObrigatoria = reportScope.filter((client) => hasObrigacaoAnual(client));
   const clientesComObservacoes = reportScope.filter((client) => hasPendenciasObservacoes(client));
   const pendenciasObservacoesRows = buildPendenciasObservacoesRows(reportScope);
+  const baseCompletaClientesRows = buildBaseCompletaClientesRows(clients);
   const clientesRetornoSeteDias = clientesAguardandoRetorno.filter((client) => (getDiasSemRetorno(client) ?? 0) >= 7);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
@@ -4441,6 +4455,14 @@ function ReportsPage({
     { label: 'ECD/ECF obrigatória', value: clientesEcdEcfObrigatoria.length },
   ].filter((row) => row.value > 0);
   const reports = [
+    {
+      title: 'Base completa de clientes',
+      rows: clients,
+      exportRows: baseCompletaClientesRows,
+      icon: Users,
+      tone: 'info',
+      pdf: true,
+    },
     { title: 'Clientes com atraso', rows: clientesComAtraso, icon: FolderClock, tone: 'danger' },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert, tone: 'warning' },
     { title: 'REINF pendente', rows: clientesReinfPendente, icon: FileSpreadsheet, tone: 'warning' },
