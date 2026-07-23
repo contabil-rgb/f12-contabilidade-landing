@@ -233,16 +233,15 @@ export async function criarCliente(cliente: Record<string, unknown>) {
   delete payload.id;
   delete payload.atualizado_em;
 
-  const { data, error } = await supabase
-    .from('clientes')
-    .insert(payload)
-    .select('*')
-    .single();
+  const { data, error } = await supabase.rpc('criar_cliente_portal', {
+    p_cliente: payload,
+  });
 
   if (error) {
     throw new Error(`Não foi possível criar cliente no Supabase: ${error.message}`);
   }
-  return normalizeRow(data as Record<string, unknown>);
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
 }
 
 export async function atualizarCliente(id: string, dados: Record<string, unknown>) {
