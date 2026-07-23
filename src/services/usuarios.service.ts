@@ -15,6 +15,14 @@ const USUARIO_UPDATE_FIELDS = new Set([
   'atualizado_em',
 ]);
 
+const USUARIO_ADMIN_UPDATE_FIELDS = new Set([
+  'nome',
+  'cargo',
+  'setor',
+  'perfil_acesso',
+  'status',
+]);
+
 function normalizePerfilAcessoValue(value: unknown) {
   const raw = String(value ?? '').trim();
   const normalized = normalizeText(raw);
@@ -121,6 +129,26 @@ export async function atualizarUsuarioPortal(id: string, dados: Record<string, u
     ...dados,
     atualizado_em: new Date().toISOString(),
   });
+
+  const isAdminUpdate = Object.keys(payload).some((key) => USUARIO_ADMIN_UPDATE_FIELDS.has(key));
+
+  if (isAdminUpdate) {
+    const { data, error } = await supabase.rpc('atualizar_usuario_portal', {
+      p_usuario_id: id,
+      p_nome: payload.nome ?? null,
+      p_cargo: payload.cargo ?? null,
+      p_setor: payload.setor ?? null,
+      p_perfil_acesso: payload.perfil_acesso ?? null,
+      p_status: payload.status ?? null,
+    });
+
+    if (error) {
+      throw new Error(`NÃ£o foi possÃ­vel atualizar usuÃ¡rio no Supabase: ${error.message}`);
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    return normalizeUsuarioRow(row as Record<string, unknown>);
+  }
 
   const { data, error } = await supabase
     .from('usuarios')
