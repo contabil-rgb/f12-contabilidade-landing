@@ -265,5 +265,14 @@ export async function atualizarCliente(id: string, dados: Record<string, unknown
 }
 
 export async function inativarCliente(id: string) {
-  return atualizarCliente(id, { status: 'Inativo' });
+  const { data, error } = await supabase.rpc('inativar_cliente_portal', {
+    p_cliente_id: id,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível inativar cliente no Supabase: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
 }
