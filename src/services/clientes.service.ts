@@ -250,17 +250,16 @@ export async function atualizarCliente(id: string, dados: Record<string, unknown
     atualizado_em: new Date().toISOString(),
   });
 
-  const { data, error } = await supabase
-    .from('clientes')
-    .update(payload)
-    .eq('id', id)
-    .select('*')
-    .single();
+  const { data, error } = await supabase.rpc('atualizar_cliente_portal', {
+    p_cliente_id: id,
+    p_cliente: payload,
+  });
 
   if (error) {
     throw new Error(`Não foi possível atualizar cliente no Supabase: ${error.message}`);
   }
-  return normalizeRow(data as Record<string, unknown>);
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
 }
 
 export async function inativarCliente(id: string) {
