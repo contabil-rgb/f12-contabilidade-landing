@@ -14,6 +14,7 @@ Arquivos SQL ativos do projeto.
 - `supabase/historico.sql` -> tabela `historico_alteracoes` + policies
 - `supabase/anexos.sql` -> tabela `anexos` + policies
 - `supabase/storage.sql` -> bucket privado e policies de Storage
+- `supabase/anexos-storage-hardening.sql` -> reforco das policies de anexos e Storage
 - `supabase/obrigacoes-status.sql` -> view persistente de obrigacoes
 - `supabase/clientes-campos-operacionais.sql` -> colunas operacionais complementares
 - `supabase/clientes-campos-acompanhamento.sql` -> datas e status de notificacao e retorno
@@ -32,11 +33,12 @@ Arquivos SQL ativos do projeto.
 8. `historico.sql`
 9. `anexos.sql`
 10. `storage.sql`
-11. `obrigacoes-status.sql`
-12. `clientes-campos-operacionais.sql`
-13. `clientes-campos-acompanhamento.sql`
-14. `acompanhamento-operacional.sql`
-15. `risco-operacional.sql`
+11. `anexos-storage-hardening.sql`
+12. `obrigacoes-status.sql`
+13. `clientes-campos-operacionais.sql`
+14. `clientes-campos-acompanhamento.sql`
+15. `acompanhamento-operacional.sql`
+16. `risco-operacional.sql`
 
 ## Scripts auxiliares para bases ja existentes
 
