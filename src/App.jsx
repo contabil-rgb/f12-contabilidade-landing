@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -101,6 +101,10 @@ import {
   listarClientes as listarClientesSupabase,
   listarClientesVinculadosResponsavel,
 } from './services/clientes.service';
+import {
+  listarSociosClientes as listarSociosClientesSupabase,
+  salvarSociosCliente as salvarSociosClienteSupabase,
+} from './services/socios-clientes.service';
 import {
   criarValorListagem,
   excluirValorListagem,
@@ -248,6 +252,7 @@ const CLIENT_FIELD_DEFAULTS = {
   data_envio_ecf: '',
   responsavel_ecd: '',
   pendencias_observacoes: '',
+  _socios: [],
 };
 
 const ATTACHMENT_FIELD_BY_TYPE = {
@@ -287,13 +292,17 @@ const BASE_CLIENTS_TABLE_COLUMNS = TABLE_COLUMNS.filter((field) =>
   BASE_CLIENTS_VISIBLE_KEYS.has(field.key),
 );
 
-const EDIT_MODAL_GROUP_TITLE_OVERRIDES = {
-  'REINF e Lucros': 'REINF e Ata',
-};
+const EDIT_MODAL_HIDDEN_FIELDS = new Set([
+  'data_enviada_reinf',
+  'anexo_recibo_reinf',
+  'precisa_ata',
+  'ata_entregue',
+  'data_entrega_ata',
+]);
 
-const EDIT_MODAL_GROUP_VISIBLE_FIELDS = {
-  'REINF e Lucros': new Set(['data_enviada_reinf', 'anexo_recibo_reinf', 'precisa_ata', 'ata_entregue', 'data_entrega_ata']),
-};
+const EDIT_MODAL_HIDDEN_GROUPS = new Set([
+  'REINF e Lucros',
+]);
 
 const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
   data_enviada_reinf: 'Data de entrega de REINF',
@@ -310,7 +319,7 @@ const AUTH_BOOTSTRAP_TIMEOUT_MS = 15000;
 const AUTH_BOOTSTRAP_TIMEOUT_WITH_CACHE_MS = 4000;
 const TRANSIENT_SIGNED_OUT_GRACE_MS = 1600;
 const AUTH_RESTORE_VISUAL_DELAY_MS = TRANSIENT_SIGNED_OUT_GRACE_MS + 250;
-const CONNECTION_WARNING_VISUAL_DELAY_MS = 1200;
+const CONNECTION_WARNING_VISUAL_DELAY_MS = 3500;
 
 async function loginSupabase(email, senha) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -499,6 +508,62 @@ function withClientDefaults(client) {
     ...CLIENT_FIELD_DEFAULTS,
     ...client,
   };
+}
+
+function normalizeCpfDigits(value) {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 11);
+}
+
+function formatCpfInput(value) {
+  const digits = normalizeCpfDigits(value);
+  if (!digits) return '';
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function normalizeSociosClienteInput(socios = []) {
+  const seen = new Set();
+  return (socios ?? [])
+    .map((socio) => {
+      const id = String(socio?.id ?? '').trim();
+      const nome = String(socio?.nome ?? '').trim();
+      const cpf = normalizeCpfDigits(socio?.cpf);
+      return {
+        ...(id ? { id } : {}),
+        nome,
+        cpf,
+      };
+    })
+    .filter((socio) => socio.nome || socio.cpf)
+    .filter((socio) => {
+      if (!socio.cpf) return true;
+      if (seen.has(socio.cpf)) return false;
+      seen.add(socio.cpf);
+      return true;
+    });
+}
+
+function indexarSociosClientes(rows = []) {
+  return (rows ?? []).reduce((acc, row) => {
+    const clienteId = String(row?.cliente_id ?? '').trim();
+    if (!clienteId) return acc;
+    if (!acc[clienteId]) acc[clienteId] = [];
+    acc[clienteId].push({
+      id: row.id,
+      nome: String(row.nome ?? '').trim(),
+      cpf: normalizeCpfDigits(row.cpf),
+    });
+    return acc;
+  }, {});
+}
+
+function hydrateClientesComSocios(clientesBase, sociosIndex = {}) {
+  return (clientesBase ?? []).map((client) => ({
+    ...client,
+    _socios: sociosIndex[String(client.id ?? '').trim()] ?? client._socios ?? [],
+  }));
 }
 
 // Selects persistidos no cliente que ainda precisam de um fallback tecnico minimo
@@ -1584,10 +1649,6 @@ function isPendenciaCritica(client) {
   return getObrigacaoFlag(client, 'pendencia_critica', isSituacaoCritica(client) || isPendenciaTecnica(client));
 }
 
-function hasPendenciaObrigacaoReinf(client) {
-  return isReinfPendente(client) || isReciboReinfPendente(client);
-}
-
 function hasPendenciaObrigacaoEcd(client) {
   return (
     isEcdPendente(client)
@@ -1689,35 +1750,6 @@ function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onEr
   );
 }
 
-function ReinfDeliveryDateCell({ client, disabled, onSave }) {
-  const [value, setValue] = useState(() => normalizeDateInputValue(getReinfDataEntregaValue(client)));
-
-  useEffect(() => {
-    setValue(normalizeDateInputValue(getReinfDataEntregaValue(client)));
-  }, [client.data_enviada_reinf, client?._db_obrigacoes?.reinf_data_entrega]);
-
-  if (disabled) {
-    return <span className="font-semibold text-slate-700">{formatDateDisplay(getReinfDataEntregaValue(client))}</span>;
-  }
-
-  return (
-    <div className="min-w-40" onClick={(event) => event.stopPropagation()}>
-      <input
-        type="date"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => {
-          const nextValue = value || '';
-          const currentValue = normalizeDateInputValue(getReinfDataEntregaValue(client));
-          if (nextValue === currentValue) return;
-          onSave?.(client.id, { data_enviada_reinf: nextValue });
-        }}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-      />
-    </div>
-  );
-}
-
 function ReinfAttachmentSentDateCell({ client }) {
   const attachment = parseAttachment(client.anexo_recibo_reinf);
   const dataPersistida = getObrigacoesPersistidas(client)?.reinf_data_enviada;
@@ -1728,6 +1760,351 @@ function ReinfAttachmentSentDateCell({ client }) {
   }
 
   return <span className="font-semibold text-slate-700">{formatDateDisplay(rawDate)}</span>;
+}
+
+function getReinfSocioOptionKey(socio, index = 0) {
+  const id = String(socio?.id ?? '').trim();
+  if (id) return id;
+  const cpf = normalizeCpfDigits(socio?.cpf);
+  if (cpf) return cpf;
+  return `${String(socio?.nome ?? '').trim()}-${index}`;
+}
+
+function getReinfSocios(client) {
+  return normalizeSociosClienteInput(client?._socios ?? []);
+}
+
+function getSelectedReinfSocio(client, selectedSocioByClientId = {}) {
+  const socios = getReinfSocios(client);
+  if (!socios.length) return null;
+
+  const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
+  const selectedKey = selectedSocioByClientId[clientKey];
+  if (!selectedKey) return socios[0];
+
+  return socios.find((socio, index) => getReinfSocioOptionKey(socio, index) === selectedKey) ?? socios[0];
+}
+
+function ReinfSocioDropdownCell({ client, selectedSocioByClientId, onSelect }) {
+  const socios = getReinfSocios(client);
+  const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
+  const selectedSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
+  const selectedIndex = selectedSocio ? socios.indexOf(selectedSocio) : 0;
+  const value = selectedSocio ? getReinfSocioOptionKey(selectedSocio, selectedIndex) : '';
+
+  if (!socios.length) {
+    return (
+      <select
+        value=""
+        disabled
+        className="input-shell reinf-socio-select h-10 text-sm"
+        aria-label="Socio da empresa"
+      >
+        <option value="">Sem socio</option>
+      </select>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onSelect?.(clientKey, event.target.value)}
+      className="input-shell reinf-socio-select h-10 text-sm"
+      aria-label={`Socio de ${client?.nome_identificacao || client?.razao_social || 'cliente'}`}
+    >
+      {socios.map((socio, index) => (
+        <option key={getReinfSocioOptionKey(socio, index)} value={getReinfSocioOptionKey(socio, index)}>
+          {socio.nome || 'Socio sem nome'}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ReinfSocioCpfCell({ client, selectedSocioByClientId }) {
+  const selectedSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
+  if (!selectedSocio?.cpf) return null;
+
+  return (
+    <span className="reinf-cpf-value font-semibold text-slate-700 dark:text-gray-200">
+      {formatCpfInput(selectedSocio.cpf)}
+    </span>
+  );
+}
+
+const REINF_MONTH_OPTIONS = [
+  { value: 'janeiro', label: 'Janeiro' },
+  { value: 'fevereiro', label: 'Fevereiro' },
+  { value: 'marco', label: 'Marco' },
+  { value: 'abril', label: 'Abril' },
+  { value: 'maio', label: 'Maio' },
+  { value: 'junho', label: 'Junho' },
+  { value: 'julho', label: 'Julho' },
+  { value: 'agosto', label: 'Agosto' },
+  { value: 'setembro', label: 'Setembro' },
+  { value: 'outubro', label: 'Outubro' },
+  { value: 'novembro', label: 'Novembro' },
+  { value: 'dezembro', label: 'Dezembro' },
+];
+
+const REINF_VALUE_MONTHLY_THRESHOLD = 50000;
+
+function parseCurrencyNumber(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+  const normalized = raw
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatCurrencyInput(value) {
+  const number = parseCurrencyNumber(value);
+  if (!number) return '';
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function getReinfPeriodicitySuggestionFromReportSocios(reportSocios = []) {
+  const hasMonthlyThreshold = reportSocios.some((reportSocio) => (
+    (reportSocio.meses ?? []).some((month) => parseCurrencyNumber(reportSocio.valoresPorMes?.[month]) >= REINF_VALUE_MONTHLY_THRESHOLD)
+  ));
+  return hasMonthlyThreshold ? 'Mensal' : 'Trimestral';
+}
+
+function getReinfMonthLabel(month) {
+  return REINF_MONTH_OPTIONS.find((item) => item.value === month)?.label ?? month;
+}
+
+function getReinfMonthShortLabel(month) {
+  const index = REINF_MONTH_OPTIONS.findIndex((item) => item.value === month);
+  return ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][index] ?? getReinfMonthLabel(month).slice(0, 3).toUpperCase();
+}
+
+function getReinfMonthNumberLabel(month) {
+  const index = REINF_MONTH_OPTIONS.findIndex((item) => item.value === month);
+  return index >= 0 ? String(index + 1).padStart(2, '0') : getReinfMonthLabel(month);
+}
+
+function getReinfReportMonths(reportSocios = []) {
+  const selected = new Set();
+  (reportSocios ?? []).forEach((reportSocio) => {
+    (reportSocio.meses ?? []).forEach((month) => selected.add(month));
+  });
+  return REINF_MONTH_OPTIONS
+    .map((month) => month.value)
+    .filter((month) => selected.has(month));
+}
+
+function getReinfPeriodLabel(months = [], anoReferencia = '') {
+  if (!months.length) return anoReferencia ? `periodo nao informado/${anoReferencia}` : 'periodo nao informado';
+  const orderedMonths = REINF_MONTH_OPTIONS
+    .map((month) => month.value)
+    .filter((month) => months.includes(month));
+  const numbers = orderedMonths.map(getReinfMonthNumberLabel);
+  const prefix = numbers.length === 1 ? numbers[0] : `${numbers[0]} ate ${numbers[numbers.length - 1]}`;
+  return anoReferencia ? `${prefix}/${anoReferencia}` : prefix;
+}
+
+function getReinfQuarterLabel(months = []) {
+  if (!months.length) return '';
+  const orderedIndexes = REINF_MONTH_OPTIONS
+    .map((month, index) => (months.includes(month.value) ? index : -1))
+    .filter((index) => index >= 0);
+  if (orderedIndexes.length !== 3) return '';
+  const quarterIndex = Math.floor(orderedIndexes[0] / 3);
+  const quarterStart = quarterIndex * 3;
+  const isSameQuarter = orderedIndexes.every((index, offset) => index === quarterStart + offset);
+  if (!isSameQuarter) return '';
+  return ['primeiro trimestre', 'segundo trimestre', 'terceiro trimestre', 'quarto trimestre'][quarterIndex] ?? '';
+}
+
+function getReinfPeriodDescription(months = [], periodicidade = 'Trimestral', anoReferencia = '') {
+  const yearSuffix = anoReferencia ? ` de ${anoReferencia}` : '';
+  if (periodicidade === 'Mensal' && months.length === 1) {
+    return `mes de ${getReinfMonthLabel(months[0]).toLowerCase()}${yearSuffix}`;
+  }
+  const quarterLabel = getReinfQuarterLabel(months);
+  if (quarterLabel) return `${quarterLabel}${yearSuffix}`;
+  return `periodo ${getReinfPeriodLabel(months, anoReferencia)}`;
+}
+
+function formatCurrencyDisplay(value) {
+  const number = parseCurrencyNumber(value);
+  if (!number) return '';
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function getClientDisplayName(client) {
+  return client?.razao_social || client?.nome_identificacao || 'Cliente';
+}
+
+function buildReinfFiscalSubject({ client, months = [], anoReferencia = '' }) {
+  return `Distribuicao de Lucro ${getReinfPeriodLabel(months, anoReferencia)} - ${getClientDisplayName(client)}`;
+}
+
+function buildReinfFiscalBodyText({ client, months = [], anoReferencia = '', periodicidade = 'Trimestral' }) {
+  return [
+    'Prezados(as),',
+    '',
+    `Segue os valores do ${getReinfPeriodDescription(months, periodicidade, anoReferencia)} referente a distribuicao de lucro dos socios da ${getClientDisplayName(client)} (${formatCnpj(client?.cnpj)}).`,
+    '',
+    'Qualquer duvida, estamos a disposicao.',
+    '',
+    'Por favor, confirme o recebimento deste e-mail.',
+    '',
+    'Atenciosamente,',
+  ].join('\n');
+}
+
+function isReinfFiscalClosingLine(line) {
+  return String(line ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .startsWith('qualquer duvida');
+}
+
+function splitReinfFiscalBodyText(bodyText) {
+  const lines = String(bodyText ?? '').split('\n');
+  const closingStart = lines.findIndex(isReinfFiscalClosingLine);
+  if (closingStart < 0) {
+    return { introLines: lines, closingLines: [] };
+  }
+  return {
+    introLines: lines.slice(0, closingStart),
+    closingLines: lines.slice(closingStart),
+  };
+}
+
+function buildPlainTextTable(rows = []) {
+  if (!rows.length) return '';
+  const columnWidths = rows[0].map((_, columnIndex) => (
+    Math.max(
+      ...rows.map((row) => String(row[columnIndex] ?? '').length),
+      3,
+    )
+  ));
+  const divider = `+${columnWidths.map((width) => '-'.repeat(width + 2)).join('+')}+`;
+  const formatRow = (row) => `|${row.map((cell, columnIndex) => ` ${String(cell ?? '').padEnd(columnWidths[columnIndex], ' ')} `).join('|')}|`;
+
+  return [
+    divider,
+    formatRow(rows[0]),
+    divider,
+    ...rows.slice(1).map(formatRow),
+    divider,
+  ].join('\n');
+}
+
+function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
+  const header = ['SOCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
+  const rows = reportSocios.length
+    ? reportSocios.map((reportSocio) => [
+      reportSocio.socio?.nome || 'Socio nao informado',
+      reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+      ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
+    ])
+    : [['Sem socio', '', ...months.map(() => '')]];
+  const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
+
+  return [
+    assunto ? `Assunto: ${assunto}` : '',
+    '',
+    introLines.join('\n'),
+    '',
+    buildPlainTextTable([header, ...rows]),
+    '',
+    closingLines.join('\n'),
+  ].filter((line) => line !== '').join('\n');
+}
+
+function buildReinfFiscalHtmlParagraphs(lines = []) {
+  return lines
+    .map((line) => line.trim() ? `<p style="margin:0 0 14px;">${escapeHtml(line)}</p>` : '<br>')
+    .join('');
+}
+
+function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
+  const headerCells = ['SOCIO', 'CPF', ...months.map(getReinfMonthShortLabel)]
+    .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
+    .join('');
+  const bodyRows = (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem socio', cpf: '' }, valoresPorMes: {} }])
+    .map((reportSocio) => {
+      const cells = [
+        reportSocio.socio?.nome || 'Socio nao informado',
+        reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+        ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
+      ];
+      return `<tr>${cells.map((cell) => `<td style="border:1px solid #111;padding:4px 8px;background:#fff;color:#111;">${escapeHtml(cell)}</td>`).join('')}</tr>`;
+    })
+    .join('');
+  const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
+
+  return `
+    <div style="font-family:Arial,sans-serif;color:#111;font-size:14px;line-height:1.45;">
+      ${assunto ? `<p style="margin:0 0 16px;font-size:18px;"><strong>${escapeHtml(assunto)}</strong></p>` : ''}
+      ${buildReinfFiscalHtmlParagraphs(introLines)}
+      <table style="border-collapse:collapse;margin:12px 0 20px;font-size:14px;border:1px solid #111;background:#fff;">
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      ${buildReinfFiscalHtmlParagraphs(closingLines)}
+    </div>
+  `;
+}
+
+async function copyRichTextToClipboard({ htmlText, plainText }) {
+  if (navigator.clipboard?.write && window.ClipboardItem) {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': new Blob([htmlText], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+      }),
+    ]);
+    return;
+  }
+
+  if (document?.body && window?.getSelection) {
+    const container = document.createElement('div');
+    container.setAttribute('contenteditable', 'true');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.innerHTML = htmlText;
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const copied = document.execCommand('copy');
+    selection.removeAllRanges();
+    document.body.removeChild(container);
+
+    if (copied) return;
+  }
+
+  await navigator.clipboard?.writeText(plainText);
 }
 
 function getEcdEcfDeliveryDateValue(client, tipo = 'ecd') {
@@ -1784,55 +2161,6 @@ function EcdEcfSentDateCell({ client, tipo = 'ecd' }) {
   }
 
   return <span className="font-semibold text-slate-700 dark:text-gray-200">{formatDateDisplay(rawDate)}</span>;
-}
-
-function getReinfObrigacaoStatus(client) {
-  if (hasObrigacoesPersistidas(client)) {
-    const persistedCode = getPersistedReinfStatusCode(client);
-    const toneMap = {
-      concluido: 'success',
-      sem_data: 'neutral',
-      em_atraso: 'danger',
-      aguardando_envio: 'warning',
-    };
-    return {
-      label: getPersistedReinfStatusLabel(client) || 'Status',
-      tone: toneMap[persistedCode] || 'neutral',
-    };
-  }
-
-  const dataEntrega = normalizeDateInputValue(getReinfDataEntregaValue(client));
-  const attachment = parseAttachment(client.anexo_recibo_reinf);
-  const dataEnviada = attachment.attachedAt ? normalizeDateInputValue(attachment.attachedAt) : '';
-  const today = new Date().toISOString().slice(0, 10);
-
-  if (attachment.has && dataEnviada) {
-    return { label: 'Concluido', tone: 'success' };
-  }
-
-  if (dataEnviada && !attachment.has) {
-    return { label: 'Recibo pendente', tone: 'warning' };
-  }
-
-  if (!dataEntrega) {
-    return { label: 'Sem data', tone: 'neutral' };
-  }
-
-  if (dataEntrega < today && !dataEnviada) {
-    return { label: 'Em atraso', tone: 'danger' };
-  }
-
-  return { label: 'Aguardando envio', tone: 'warning' };
-}
-
-function ReinfObrigacaoStatusCell({ client }) {
-  const status = getReinfObrigacaoStatus(client);
-
-  return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(status.tone)}`}>
-      {status.label}
-    </span>
-  );
 }
 
 function EcdEcfObrigacaoStatusCell({ client }) {
@@ -2223,7 +2551,7 @@ function AppShell({
       </aside>
 
       <div className="min-w-0 lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80">
+        <header className="z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80 lg:sticky lg:top-0">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <img
@@ -3832,14 +4160,521 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
+function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onClose }) {
+  const socios = getReinfSocios(client);
+  const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
+  const currentSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
+  const currentSocioIndex = currentSocio ? socios.indexOf(currentSocio) : 0;
+  const currentSocioKey = currentSocio ? getReinfSocioOptionKey(currentSocio, currentSocioIndex) : '';
+  const getSocioByKey = (socioKey) => socios.find((socio, index) => getReinfSocioOptionKey(socio, index) === socioKey) ?? null;
+  const createInitialReportSocios = () => {
+    const initialKey = currentSocioKey || (socios[0] ? getReinfSocioOptionKey(socios[0], 0) : '');
+    return initialKey ? [{ socioKey: initialKey, meses: [], valoresPorMes: {} }] : [];
+  };
+  const [reportSocios, setReportSocios] = useState(createInitialReportSocios);
+  const [socioToAdd, setSocioToAdd] = useState('');
+  const [periodicidade, setPeriodicidade] = useState('Trimestral');
+  const [periodicidadeManual, setPeriodicidadeManual] = useState(false);
+  const [anoReferencia, setAnoReferencia] = useState(String(new Date().getFullYear()));
+  const [assuntoEditado, setAssuntoEditado] = useState(false);
+  const [assunto, setAssunto] = useState('');
+  const [mensagemEditada, setMensagemEditada] = useState(false);
+  const [mensagem, setMensagem] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('');
+  const reportSociosHydrated = useMemo(() => reportSocios
+    .map((reportSocio) => ({
+      ...reportSocio,
+      socio: getSocioByKey(reportSocio.socioKey),
+    }))
+    .filter((reportSocio) => reportSocio.socio), [reportSocios, client?._socios]);
+  const selectedReportSocioKeys = new Set(reportSocios.map((reportSocio) => reportSocio.socioKey));
+  const availableSociosToAdd = socios
+    .map((socio, index) => ({ socio, socioKey: getReinfSocioOptionKey(socio, index) }))
+    .filter((item) => !selectedReportSocioKeys.has(item.socioKey));
+  const suggestedPeriodicity = getReinfPeriodicitySuggestionFromReportSocios(reportSociosHydrated);
+  const reportMonths = useMemo(() => getReinfReportMonths(reportSociosHydrated), [reportSociosHydrated]);
+
+  useEffect(() => {
+    setReportSocios(createInitialReportSocios());
+    setSocioToAdd('');
+    setPeriodicidade('Trimestral');
+    setPeriodicidadeManual(false);
+    setAnoReferencia(String(new Date().getFullYear()));
+    setAssuntoEditado(false);
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }, [client?.id]);
+
+  useEffect(() => {
+    setSocioToAdd((current) => {
+      if (current && availableSociosToAdd.some((item) => item.socioKey === current)) return current;
+      return availableSociosToAdd[0]?.socioKey ?? '';
+    });
+  }, [availableSociosToAdd.map((item) => item.socioKey).join('|')]);
+
+  useEffect(() => {
+    if (!periodicidadeManual) {
+      setPeriodicidade(suggestedPeriodicity);
+    }
+  }, [periodicidadeManual, suggestedPeriodicity]);
+
+  const generatedSubject = useMemo(() => buildReinfFiscalSubject({
+    client,
+    months: reportMonths,
+    anoReferencia,
+  }), [client, reportMonths, anoReferencia]);
+
+  const generatedMessage = useMemo(() => buildReinfFiscalBodyText({
+    client,
+    months: reportMonths,
+    anoReferencia,
+    periodicidade,
+  }), [client, reportMonths, anoReferencia, periodicidade]);
+  const previewBodyParts = useMemo(() => splitReinfFiscalBodyText(mensagem), [mensagem]);
+
+  useEffect(() => {
+    if (!assuntoEditado) {
+      setAssunto(generatedSubject);
+    }
+  }, [generatedSubject, assuntoEditado]);
+
+  useEffect(() => {
+    if (!mensagemEditada) {
+      setMensagem(generatedMessage);
+    }
+  }, [generatedMessage, mensagemEditada]);
+
+  function addReportSocio() {
+    if (!socioToAdd || selectedReportSocioKeys.has(socioToAdd)) return;
+    setReportSocios((current) => [...current, { socioKey: socioToAdd, meses: [], valoresPorMes: {} }]);
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function removeReportSocio(socioKey) {
+    setReportSocios((current) => current.filter((reportSocio) => reportSocio.socioKey !== socioKey));
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function toggleMes(socioKey, month) {
+    setReportSocios((current) => current.map((reportSocio) => {
+      if (reportSocio.socioKey !== socioKey) return reportSocio;
+      const currentMeses = reportSocio.meses ?? [];
+      if (currentMeses.includes(month)) {
+        const nextValues = { ...(reportSocio.valoresPorMes ?? {}) };
+        delete nextValues[month];
+        return {
+          ...reportSocio,
+          meses: currentMeses.filter((item) => item !== month),
+          valoresPorMes: nextValues,
+        };
+      }
+      return {
+        ...reportSocio,
+        meses: [...currentMeses, month],
+      };
+    }));
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function clearMeses(socioKey) {
+    setReportSocios((current) => current.map((reportSocio) => (
+      reportSocio.socioKey === socioKey
+        ? { ...reportSocio, meses: [], valoresPorMes: {} }
+        : reportSocio
+    )));
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function updateValorMes(socioKey, month, value) {
+    setReportSocios((current) => current.map((reportSocio) => (
+      reportSocio.socioKey === socioKey
+        ? {
+          ...reportSocio,
+          valoresPorMes: {
+            ...(reportSocio.valoresPorMes ?? {}),
+            [month]: value,
+          },
+        }
+        : reportSocio
+    )));
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function formatValorMes(socioKey, month) {
+    setReportSocios((current) => current.map((reportSocio) => {
+      if (reportSocio.socioKey !== socioKey) return reportSocio;
+      const formatted = formatCurrencyInput(reportSocio.valoresPorMes?.[month]);
+      if (!formatted) return reportSocio;
+      return {
+        ...reportSocio,
+        valoresPorMes: {
+          ...(reportSocio.valoresPorMes ?? {}),
+          [month]: formatted,
+        },
+      };
+    }));
+  }
+
+  async function copyMessage() {
+    const plainText = buildReinfFiscalPlainMessage({
+      assunto,
+      bodyText: mensagem,
+      reportSocios: reportSociosHydrated,
+      months: reportMonths,
+    });
+    const htmlText = buildReinfFiscalHtmlMessage({
+      assunto,
+      bodyText: mensagem,
+      reportSocios: reportSociosHydrated,
+      months: reportMonths,
+    });
+    try {
+      await copyRichTextToClipboard({ htmlText, plainText });
+      setCopied(true);
+      setCopyStatus('E-mail copiado');
+    } catch {
+      setCopied(false);
+      setCopyStatus('Falha ao copiar');
+    }
+  }
+
+  if (!client) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
+      <div className="mx-auto my-6 max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-gray-700 dark:bg-gray-900">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+          <div>
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparacao REINF</p>
+            <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-gray-100">{getClientDisplayName(client)}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">{formatCnpj(client.cnpj)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
+            aria-label="Fechar modal REINF"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Socios no relatorio</h3>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                  Inclua um ou mais socios e informe valores especificos para cada um.
+                </p>
+              </div>
+              <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500 dark:border-gray-700 dark:text-gray-300">
+                {reportSociosHydrated.length} socio(s)
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                Adicionar socio
+                <select
+                  value={socioToAdd}
+                  onChange={(event) => setSocioToAdd(event.target.value)}
+                  disabled={!availableSociosToAdd.length}
+                  className="form-control-shell mt-1 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {!availableSociosToAdd.length ? <option value="">Todos os socios ja foram incluidos</option> : null}
+                  {availableSociosToAdd.map(({ socio, socioKey }) => (
+                    <option key={socioKey} value={socioKey}>
+                      {socio.nome || 'Socio sem nome'}{socio.cpf ? ` - ${formatCpfInput(socio.cpf)}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={addReportSocio}
+                disabled={!socioToAdd}
+                className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                <Plus size={16} aria-hidden="true" />
+                Adicionar
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
+            <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e periodo</h3>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[220px_180px_minmax(0,1fr)]">
+              <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                Periodicidade
+                <select
+                  value={periodicidade}
+                  onChange={(event) => {
+                    setPeriodicidade(event.target.value);
+                    setPeriodicidadeManual(true);
+                    setCopied(false);
+                    setCopyStatus('');
+                  }}
+                  className="form-control-shell mt-1"
+                >
+                  <option value="Mensal">Mensal</option>
+                  <option value="Trimestral">Trimestral</option>
+                </select>
+              </label>
+              <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                Ano de referencia
+                <input
+                  value={anoReferencia}
+                  onChange={(event) => {
+                    setAnoReferencia(event.target.value.replace(/\D/g, '').slice(0, 4));
+                    setCopied(false);
+                    setCopyStatus('');
+                  }}
+                  inputMode="numeric"
+                  placeholder="2026"
+                  className="form-control-shell mt-1"
+                />
+              </label>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <span className="block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Regra sugerida</span>
+                <span>
+                  Mes com R$ 50.000,00 ou acima: mensal. Mes abaixo de R$ 50.000,00: trimestral.
+                </span>
+                <span className="mt-1 block text-xs text-slate-500 dark:text-gray-400">Sugestao atual: {suggestedPeriodicity}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {reportSociosHydrated.length ? reportSociosHydrated.map((reportSocio) => (
+                <div key={reportSocio.socioKey} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-gray-700 dark:bg-gray-800/70">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-950 dark:text-gray-100">{reportSocio.socio?.nome || 'Socio sem nome'}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                        CPF: {reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : 'CPF nao informado'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeReportSocio(reportSocio.socioKey)}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
+                    >
+                      Remover
+                    </button>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Meses de referencia</p>
+                      <button
+                        type="button"
+                        onClick={() => clearMeses(reportSocio.socioKey)}
+                        className="text-xs font-black text-slate-500 transition hover:text-brand-blue dark:text-gray-400 dark:hover:text-blue-300"
+                      >
+                        Limpar meses
+                      </button>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {REINF_MONTH_OPTIONS.map((month) => (
+                        <label
+                          key={month.value}
+                          className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-black transition ${
+                            reportSocio.meses.includes(month.value)
+                              ? 'border-brand-blue bg-brand-blue/10 text-brand-blue dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200'
+                              : 'border-slate-200 bg-white text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={reportSocio.meses.includes(month.value)}
+                            onChange={() => toggleMes(reportSocio.socioKey, month.value)}
+                            className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+                          />
+                          {month.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores por mes selecionado</p>
+                    {reportSocio.meses.length ? (
+                      <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {REINF_MONTH_OPTIONS.filter((month) => reportSocio.meses.includes(month.value)).map((month) => (
+                          <label key={month.value} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                            {month.label}
+                            <input
+                              value={reportSocio.valoresPorMes?.[month.value] ?? ''}
+                              onChange={(event) => updateValorMes(reportSocio.socioKey, month.value, event.target.value)}
+                              onBlur={() => formatValorMes(reportSocio.socioKey, month.value)}
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              className="form-control-shell mt-1"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                        Selecione um ou mais meses para informar os valores deste socio.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-400">
+                  Nenhum socio incluido no relatorio. Cadastre socios no cliente ou adicione um socio acima.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Mensagem para o setor fiscal</h3>
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">O assunto, o texto e a tabela acompanham os campos acima e podem ser copiados para o e-mail.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssuntoEditado(false);
+                  setAssunto(generatedSubject);
+                  setMensagemEditada(false);
+                  setMensagem(generatedMessage);
+                  setCopied(false);
+                  setCopyStatus('');
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                Restaurar padrao
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                  Assunto sugerido
+                  <input
+                    value={assunto}
+                    onChange={(event) => {
+                      setAssunto(event.target.value);
+                      setAssuntoEditado(true);
+                      setCopied(false);
+                      setCopyStatus('');
+                    }}
+                    className="form-control-shell mt-1"
+                  />
+                </label>
+                <label className="block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                  Texto do e-mail
+                  <textarea
+                    value={mensagem}
+                    onChange={(event) => {
+                      setMensagem(event.target.value);
+                      setMensagemEditada(true);
+                      setCopied(false);
+                      setCopyStatus('');
+                    }}
+                    rows={9}
+                    className="form-control-shell mt-1 min-h-56 resize-y leading-6"
+                  />
+                </label>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Previa formatada</p>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-950 shadow-sm dark:border-gray-700 dark:bg-white dark:text-slate-950">
+                  <p className="text-lg font-semibold leading-snug">{assunto || 'Assunto nao informado'}</p>
+                  <div className="mt-4 space-y-3">
+                    {previewBodyParts.introLines.map((line, index) => (
+                      line.trim()
+                        ? <p key={`intro-${line}-${index}`}>{line}</p>
+                        : <div key={`intro-blank-${index}`} className="h-2" />
+                    ))}
+                  </div>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-[520px] border-collapse border border-slate-950 bg-white text-left text-[13px] leading-5 text-slate-950">
+                      <thead>
+                        <tr>
+                          <th className="w-[42%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SOCIO</th>
+                          <th className="w-[22%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF</th>
+                          {reportMonths.map((month) => (
+                            <th key={month} className="border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">
+                              {getReinfMonthShortLabel(month)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(reportSociosHydrated.length ? reportSociosHydrated : [{ socio: { nome: 'Sem socio', cpf: '' }, valoresPorMes: {} }]).map((reportSocio, index) => (
+                          <tr key={reportSocio.socioKey ?? `empty-${index}`}>
+                            <td className="border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.nome || 'Socio nao informado'}</td>
+                            <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : ''}</td>
+                            {reportMonths.map((month) => (
+                              <td key={month} className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">
+                                {formatCurrencyDisplay(reportSocio.valoresPorMes?.[month])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {previewBodyParts.closingLines.length ? (
+                    <div className="mt-4 space-y-3">
+                      {previewBodyParts.closingLines.map((line, index) => (
+                        line.trim()
+                          ? <p key={`closing-${line}-${index}`}>{line}</p>
+                          : <div key={`closing-blank-${index}`} className="h-2" />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+            Esta etapa apenas prepara a mensagem. Nenhum e-mail sera enviado automaticamente.
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {copyStatus ? (
+              <span className={`text-xs font-black ${copied ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'}`}>
+                {copyStatus}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={copyMessage}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
+            >
+              <Mail size={16} aria-hidden="true" />
+              Copiar e-mail
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReinfPage({
   clients,
   onView,
-  canManageAttachments,
-  canEditReinfDate,
-  onQuickUpdate,
-  onAnexoSuccess,
-  onAnexoError,
   supabaseStatus,
   metadata,
   onRefresh,
@@ -3852,31 +4687,24 @@ function ReinfPage({
   const emptyFilters = {
     search: '',
     cnpj: '',
-    regime_tributario: '',
-    envio_reinf: '',
-    data_enviada_reinf: '',
-    anexo_recibo_reinf: 'all',
-    status: '',
   };
-  const [quick, setQuick] = useState('todos');
   const [filters, setFilters] = useState(emptyFilters);
   const [focusedClientId, setFocusedClientId] = useState('');
   const [focusedClientLabel, setFocusedClientLabel] = useState('');
+  const [selectedSocioByClientId, setSelectedSocioByClientId] = useState({});
+  const [reinfModalClientId, setReinfModalClientId] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
-  const attachmentOptions = Object.entries(ATTACHMENT_FILTERS).map(([value, label]) => ({ value, label }));
-  const quickFilters = [
-    { key: 'todos', label: 'Todos', predicate: () => true, tone: 'neutral' },
-    { key: 'reinf-enviada', label: 'REINF enviada', predicate: (client) => isReinfEnviada(client), tone: 'success' },
-    { key: 'reinf-pendente', label: 'REINF pendente', predicate: (client) => isReinfPendente(client), tone: 'warning' },
-    { key: 'com-anexo-reinf', label: 'Com anexo REINF', predicate: (client) => hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf'), tone: 'success' },
-    { key: 'sem-anexo-reinf', label: 'Sem anexo REINF', predicate: (client) => !hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf'), tone: 'warning' },
-  ];
-  const quickPredicate = quickFilters.find((item) => item.key === quick)?.predicate ?? (() => true);
+  const updateSelectedSocio = (clientId, socioKey) => {
+    if (!clientId) return;
+    setSelectedSocioByClientId((current) => ({
+      ...current,
+      [clientId]: socioKey,
+    }));
+  };
 
   useEffect(() => {
     const nextClientId = String(searchContext?.clientId ?? '');
     if (!nextClientId) return;
-    setQuick('todos');
     setFilters(emptyFilters);
     setFocusedClientId(nextClientId);
     setFocusedClientLabel(searchContext?.query || 'cliente selecionado');
@@ -3886,22 +4714,19 @@ function ReinfPage({
   const rows = clients.filter((client) => {
     if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
-    const reinfStatus = getObrigacoesPersistidas(client)?.reinf_status_codigo;
-    const dataEntregaReinf = normalizeDateInputValue(getReinfDataEntregaValue(client));
-    const reinfComprovante = hasObrigacaoComprovante(client, 'reinf_comprovante_anexado', 'anexo_recibo_reinf');
-    const envioReinfConcluido = reinfStatus ? reinfStatus === 'concluido' : isReinfEnviada(client);
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
-    if (filters.regime_tributario && normalizeText(client.regime_tributario) !== normalizeText(filters.regime_tributario)) return false;
-    if (filters.envio_reinf && normalizeText(envioReinfConcluido ? 'Sim' : 'Não') !== normalizeText(filters.envio_reinf)) return false;
-    if (filters.data_enviada_reinf && normalizeText(dataEntregaReinf) !== normalizeText(normalizeDateInputValue(filters.data_enviada_reinf))) return false;
-    if (filters.anexo_recibo_reinf === 'attached' && !reinfComprovante) return false;
-    if (filters.anexo_recibo_reinf === 'missing' && reinfComprovante) return false;
-    if (filters.status === 'reinf-pendente' && !isReinfPendente(client)) return false;
-    if (filters.status === 'recibo-pendente' && !isReciboReinfPendente(client)) return false;
-    if (filters.status === 'sem-pendencia' && (isReinfPendente(client) || isReciboReinfPendente(client))) return false;
-    return quickPredicate(client);
+    return true;
   });
+  const reinfModalClient = clients.find((client) => String(client.id ?? '') === String(reinfModalClientId)) ?? null;
+  const openReinfModal = (clientOrId) => {
+    const clientId = typeof clientOrId === 'object' && clientOrId !== null ? clientOrId.id : clientOrId;
+    const client = typeof clientOrId === 'object' && clientOrId !== null
+      ? clientOrId
+      : clients.find((item) => String(item.id ?? '') === String(clientId));
+    if (!client?.id) return;
+    setReinfModalClientId(String(client.id));
+  };
 
   return (
     <div className="min-w-0 space-y-5">
@@ -3928,11 +4753,6 @@ function ReinfPage({
           </>
         )}
       />
-      <section className="grid max-w-3xl gap-4 md:grid-cols-2">
-        <MetricCard title="REINF pendente" value={countWhere(clients, (client) => isReinfPendente(client))} icon={AlertTriangle} tone="warning" />
-        <MetricCard title="Recibo pendente" value={countWhere(clients, (client) => isReciboReinfPendente(client))} icon={Paperclip} tone="warning" />
-      </section>
-
       {focusedClientId ? (
         <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3960,12 +4780,11 @@ function ReinfPage({
           <div>
             <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de REINF</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Use os filtros para separar envio, comprovante e pendências da REINF.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Localize clientes por nome, razão social ou CNPJ.</p>
           </div>
           <button
             type="button"
             onClick={() => {
-              setQuick('todos');
               setFilters(emptyFilters);
             }}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
@@ -3974,19 +4793,7 @@ function ReinfPage({
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {quickFilters.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setQuick(item.key)}
-              className={`rounded-full border px-3 py-2 text-xs font-black transition ${quick === item.key ? chipClass(item.tone) : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid max-w-3xl gap-3 md:grid-cols-[minmax(260px,420px)_minmax(200px,280px)]">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -3995,69 +4802,65 @@ function ReinfPage({
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(clients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
-          <FilterSelect label="Envio de REINF" value={filters.envio_reinf} options={YES_NO_OPTIONS} onChange={(value) => updateFilter({ envio_reinf: value })} />
-          <FilterSelect label="Data de entrega de REINF" value={filters.data_enviada_reinf} options={uniqueValues(clients.map((client) => getReinfDataEntregaValue(client)))} onChange={(value) => updateFilter({ data_enviada_reinf: value })} />
-          <FilterSelect label="Anexo recibo REINF" value={filters.anexo_recibo_reinf} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_reinf: value })} includeBlank={false} />
-          <FilterSelect
-            label="Status da pendência"
-            value={filters.status}
-            options={[
-              { value: 'reinf-pendente', label: 'REINF pendente' },
-              { value: 'recibo-pendente', label: 'Recibo pendente' },
-              { value: 'sem-pendencia', label: 'Sem pendência REINF' },
-            ]}
-            onChange={(value) => updateFilter({ status: value })}
-          />
         </div>
       </section>
 
       <section className="min-w-0 surface-card">
         <DataTable
           rows={rows}
+          tableClassName="table-reinf-compact"
           columns={[
              'nome_identificacao',
              'cnpj',
-             'regime_tributario',
-             'data_enviada_reinf',
+             'reinf_socio',
+             'reinf_socio_cpf',
              'data_envio_recibo_reinf',
-             'anexo_recibo_reinf',
            ]}
-           columnLabels={{
-             data_enviada_reinf: 'Data de entrega de REINF',
-             data_envio_recibo_reinf: 'Data enviada',
+            columnLabels={{
+              reinf_socio: 'Socio',
+              reinf_socio_cpf: 'CPF',
+              data_envio_recibo_reinf: 'Data enviada',
+            }}
+            renderCell={(client, column) => {
+              if (column === 'nome_identificacao') {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => openReinfModal(client)}
+                    className="text-left font-black text-slate-950 hover:text-brand-blue dark:text-gray-100 dark:hover:text-blue-300"
+                  >
+                    {client.nome_identificacao || client.razao_social}
+                  </button>
+                );
+              }
+              if (column === 'reinf_socio') {
+                return (
+                  <ReinfSocioDropdownCell
+                    client={client}
+                    selectedSocioByClientId={selectedSocioByClientId}
+                    onSelect={updateSelectedSocio}
+                  />
+                );
+              }
+              if (column === 'reinf_socio_cpf') {
+                return <ReinfSocioCpfCell client={client} selectedSocioByClientId={selectedSocioByClientId} />;
+              }
+              if (column === 'data_envio_recibo_reinf') {
+                return <ReinfAttachmentSentDateCell client={client} />;
+              }
+             return undefined;
            }}
-           onView={onView}
-           renderCell={(client, column) => {
-             if (column === 'data_enviada_reinf') {
-               return (
-                 <ReinfDeliveryDateCell
-                   client={client}
-                   disabled={!canEditReinfDate?.(client)}
-                   onSave={onQuickUpdate}
-                 />
-               );
-             }
-             if (column === 'data_envio_recibo_reinf') {
-               return <ReinfAttachmentSentDateCell client={client} />;
-             }
-             if (column === 'anexo_recibo_reinf') {
-               return (
-                 <AttachmentCell
-                  client={client}
-                  fieldKey="anexo_recibo_reinf"
-                  tipoAnexo={TIPOS_ANEXO.RECIBO_REINF}
-                  disabled={!canManageAttachments?.(client, 'anexo_recibo_reinf')}
-                  onSuccess={onAnexoSuccess}
-                  onError={onAnexoError}
-                />
-              );
-            }
-            return undefined;
-          }}
-          trailing={(client) => <ReinfObrigacaoStatusCell client={client} />}
-        />
+           onView={openReinfModal}
+         />
       </section>
+      {reinfModalClient ? (
+        <ReinfFiscalModal
+          client={reinfModalClient}
+          selectedSocioByClientId={selectedSocioByClientId}
+          onSelectSocio={updateSelectedSocio}
+          onClose={() => setReinfModalClientId('')}
+        />
+      ) : null}
     </div>
   );
 }
@@ -4278,11 +5081,13 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   );
 }
 
-function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels = {} }) {
+function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels = {}, tableClassName = 'min-w-[920px] xl:min-w-[1080px]' }) {
+  const hasTrailingColumn = typeof trailing === 'function';
+
   return (
     <>
       <div className="table-scroll-shell overflow-soft">
-        <table className="table-base min-w-[920px] xl:min-w-[1080px]">
+        <table className={`table-base ${tableClassName}`}>
           <thead className="table-head">
             <tr>
               {columns.map((column) => (
@@ -4290,9 +5095,11 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
                   {columnLabels[column] ?? getFieldLabel(FIELD_DEFINITIONS, column)}
                 </th>
               ))}
-              <th className="table-head-cell">
-                Status da obrigação
-              </th>
+              {hasTrailingColumn ? (
+                <th className="table-head-cell">
+                  Status da obrigação
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -4309,7 +5116,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
                     ))}
                   </td>
                 ))}
-                <td className="table-cell">{trailing(client)}</td>
+                {hasTrailingColumn ? <td className="table-cell">{trailing(client)}</td> : null}
               </tr>
             ))}
           </tbody>
@@ -4388,7 +5195,7 @@ function buildPendenciasObservacoesRows(clients) {
       Cliente: client.nome_identificacao || client.razao_social || '',
       'Razão Social': client.razao_social || '',
       CNPJ: client.cnpj || '',
-      Responsável: client.responsavel || '',
+      'Responsável': client.responsavel || '',
       Revisor: client.revisor || '',
       'Pendências/Observações': client.pendencias_observacoes || '',
     }));
@@ -4399,7 +5206,7 @@ function buildBaseCompletaClientesRows(clients) {
     CNPJ: client.cnpj || '',
     'Razão Social': client.razao_social || '',
     'Nome/Identificação': client.nome_identificacao || '',
-    Responsável: client.responsavel || '',
+    'Responsável': client.responsavel || '',
     Revisor: client.revisor || '',
     'Tipo de Cliente': client.tipo_cliente || '',
     'Regime Tributário': client.regime_tributario || '',
@@ -4429,7 +5236,6 @@ function ReportsPage({
   const clientesSemRetorno = reportScope.filter((client) => isSemRetorno(client));
   const clientesSemNotificacao = reportScope.filter((client) => !isClienteNotificado(client));
   const clientesRetornoRecebido = reportScope.filter((client) => hasRetornoConcluido(client));
-  const clientesReinfPendente = reportScope.filter((client) => hasPendenciaObrigacaoReinf(client));
   const clientesEcdEcfObrigatoria = reportScope.filter((client) => hasObrigacaoAnual(client));
   const clientesComObservacoes = reportScope.filter((client) => hasPendenciasObservacoes(client));
   const pendenciasObservacoesRows = buildPendenciasObservacoesRows(reportScope);
@@ -4451,7 +5257,6 @@ function ReportsPage({
   const pendenciasEAtrasosRows = [
     { label: 'Clientes com pendências', value: clientesComPendencias.length },
     { label: 'Clientes com atraso', value: clientesComAtraso.length },
-    { label: 'REINF pendente', value: clientesReinfPendente.length },
     { label: 'ECD/ECF obrigatória', value: clientesEcdEcfObrigatoria.length },
   ].filter((row) => row.value > 0);
   const reports = [
@@ -4465,7 +5270,6 @@ function ReportsPage({
     },
     { title: 'Clientes com atraso', rows: clientesComAtraso, icon: FolderClock, tone: 'danger' },
     { title: 'Clientes com pendências', rows: clientesComPendencias, icon: ShieldAlert, tone: 'warning' },
-    { title: 'REINF pendente', rows: clientesReinfPendente, icon: FileSpreadsheet, tone: 'warning' },
     { title: 'ECD/ECF obrigatória', rows: clientesEcdEcfObrigatoria, icon: BookOpenCheck, tone: 'info' },
     { title: 'Aguardando retorno', rows: clientesAguardandoRetorno, icon: Mail, tone: 'warning' },
     { title: 'Sem retorno', rows: clientesSemRetorno, icon: AlertTriangle, tone: 'danger' },
@@ -4914,6 +5718,17 @@ function UserModal({ user, users, onClose, onSave }) {
     if (duplicate) nextErrors.push('Já existe um usuário cadastrado com este e-mail.');
     if (!form.perfil_acesso) nextErrors.push('Selecione o perfil de acesso.');
 
+    const sociosValidos = normalizeSociosClienteInput(form._socios ?? []);
+    if (sociosValidos.some((socio) => !socio.nome && socio.cpf)) {
+      nextErrors.push('Informe o nome do socio.');
+    }
+    if (sociosValidos.some((socio) => socio.nome && !socio.cpf)) {
+      nextErrors.push('Informe o CPF do socio.');
+    }
+    if (sociosValidos.some((socio) => socio.cpf && socio.cpf.length !== 11)) {
+      nextErrors.push('CPF do socio deve ter 11 digitos.');
+    }
+
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
@@ -5024,23 +5839,30 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
     ...client,
+    _socios: normalizeSociosClienteInput(client?._socios ?? []),
+    _sociosDirty: false,
     cnpj: client?.cnpj ? formatCnpj(client.cnpj) : '',
   }));
   const [errors, setErrors] = useState([]);
-  const modalFields = FIELD_DEFINITIONS.filter((field) => !['criado_em', 'atualizado_em'].includes(field.key));
+  const modalFields = FIELD_DEFINITIONS.filter((field) =>
+    !['criado_em', 'atualizado_em'].includes(field.key)
+      && !EDIT_MODAL_HIDDEN_FIELDS.has(field.key)
+      && !EDIT_MODAL_HIDDEN_GROUPS.has(field.group),
+  );
 
   function updateField(key, value) {
     setForm((current) => {
       const nextPatch = applyResponsavelEcdFallback(current, { [key]: value });
-      if (key === 'precisa_ata' && !isYes(value)) {
-        nextPatch.ata_entregue = '';
-        nextPatch.data_entrega_ata = '';
-      }
-      if (key === 'ata_entregue' && !isYes(value)) {
-        nextPatch.data_entrega_ata = '';
-      }
       return { ...current, ...nextPatch };
     });
+  }
+
+  function updateSocios(nextSocios) {
+    setForm((current) => ({
+      ...current,
+      _socios: normalizeSociosClienteInput(nextSocios),
+      _sociosDirty: true,
+    }));
   }
 
   function submit(event) {
@@ -5108,38 +5930,43 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
           ) : null}
 
           {FIELD_GROUPS.map((group) => {
-            const visibleFields = modalFields.filter((field) => {
-              if (field.group !== group) return false;
-              const allowedKeys = EDIT_MODAL_GROUP_VISIBLE_FIELDS[group];
-              return allowedKeys ? allowedKeys.has(field.key) : true;
-            });
+            const visibleFields = modalFields.filter((field) => field.group === group);
 
             if (!visibleFields.length) return null;
 
             return (
-            <section key={group} className="rounded-lg border border-slate-200 p-4">
-              <h3 className="text-base font-black text-slate-950">{EDIT_MODAL_GROUP_TITLE_OVERRIDES[group] ?? group}</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {visibleFields.map((field) => (
-                  <FormField
-                    key={field.key}
-                    field={{ ...field, label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label }}
-                    value={form[field.key] ?? ''}
-                    cliente={form}
-                    listagens={listagens}
-                    disabled={!canEditFieldForClient(field.key)}
-                    disabledReason={deniedReasonForField(null, field.key)}
-                    onChange={(value) => updateField(field.key, value)}
-                    onAttachmentSuccess={(tipoAnexo, anexo) => {
-                      const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
-                      if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
-                      onAnexoSuccess?.(form.id, tipoAnexo, anexo);
-                    }}
-                    onAttachmentError={onAnexoError}
+              <Fragment key={group}>
+                <section className="rounded-lg border border-slate-200 p-4">
+                  <h3 className="text-base font-black text-slate-950">{group}</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {visibleFields.map((field) => (
+                      <FormField
+                        key={field.key}
+                        field={{ ...field, label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label }}
+                        value={form[field.key] ?? ''}
+                        cliente={form}
+                        listagens={listagens}
+                        disabled={!canEditFieldForClient(field.key)}
+                        disabledReason={deniedReasonForField(null, field.key)}
+                        onChange={(value) => updateField(field.key, value)}
+                        onAttachmentSuccess={(tipoAnexo, anexo) => {
+                          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
+                          if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
+                          onAnexoSuccess?.(form.id, tipoAnexo, anexo);
+                        }}
+                        onAttachmentError={onAnexoError}
+                      />
+                    ))}
+                  </div>
+                </section>
+                {group === FIELD_GROUPS[0] ? (
+                  <SociosEmpresaSection
+                    socios={form._socios ?? []}
+                    disabled={!canEditFieldForClient('nome_identificacao')}
+                    onChange={updateSocios}
                   />
-                ))}
-              </div>
-            </section>
+                ) : null}
+              </Fragment>
             );
           })}
         </div>
@@ -5158,6 +5985,152 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
   );
 }
 
+function SociosEmpresaSection({ socios, disabled = false, onChange }) {
+  const [draft, setDraft] = useState({ nome: '', cpf: '' });
+  const [error, setError] = useState('');
+  const normalizedSocios = normalizeSociosClienteInput(socios);
+  const [listOpen, setListOpen] = useState(() => normalizedSocios.length > 0);
+
+  useEffect(() => {
+    if (normalizedSocios.length > 0) {
+      setListOpen(true);
+    }
+  }, [normalizedSocios.length]);
+
+  function addSocio() {
+    const nome = String(draft.nome ?? '').trim();
+    const cpf = normalizeCpfDigits(draft.cpf);
+    if (!nome || !cpf) {
+      setError('Informe nome e CPF para adicionar o socio.');
+      return;
+    }
+    if (cpf.length !== 11) {
+      setError('CPF deve ter 11 digitos.');
+      return;
+    }
+    if (normalizedSocios.some((socio) => socio.cpf === cpf)) {
+      setError('Este CPF ja foi cadastrado para o cliente.');
+      return;
+    }
+    onChange([...normalizedSocios, { nome, cpf }]);
+    setDraft({ nome: '', cpf: '' });
+    setError('');
+  }
+
+  function updateSocio(index, key, value) {
+    const next = normalizedSocios.map((socio, socioIndex) => {
+      if (socioIndex !== index) return socio;
+      return {
+        ...socio,
+        [key]: key === 'cpf' ? normalizeCpfDigits(value) : value,
+      };
+    });
+    onChange(next);
+  }
+
+  function removeSocio(index) {
+    onChange(normalizedSocios.filter((_, socioIndex) => socioIndex !== index));
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-black text-slate-950">Socios da Empresa</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Cadastre nome e CPF dos socios vinculados ao cliente.</p>
+        </div>
+        <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500">
+          {normalizedSocios.length} socio(s)
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
+        <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+          Nome do socio
+          <input
+            value={draft.nome}
+            onChange={(event) => {
+              setDraft((current) => ({ ...current, nome: event.target.value }));
+              setError('');
+            }}
+            disabled={disabled}
+            placeholder="Nome completo"
+            className="form-control-shell mt-1 disabled:bg-slate-100 disabled:text-slate-400"
+          />
+        </label>
+        <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+          CPF
+          <input
+            value={formatCpfInput(draft.cpf)}
+            onChange={(event) => {
+              setDraft((current) => ({ ...current, cpf: event.target.value }));
+              setError('');
+            }}
+            disabled={disabled}
+            placeholder="000.000.000-00"
+            className="form-control-shell mt-1 disabled:bg-slate-100 disabled:text-slate-400"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={addSocio}
+          disabled={disabled}
+          className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Plus size={16} aria-hidden="true" />
+          Adicionar
+        </button>
+      </div>
+      {error ? <p className="mt-2 text-xs font-bold text-red-600">{error}</p> : null}
+
+      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 shadow-inner shadow-black/10 light:border-slate-200 light:bg-slate-50/80 light:shadow-none">
+        <button
+          type="button"
+          onClick={() => setListOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 text-left text-sm font-black text-slate-100 light:text-slate-700"
+        >
+          <span>Socios cadastrados</span>
+          <ChevronDown size={16} className={`transition ${listOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </button>
+        {listOpen && normalizedSocios.length ? (
+          <div className="mt-3 space-y-2">
+            {normalizedSocios.map((socio, index) => (
+              <div key={`${socio.cpf || socio.nome}-${index}`} className="grid gap-2 rounded-lg border border-white/10 bg-slate-950/20 p-2 light:border-slate-200 light:bg-white md:grid-cols-[minmax(0,1fr)_200px_auto]">
+                <input
+                  value={socio.nome}
+                  onChange={(event) => updateSocio(index, 'nome', event.target.value)}
+                  disabled={disabled}
+                  aria-label="Nome do socio"
+                  className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
+                />
+                <input
+                  value={formatCpfInput(socio.cpf)}
+                  onChange={(event) => updateSocio(index, 'cpf', event.target.value)}
+                  disabled={disabled}
+                  aria-label="CPF do socio"
+                  className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSocio(index)}
+                  disabled={disabled}
+                  className="inline-flex h-11 items-center justify-center rounded-lg border border-red-200 px-3 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Remover socio"
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {listOpen && !normalizedSocios.length ? (
+          <p className="mt-3 text-sm font-semibold text-slate-500">Nenhum socio cadastrado.</p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function FormField({
   field,
   value,
@@ -5171,19 +6144,11 @@ function FormField({
 }) {
   const baseClass =
     'form-control-shell mt-1';
-  const isAtaEntregueField = field.key === 'ata_entregue';
-  const isDataEntregaAtaField = field.key === 'data_entrega_ata';
-  const ataNotRequired = (isAtaEntregueField || isDataEntregaAtaField) && !isYes(cliente?.precisa_ata);
-  const ataNotDelivered = isDataEntregaAtaField && !isYes(cliente?.ata_entregue);
-  const computedDisabled = disabled || ataNotRequired || ataNotDelivered;
+  const computedDisabled = disabled;
   const computedDisabledReason =
     disabled
       ? disabledReason
-      : ataNotRequired
-        ? 'Marque primeiro que o cliente precisa de ata.'
-        : ataNotDelivered
-          ? 'Informe primeiro se a ata foi entregue.'
-          : undefined;
+      : undefined;
 
   const label = (
     <span>
@@ -5482,8 +6447,9 @@ export default function App() {
     Boolean(hasStoredSession && authRestoring),
     AUTH_RESTORE_VISUAL_DELAY_MS,
   );
+  const isSupabaseChecking = authRestoring || supabaseBootstrapping || supabaseRefreshing;
   const showConnectionWarningUi = useDelayedFlag(
-    !supabaseStatus.connected,
+    !supabaseStatus.connected && !isSupabaseChecking,
     CONNECTION_WARNING_VISUAL_DELAY_MS,
   );
   const canWritePortalData = supabaseStatus.connected && !authRestoring;
@@ -5495,17 +6461,17 @@ export default function App() {
   const authGateLabel = showRestoreUi ? 'Restaurando sessão...' : 'Validando sessão...';
   const supabaseStatusLabel = authRestoring && currentUserFull
     ? 'Sessão em restauração...'
-    : !supabaseStatus.connected && !showConnectionWarningUi
+    : !supabaseStatus.connected && (isSupabaseChecking || !showConnectionWarningUi)
       ? 'Verificando conexão com o Supabase...'
       : getSupabaseStatusDisplay(supabaseStatus, metadata);
   const supabaseStatusTone = authRestoring && currentUserFull
     ? 'info'
-    : !supabaseStatus.connected && !showConnectionWarningUi
+    : !supabaseStatus.connected && (isSupabaseChecking || !showConnectionWarningUi)
       ? 'info'
       : supabaseStatus.connected
         ? 'success'
         : 'warning';
-  const writeBlockedMessage = !authRestoring && showConnectionWarningUi ? writeBlockedReason : '';
+  const writeBlockedMessage = !isSupabaseChecking && showConnectionWarningUi ? writeBlockedReason : '';
 
   const enrichedClients = useMemo(() => {
     const allClients = enrichClients(clients);
@@ -5924,9 +6890,12 @@ export default function App() {
         || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
       const shouldLoadHistoricoPortal = can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
 
-      const [clientesSupabase, listagensSupabase, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
+        listarSociosClientesSupabase()
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
         listarValoresListagemPorCategoria('responsavel', { incluirInativos: true })
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
@@ -5957,11 +6926,13 @@ export default function App() {
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
       const clientesComAcompanhamento = hydrateClientesComAcompanhamentoOperacional(clientesComRisco, acompanhamentoIndex);
-      const latestUpdatedAt = getLatestClienteAtualizadoEm(clientesComAcompanhamento);
+      const sociosIndex = sociosResult.ok ? indexarSociosClientes(sociosResult.rows) : {};
+      const clientesComSocios = hydrateClientesComSocios(clientesComAcompanhamento, sociosIndex);
+      const latestUpdatedAt = getLatestClienteAtualizadoEm(clientesComSocios);
 
       const nextListagens = mergeListagensFromClients(
         mergeListagensFromSupabase(createRuntimeListBase(), listagensSupabase),
-        clientesComAcompanhamento,
+        clientesComSocios,
       );
       if (responsaveisResult.ok) {
         setResponsavelCatalogo(responsaveisResult.rows);
@@ -5972,7 +6943,7 @@ export default function App() {
       } else {
         console.warn('[listagens] Falha ao carregar responsaveis do Supabase:', responsaveisResult.error);
       }
-      persist(clientesComAcompanhamento, nextListagens, {
+      persist(clientesComSocios, nextListagens, {
         ...metadata,
         source: 'Supabase',
         importedAt: latestUpdatedAt ? formatDateTime(latestUpdatedAt) : (metadata?.importedAt || todayBr()),
@@ -5989,8 +6960,11 @@ export default function App() {
       }
       setSupabaseStatus({
         connected: true,
-        message: `Conectado ao Supabase (${formatNumber(clientesComAcompanhamento.length)} cliente(s))`,
+        message: `Conectado ao Supabase (${formatNumber(clientesComSocios.length)} cliente(s))`,
       });
+      if (!sociosResult.ok) {
+        console.warn('[clientes_socios] Falha ao carregar socios dos clientes:', sociosResult.error);
+      }
       if (!obrigacoesResult.ok) {
         console.warn('[obrigacoes] Falha ao carregar view persistente de obrigacoes:', obrigacoesResult.error);
       }
@@ -6266,6 +7240,10 @@ export default function App() {
   async function saveClient(client) {
     if (!currentUserFull) return;
     if (!ensureSupabaseWriteReady(client?.id ? 'salvar o cliente' : 'criar o cliente')) return;
+    const sociosPayload = normalizeSociosClienteInput(client?._socios ?? []);
+    const sociosDirty = Boolean(client?._sociosDirty);
+    const { _socios, _sociosDirty, ...clientSemSocios } = client;
+    client = clientSemSocios;
     client = { ...client, ...applyResponsavelEcdFallback(client, client) };
     const key = normalizeCnpj(client.cnpj) || client.id;
     const nextClients = [...clients];
@@ -6307,7 +7285,12 @@ export default function App() {
         }
         try {
           const saved = await atualizarClienteSupabase(previous.id, mergedClient);
-          mergedClient = withClientDefaults({ ...mergedClient, ...saved });
+          const savedId = String(saved?.id ?? previous.id ?? '').trim();
+          let sociosAtualizados = previous._socios ?? [];
+          if (sociosDirty && isUuid(savedId)) {
+            sociosAtualizados = await salvarSociosClienteSupabase(savedId, sociosPayload);
+          }
+          mergedClient = withClientDefaults({ ...mergedClient, ...saved, _socios: sociosAtualizados });
           setSupabaseStatus({ connected: true, message: 'Alteracao salva no Supabase' });
           syncedWithSupabase = true;
           const historicoResult = await registrarHistoricoPersistente({
@@ -6335,7 +7318,12 @@ export default function App() {
       let createdClient = { ...nextClient };
       try {
         const saved = await criarClienteSupabase(createdClient);
-        createdClient = withClientDefaults({ ...createdClient, ...saved });
+        const savedId = String(saved?.id ?? '').trim();
+        let sociosAtualizados = [];
+        if (sociosDirty && sociosPayload.length && isUuid(savedId)) {
+          sociosAtualizados = await salvarSociosClienteSupabase(savedId, sociosPayload);
+        }
+        createdClient = withClientDefaults({ ...createdClient, ...saved, _socios: sociosAtualizados });
         setSupabaseStatus({ connected: true, message: 'Cliente criado no Supabase' });
         syncedWithSupabase = true;
       } catch (error) {
@@ -7144,11 +8132,6 @@ export default function App() {
       <ReinfPage
         clients={enrichedClients}
         onView={openClient}
-        canManageAttachments={canManageAttachment}
-        canEditReinfDate={(client) => canWritePortalData && isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'data_enviada_reinf')}
-        onQuickUpdate={quickUpdateClient}
-        onAnexoSuccess={handleAnexoSuccess}
-        onAnexoError={handleAnexoError}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
         statusLabel={supabaseStatusLabel}
