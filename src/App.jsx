@@ -106,6 +106,10 @@ import {
   salvarSociosCliente as salvarSociosClienteSupabase,
 } from './services/socios-clientes.service';
 import {
+  listarReinfRelatorios as listarReinfRelatoriosSupabase,
+  salvarReinfRelatorio as salvarReinfRelatorioSupabase,
+} from './services/reinf-relatorios.service';
+import {
   criarValorListagem,
   excluirValorListagem,
   inativarValorListagem,
@@ -2070,6 +2074,117 @@ function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], mon
       ${buildReinfFiscalHtmlParagraphs(closingLines)}
     </div>
   `;
+}
+
+function buildReinfReportSociosSnapshot(reportSocios = [], months = []) {
+  return (reportSocios ?? []).map((reportSocio) => {
+    const valoresPorMes = {};
+    let total = 0;
+    months.forEach((month) => {
+      const formattedValue = formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || '';
+      valoresPorMes[month] = formattedValue;
+      total += parseCurrencyNumber(reportSocio.valoresPorMes?.[month]);
+    });
+    return {
+      socio_id: reportSocio.socio?.id ?? null,
+      nome: reportSocio.socio?.nome || 'Socio nao informado',
+      cpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+      valores_por_mes: valoresPorMes,
+      total: total ? formatCurrencyDisplay(total) : '',
+    };
+  });
+}
+
+function buildReinfReportPayload({ client, periodicidade, anoReferencia, months, assunto, mensagem, reportSocios }) {
+  const sociosSnapshot = buildReinfReportSociosSnapshot(reportSocios, months);
+  return {
+    cliente_id: client?.id,
+    cnpj: client?.cnpj,
+    razao_social: client?.razao_social,
+    nome_identificacao: client?.nome_identificacao,
+    responsavel: client?.responsavel,
+    revisor: client?.revisor,
+    periodicidade,
+    ano_referencia: anoReferencia,
+    meses: months,
+    assunto,
+    corpo_mensagem: mensagem,
+    socios: sociosSnapshot,
+  };
+}
+
+function buildReinfRelatoriosExportRows(relatorios = []) {
+  return (relatorios ?? []).flatMap((relatorio) => {
+    const meses = Array.isArray(relatorio.meses) ? relatorio.meses : [];
+    const socios = Array.isArray(relatorio.socios) && relatorio.socios.length
+      ? relatorio.socios
+      : [{ nome: 'Socio nao informado', cpf: '', valores_por_mes: {}, total: '' }];
+
+    return socios.map((socio) => {
+      const valoresPorMes = socio.valores_por_mes ?? socio.valoresPorMes ?? {};
+      const valoresResumo = meses
+        .map((month) => {
+          const value = valoresPorMes[month] ?? '';
+          return value ? `${getReinfMonthShortLabel(month)}: ${value}` : '';
+        })
+        .filter(Boolean)
+        .join(' | ');
+      const row = {
+        'Gerado em': formatDateTime(relatorio.criado_em),
+        Cliente: relatorio.razao_social || relatorio.nome_identificacao || '',
+        CNPJ: formatCnpj(relatorio.cnpj),
+        'Nome/identificação': relatorio.nome_identificacao || '',
+        Responsável: relatorio.responsavel || '',
+        Revisor: relatorio.revisor || '',
+        Periodicidade: relatorio.periodicidade || '',
+        Ano: relatorio.ano_referencia || '',
+        Meses: meses.map(getReinfMonthLabel).join(', '),
+        Sócio: socio.nome || '',
+        CPF: socio.cpf || '',
+      };
+
+      meses.forEach((month) => {
+        row[getReinfMonthShortLabel(month)] = valoresPorMes[month] ?? '';
+      });
+
+      return {
+        ...row,
+        'Valores por mês': valoresResumo,
+        Total: socio.total || '',
+        Assunto: relatorio.assunto || '',
+        'Texto do e-mail': relatorio.corpo_mensagem || '',
+        'Gerado por': relatorio.criado_por_nome || relatorio.criado_por_email || '',
+      };
+    });
+  });
+}
+
+function getReinfRelatorioSociosCount(relatorio) {
+  return Array.isArray(relatorio?.socios) ? relatorio.socios.length : 0;
+}
+
+function getReinfRelatorioMonthsLabel(relatorio) {
+  const meses = Array.isArray(relatorio?.meses) ? relatorio.meses : [];
+  const labels = meses.map(getReinfMonthShortLabel).filter(Boolean);
+  return labels.length ? labels.join(', ') : 'Sem mês informado';
+}
+
+function slugifyFilenamePart(value, fallback = 'relatorio') {
+  const normalized = String(value || fallback)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 70);
+
+  return normalized || fallback;
+}
+
+function buildReinfRelatorioFilename(relatorio, extension) {
+  const clientName = slugifyFilenamePart(relatorio?.razao_social || relatorio?.nome_identificacao, 'cliente');
+  const createdAt = relatorio?.criado_em ? String(relatorio.criado_em).slice(0, 10) : 'sem-data';
+  return `reinf-${clientName}-${createdAt}.${extension}`;
 }
 
 async function copyRichTextToClipboard({ htmlText, plainText }) {
@@ -4160,7 +4275,7 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
-function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onClose }) {
+function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onSaveReport, onClose }) {
   const socios = getReinfSocios(client);
   const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
   const currentSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
@@ -4182,6 +4297,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
   const [mensagem, setMensagem] = useState('');
   const [copied, setCopied] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
   const reportSociosHydrated = useMemo(() => reportSocios
     .map((reportSocio) => ({
       ...reportSocio,
@@ -4205,6 +4322,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
+    setSaveStatus('');
+    setSavingReport(false);
   }, [client?.id]);
 
   useEffect(() => {
@@ -4347,6 +4466,46 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
     } catch {
       setCopied(false);
       setCopyStatus('Falha ao copiar');
+    }
+  }
+
+  async function saveReport() {
+    setSaveStatus('');
+    if (!client?.id) {
+      setSaveStatus('Cliente invalido para salvar');
+      return;
+    }
+    if (!reportSociosHydrated.length) {
+      setSaveStatus('Inclua pelo menos um socio');
+      return;
+    }
+    if (!reportMonths.length) {
+      setSaveStatus('Selecione ao menos um mes');
+      return;
+    }
+    if (!onSaveReport) {
+      setSaveStatus('Salvamento indisponivel');
+      return;
+    }
+
+    const payload = buildReinfReportPayload({
+      client,
+      periodicidade,
+      anoReferencia,
+      months: reportMonths,
+      assunto,
+      mensagem,
+      reportSocios: reportSociosHydrated,
+    });
+
+    setSavingReport(true);
+    try {
+      const saved = await onSaveReport(payload);
+      setSaveStatus(saved ? 'Relatório salvo' : 'Não foi possível salvar');
+    } catch (error) {
+      setSaveStatus(error?.message || 'Não foi possível salvar');
+    } finally {
+      setSavingReport(false);
     }
   }
 
@@ -4651,20 +4810,38 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
           <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
             Esta etapa apenas prepara a mensagem. Nenhum e-mail sera enviado automaticamente.
           </p>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {copyStatus ? (
-              <span className={`text-xs font-black ${copied ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'}`}>
-                {copyStatus}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={copyMessage}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
-            >
-              <Mail size={16} aria-hidden="true" />
-              Copiar e-mail
-            </button>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
+            <div className="min-h-4 min-w-[150px] text-right">
+              {copyStatus ? (
+                <span className={`text-xs font-black ${copied ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'}`}>
+                  {copyStatus}
+                </span>
+              ) : null}
+              {!copyStatus && saveStatus ? (
+                <span className={`text-xs font-black ${saveStatus === 'Relatório salvo' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+                  {saveStatus}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={saveReport}
+                disabled={savingReport}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                <Save size={16} aria-hidden="true" />
+                {savingReport ? 'Salvando...' : 'Salvar relatório'}
+              </button>
+              <button
+                type="button"
+                onClick={copyMessage}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
+              >
+                <Mail size={16} aria-hidden="true" />
+                Copiar e-mail
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -4675,6 +4852,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
 function ReinfPage({
   clients,
   onView,
+  onSaveReport,
   supabaseStatus,
   metadata,
   onRefresh,
@@ -4687,6 +4865,8 @@ function ReinfPage({
   const emptyFilters = {
     search: '',
     cnpj: '',
+    responsavel: '',
+    revisor: '',
   };
   const [filters, setFilters] = useState(emptyFilters);
   const [focusedClientId, setFocusedClientId] = useState('');
@@ -4716,6 +4896,8 @@ function ReinfPage({
     const search = normalizeText(filters.search);
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
+    if (filters.responsavel && normalizeText(client.responsavel) !== normalizeText(filters.responsavel)) return false;
+    if (filters.revisor && normalizeText(client.revisor) !== normalizeText(filters.revisor)) return false;
     return true;
   });
   const reinfModalClient = clients.find((client) => String(client.id ?? '') === String(reinfModalClientId)) ?? null;
@@ -4793,7 +4975,7 @@ function ReinfPage({
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 grid max-w-3xl gap-3 md:grid-cols-[minmax(260px,420px)_minmax(200px,280px)]">
+        <div className="mt-4 grid max-w-5xl gap-3 md:grid-cols-[minmax(240px,360px)_minmax(180px,240px)_minmax(160px,220px)_minmax(160px,220px)]">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -4801,6 +4983,28 @@ function ReinfPage({
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
+          </label>
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
+            Responsável
+            <select value={filters.responsavel} onChange={(event) => updateFilter({ responsavel: event.target.value })} className="input-shell mt-1 h-10 normal-case">
+              <option value="">Todos</option>
+              {uniqueValues(clients.map((client) => client.responsavel)).map((responsavel) => (
+                <option key={responsavel} value={responsavel}>
+                  {responsavel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
+            Revisor
+            <select value={filters.revisor} onChange={(event) => updateFilter({ revisor: event.target.value })} className="input-shell mt-1 h-10 normal-case">
+              <option value="">Todos</option>
+              {uniqueValues(clients.map((client) => client.revisor)).map((revisor) => (
+                <option key={revisor} value={revisor}>
+                  {revisor}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </section>
@@ -4858,6 +5062,7 @@ function ReinfPage({
           client={reinfModalClient}
           selectedSocioByClientId={selectedSocioByClientId}
           onSelectSocio={updateSelectedSocio}
+          onSaveReport={onSaveReport}
           onClose={() => setReinfModalClientId('')}
         />
       ) : null}
@@ -5217,6 +5422,7 @@ function buildBaseCompletaClientesRows(clients) {
 function ReportsPage({
   clients,
   filteredClients,
+  reinfRelatorios = [],
   onExportXlsx,
   onExportCsv,
   onExportPdf,
@@ -5240,6 +5446,20 @@ function ReportsPage({
   const clientesComObservacoes = reportScope.filter((client) => hasPendenciasObservacoes(client));
   const pendenciasObservacoesRows = buildPendenciasObservacoesRows(reportScope);
   const baseCompletaClientesRows = buildBaseCompletaClientesRows(clients);
+  const clientsById = new Map((Array.isArray(clients) ? clients : []).map((client) => [client.id, client]));
+  const reinfRelatoriosEnriquecidos = reinfRelatorios.map((relatorio) => {
+    const client = clientsById.get(relatorio.cliente_id);
+    if (!client) return relatorio;
+
+    return {
+      ...relatorio,
+      cnpj: relatorio.cnpj || client.cnpj,
+      razao_social: relatorio.razao_social || client.razao_social,
+      nome_identificacao: relatorio.nome_identificacao || client.nome_identificacao,
+      responsavel: relatorio.responsavel || client.responsavel,
+      revisor: relatorio.revisor || client.revisor,
+    };
+  });
   const clientesRetornoSeteDias = clientesAguardandoRetorno.filter((client) => (getDiasSemRetorno(client) ?? 0) >= 7);
   const acompanhamentoStatusRows = [
     { label: 'Acompanhamento pendente', value: clientesAcompanhamentoPendente.length },
@@ -5293,6 +5513,15 @@ function ReportsPage({
     pdf,
     count: Array.isArray(rows) ? reportCount(rows) : 0,
   }));
+  const reinfRelatorioCards = reinfRelatoriosEnriquecidos.map((relatorio) => ({
+    relatorio,
+    exportRows: buildReinfRelatoriosExportRows([relatorio]),
+  }));
+  const [showAllReinfReports, setShowAllReinfReports] = useState(false);
+  const visibleReinfRelatorioCards = showAllReinfReports
+    ? reinfRelatorioCards
+    : reinfRelatorioCards.slice(0, 5);
+  const hasHiddenReinfRelatorios = reinfRelatorioCards.length > visibleReinfRelatorioCards.length;
   return (
     <div className="min-w-0 space-y-5">
       <section className="surface-card p-6">
@@ -5358,6 +5587,121 @@ function ReportsPage({
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="surface-card p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
+              Histórico REINF
+            </p>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatórios REINF por empresa</h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
+              Cada linha representa um relatório salvo pelo modal da REINF, com exportação individual em Excel, CSV ou PDF.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-500/20 dark:text-gray-100">
+              {formatNumber(reinfRelatorios.length)} relatório(s) salvo(s)
+            </span>
+            {reinfRelatorioCards.length > 5 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllReinfReports((current) => !current)}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                {showAllReinfReports ? 'Mostrar menos' : 'Ver todos'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {reinfRelatorioCards.length ? (
+          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-gray-800">
+            <table className="w-full min-w-[980px] table-fixed text-left text-sm">
+              <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:bg-gray-900/80 dark:text-gray-400">
+                <tr>
+                  <th className="w-[24%] px-4 py-3">Cliente</th>
+                  <th className="w-[14%] px-4 py-3">CNPJ</th>
+                  <th className="w-[13%] px-4 py-3">Responsável</th>
+                  <th className="w-[13%] px-4 py-3">Revisor</th>
+                  <th className="w-[14%] px-4 py-3">Período</th>
+                  <th className="w-[8%] px-4 py-3">Sócios</th>
+                  <th className="w-[14%] px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700 dark:divide-gray-800 dark:text-gray-200">
+                {visibleReinfRelatorioCards.map(({ relatorio, exportRows }) => {
+                  const title = `Relatório REINF - ${relatorio.razao_social || relatorio.nome_identificacao || 'Cliente'}`;
+                  const key = relatorio.id || `${relatorio.cliente_id}-${relatorio.criado_em}`;
+
+                  return (
+                    <tr key={key} className="transition hover:bg-slate-50/80 dark:hover:bg-gray-800/55">
+                      <td className="px-4 py-3 align-top">
+                        <p className="truncate font-black text-slate-950 dark:text-gray-100">
+                          {relatorio.razao_social || relatorio.nome_identificacao || 'Cliente sem identificação'}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                          Gerado em {formatDateTime(relatorio.criado_em)}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-top font-bold">{formatCnpj(relatorio.cnpj)}</td>
+                      <td className="px-4 py-3 align-top font-semibold">{relatorio.responsavel || 'Não informado'}</td>
+                      <td className="px-4 py-3 align-top font-semibold">{relatorio.revisor || 'Não informado'}</td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="font-black">{relatorio.periodicidade || 'Sem periodicidade'}</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                          {getReinfRelatorioMonthsLabel(relatorio)} {relatorio.ano_referencia || ''}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-top font-black">{formatNumber(getReinfRelatorioSociosCount(relatorio))}</td>
+                      <td className="px-4 py-3 align-top">
+                        {canExport ? (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
+                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                            >
+                              Excel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
+                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                            >
+                              CSV
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), title)}
+                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                            >
+                              PDF
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
+                            Exportação bloqueada
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {hasHiddenReinfRelatorios ? (
+              <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-900/70 dark:text-gray-400">
+                Mostrando os 5 relatórios mais recentes. Use “Ver todos” para carregar o histórico completo.
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-400">
+            Nenhum relatório REINF salvo até o momento.
+          </div>
+        )}
       </section>
 
       <section>
@@ -6408,6 +6752,7 @@ export default function App() {
   );
   const [historicoCliente, setHistoricoCliente] = useState([]);
   const [historicoClienteLoading, setHistoricoClienteLoading] = useState(false);
+  const [reinfRelatorios, setReinfRelatorios] = useState([]);
   const [sessionProfile, setSessionProfile] = useState(initialSessionState.sessionProfile);
   const [authReady, setAuthReady] = useState(initialSessionState.authReady);
   const [authRestoring, setAuthRestoring] = useState(
@@ -6889,8 +7234,9 @@ export default function App() {
         can(currentUserFull, PERMISSIONS.USERS_MANAGE)
         || can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
       const shouldLoadHistoricoPortal = can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
+      const shouldLoadReinfRelatorios = can(currentUserFull, PERMISSIONS.REPORTS_VIEW);
 
-      const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult, reinfRelatoriosResult] = await Promise.all([
         listarClientesSupabase(),
         listarListagensAgrupadas(),
         listarSociosClientesSupabase()
@@ -6915,6 +7261,11 @@ export default function App() {
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
         shouldLoadHistoricoPortal
           ? listarHistoricoPortalSupabase()
+            .then((rows) => ({ ok: true, rows, skipped: false }))
+            .catch((error) => ({ ok: false, error, skipped: false }))
+          : Promise.resolve({ ok: true, rows: [], skipped: true }),
+        shouldLoadReinfRelatorios
+          ? listarReinfRelatoriosSupabase()
             .then((rows) => ({ ok: true, rows, skipped: false }))
             .catch((error) => ({ ok: false, error, skipped: false }))
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
@@ -6957,6 +7308,11 @@ export default function App() {
         sincronizarHistoricoSupabase(historicoResult.rows);
       } else if (!historicoResult.ok) {
         console.warn('[historico] Falha ao carregar historico geral do Supabase:', historicoResult.error);
+      }
+      if (reinfRelatoriosResult.ok && !reinfRelatoriosResult.skipped) {
+        setReinfRelatorios(reinfRelatoriosResult.rows);
+      } else if (!reinfRelatoriosResult.ok) {
+        console.warn('[reinf_relatorios] Falha ao carregar relatorios REINF:', reinfRelatoriosResult.error);
       }
       setSupabaseStatus({
         connected: true,
@@ -7580,6 +7936,30 @@ export default function App() {
     });
   }
 
+  async function salvarRelatorioReinf(payload) {
+    if (!ensureSupabaseWriteReady('salvar o relatório REINF')) return false;
+    try {
+      const saved = await salvarReinfRelatorioSupabase(payload);
+      if (saved?.id) {
+        setReinfRelatorios((current) => [
+          saved,
+          ...current.filter((item) => item.id !== saved.id),
+        ]);
+      }
+      setToast({
+        title: 'Relatório REINF salvo',
+        message: saved?.razao_social || saved?.nome_identificacao || 'Historico atualizado.',
+      });
+      return saved || true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao salvar relatório REINF',
+        message: error.message || 'Não foi possível salvar o relatório agora.',
+      });
+      return false;
+    }
+  }
+
   function canManageAttachment(client, fieldKey) {
     if (!currentUserFull || !client) return false;
     return canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey);
@@ -8132,6 +8512,7 @@ export default function App() {
       <ReinfPage
         clients={enrichedClients}
         onView={openClient}
+        onSaveReport={salvarRelatorioReinf}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
         statusLabel={supabaseStatusLabel}
@@ -8166,6 +8547,7 @@ export default function App() {
         <ReportsPage
           clients={enrichedClients}
           filteredClients={filteredClients}
+          reinfRelatorios={reinfRelatorios}
           onExportXlsx={exportXlsx}
           onExportCsv={exportCsv}
           onExportPdf={exportPdf}

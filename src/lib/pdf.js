@@ -32,8 +32,48 @@ const CLIENT_BASE_LAYOUT = {
   ],
 };
 
+const REINF_REPORT_LAYOUT = {
+  pageWidth: 842,
+  pageHeight: 595,
+  margin: 24,
+  fontSize: 6.6,
+  lineHeight: 8,
+  headerY: 548,
+  columns: [
+    { key: 'Gerado em', label: 'Gerado em', x: 24, width: 58 },
+    { key: 'Cliente', label: 'Cliente', x: 88, width: 116 },
+    { key: 'CNPJ', label: 'CNPJ', x: 210, width: 68 },
+    { key: 'Responsável', label: 'Responsavel', x: 284, width: 54 },
+    { key: 'Revisor', label: 'Revisor', x: 344, width: 46 },
+    { key: 'Periodicidade', label: 'Periodo', x: 396, width: 48 },
+    { key: 'Meses', label: 'Meses', x: 450, width: 74 },
+    { key: 'Sócio', label: 'Socio', x: 530, width: 92 },
+    { key: 'CPF', label: 'CPF', x: 628, width: 62 },
+    { key: 'Valores por mês', label: 'Valores por mes', x: 696, width: 122 },
+  ],
+};
+
+const REINF_REPORT_MONTH_KEYS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+function isReinfReportRows(rows) {
+  const firstRow = rows.find(Boolean) ?? {};
+  return (
+    Object.hasOwn(firstRow, 'Gerado em') &&
+    Object.hasOwn(firstRow, 'Sócio') &&
+    Object.hasOwn(firstRow, 'Valores por mês')
+  );
+}
+
+function getReinfReportMonthKeys(rows) {
+  return REINF_REPORT_MONTH_KEYS.filter((month) => rows.some((row) => Object.hasOwn(row ?? {}, month)));
+}
+
 function getLayoutForRows(rows) {
   const firstRow = rows.find(Boolean) ?? {};
+  if (isReinfReportRows(rows)) {
+    return REINF_REPORT_LAYOUT;
+  }
+
   if (
     Object.hasOwn(firstRow, 'Razão Social') &&
     Object.hasOwn(firstRow, 'Nome/Identificação') &&
@@ -93,6 +133,24 @@ function wrapText(value, maxChars) {
 
 function addText(commands, text, x, y, size) {
   commands.push(`BT /F1 ${size} Tf ${x} ${y} Td (${escapePdfText(text)}) Tj ET`);
+}
+
+function addWrappedText(commands, text, x, y, width, size, lineHeight = size + 3, maxLines = 99) {
+  const maxChars = Math.max(8, Math.floor(width / (size * 0.54)));
+  const lines = wrapText(text, maxChars).slice(0, maxLines);
+  lines.forEach((line, index) => addText(commands, line, x, y - index * lineHeight, size));
+  return y - lines.length * lineHeight;
+}
+
+function addCell(commands, text, x, y, width, height, size, options = {}) {
+  if (options.fill) {
+    commands.push(options.fill);
+    commands.push(`${x} ${y - height} ${width} ${height} re f`);
+  }
+  commands.push('0.35 0.40 0.48 RG');
+  commands.push(`${x} ${y - height} ${width} ${height} re S`);
+  commands.push('0 0 0 rg');
+  addWrappedText(commands, text, x + 5, y - 14, width - 10, size, size + 3, options.maxLines ?? 4);
 }
 
 function addHeader(commands, title, total, layout) {
@@ -159,6 +217,135 @@ function buildPages(rows, title, layout) {
   return pages;
 }
 
+function buildReinfReportPages(rows, title) {
+  const layout = {
+    pageWidth: 842,
+    pageHeight: 595,
+    margin: 28,
+    fontSize: 8,
+    lineHeight: 10,
+    headerY: 552,
+  };
+  const pages = [];
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const firstRow = safeRows[0] ?? {};
+  const months = getReinfReportMonthKeys(safeRows);
+  const availableWidth = layout.pageWidth - layout.margin * 2;
+  const socioWidth = months.length > 6 ? 150 : 210;
+  const cpfWidth = months.length > 6 ? 78 : 92;
+  const totalWidth = 74;
+  const monthWidth = months.length
+    ? (availableWidth - socioWidth - cpfWidth - totalWidth) / months.length
+    : availableWidth - socioWidth - cpfWidth - totalWidth;
+  const columns = [
+    { key: 'Sócio', label: 'SOCIO', width: socioWidth },
+    { key: 'CPF', label: 'CPF', width: cpfWidth },
+    ...(months.length
+      ? months.map((month) => ({ key: month, label: month, width: monthWidth }))
+      : [{ key: 'Valores por mês', label: 'VALORES POR MES', width: monthWidth }]),
+    { key: 'Total', label: 'TOTAL', width: totalWidth },
+  ];
+
+  let commands = [];
+  let y = layout.headerY;
+
+  const addReportHeader = (compact = false) => {
+    commands = [];
+    y = layout.headerY;
+    addWrappedText(commands, title, layout.margin, y, availableWidth, compact ? 12 : 15, compact ? 15 : 18, 2);
+    y -= compact ? 34 : 48;
+    addText(commands, `PDF gerado em ${new Date().toLocaleDateString('pt-BR')}`, layout.margin, y, 8);
+    y -= 22;
+  };
+
+  const addSummary = () => {
+    const cliente = firstRow.Cliente || 'Cliente nao informado';
+    const cnpj = firstRow.CNPJ || 'CNPJ nao informado';
+    const periodo = `${firstRow.Periodicidade || 'Sem periodicidade'} - ${firstRow.Meses || 'Meses nao informados'} ${firstRow.Ano || ''}`.trim();
+
+    addWrappedText(commands, `Cliente: ${cliente}`, layout.margin, y, 360, 9, 12, 2);
+    addWrappedText(commands, `CNPJ: ${cnpj}`, 420, y, 170, 9, 12, 2);
+    addWrappedText(commands, `Gerado em: ${firstRow['Gerado em'] || 'Nao informado'}`, 610, y, 190, 9, 12, 2);
+    y -= 34;
+    addWrappedText(commands, `Responsavel: ${firstRow['Responsável'] || 'Nao informado'}`, layout.margin, y, 260, 8, 11, 2);
+    addWrappedText(commands, `Revisor: ${firstRow.Revisor || 'Nao informado'}`, 320, y, 180, 8, 11, 2);
+    addWrappedText(commands, `Periodo: ${periodo}`, 520, y, 290, 8, 11, 2);
+    y -= 38;
+    addWrappedText(
+      commands,
+      `Segue valores referentes a distribuicao de lucro dos socios da ${cliente} (${cnpj}) no periodo ${firstRow.Meses || 'nao informado'} ${firstRow.Ano || ''}.`,
+      layout.margin,
+      y,
+      availableWidth,
+      9,
+      12,
+      3,
+    );
+    y -= 52;
+  };
+
+  const addTableHeader = () => {
+    let x = layout.margin;
+    columns.forEach((column) => {
+      addCell(commands, column.label, x, y, column.width, 24, 7.2, {
+        fill: '0.90 0.93 0.97 rg',
+        maxLines: 1,
+      });
+      x += column.width;
+    });
+    y -= 24;
+  };
+
+  const addClosing = () => {
+    if (y < 92) {
+      pages.push(commands.join('\n'));
+      addReportHeader(true);
+    }
+
+    y -= 14;
+    addText(commands, 'Qualquer duvida, estamos a disposicao.', layout.margin, y, 9);
+    y -= 28;
+    addText(commands, 'Por favor, confirme o recebimento deste e-mail.', layout.margin, y, 9);
+    y -= 28;
+    addText(commands, 'Atenciosamente,', layout.margin, y, 9);
+  };
+
+  addReportHeader();
+
+  if (!safeRows.length) {
+    addText(commands, 'Nenhum registro encontrado para este relatorio.', layout.margin, y, 10);
+    pages.push(commands.join('\n'));
+    return { pages, layout };
+  }
+
+  addSummary();
+  addTableHeader();
+
+  safeRows.forEach((row) => {
+    const lineCounts = columns.map((column) =>
+      wrapText(row[column.key], Math.max(8, Math.floor((column.width - 10) / 4.2))).slice(0, 4).length,
+    );
+    const rowHeight = Math.max(26, Math.max(...lineCounts, 1) * 11 + 10);
+
+    if (y - rowHeight < layout.margin + 72) {
+      pages.push(commands.join('\n'));
+      addReportHeader(true);
+      addTableHeader();
+    }
+
+    let x = layout.margin;
+    columns.forEach((column) => {
+      addCell(commands, row[column.key] ?? '', x, y, column.width, rowHeight, layout.fontSize);
+      x += column.width;
+    });
+    y -= rowHeight;
+  });
+
+  addClosing();
+  pages.push(commands.join('\n'));
+  return { pages, layout };
+}
+
 function buildPdf(pages, layout) {
   const fontObjectNumber = 3 + pages.length * 2;
   const objects = [
@@ -209,6 +396,12 @@ function downloadBlob(content, filename) {
 
 export function exportRowsToPdf(rows, filename = 'relatorio.pdf', title = 'Relatorio') {
   const safeRows = Array.isArray(rows) ? rows : [];
+  if (isReinfReportRows(safeRows)) {
+    const { pages, layout } = buildReinfReportPages(safeRows, title);
+    downloadBlob(buildPdf(pages, layout), filename);
+    return;
+  }
+
   const layout = getLayoutForRows(safeRows);
   const pages = buildPages(safeRows, title, layout);
   downloadBlob(buildPdf(pages, layout), filename);
