@@ -1802,9 +1802,9 @@ function ReinfSocioDropdownCell({ client, selectedSocioByClientId, onSelect }) {
         value=""
         disabled
         className="input-shell reinf-socio-select h-10 text-sm"
-        aria-label="Socio da empresa"
+        aria-label="Sócio da empresa"
       >
-        <option value="">Sem socio</option>
+        <option value="">Sem sócio</option>
       </select>
     );
   }
@@ -1815,11 +1815,11 @@ function ReinfSocioDropdownCell({ client, selectedSocioByClientId, onSelect }) {
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => onSelect?.(clientKey, event.target.value)}
       className="input-shell reinf-socio-select h-10 text-sm"
-      aria-label={`Socio de ${client?.nome_identificacao || client?.razao_social || 'cliente'}`}
+      aria-label={`Sócio de ${client?.nome_identificacao || client?.razao_social || 'cliente'}`}
     >
       {socios.map((socio, index) => (
         <option key={getReinfSocioOptionKey(socio, index)} value={getReinfSocioOptionKey(socio, index)}>
-          {socio.nome || 'Socio sem nome'}
+          {socio.nome || 'Sócio sem nome'}
         </option>
       ))}
     </select>
@@ -1906,12 +1906,12 @@ function getReinfReportMonths(reportSocios = []) {
 }
 
 function getReinfPeriodLabel(months = [], anoReferencia = '') {
-  if (!months.length) return anoReferencia ? `periodo nao informado/${anoReferencia}` : 'periodo nao informado';
+  if (!months.length) return anoReferencia ? `período não informado/${anoReferencia}` : 'período não informado';
   const orderedMonths = REINF_MONTH_OPTIONS
     .map((month) => month.value)
     .filter((month) => months.includes(month));
   const numbers = orderedMonths.map(getReinfMonthNumberLabel);
-  const prefix = numbers.length === 1 ? numbers[0] : `${numbers[0]} ate ${numbers[numbers.length - 1]}`;
+  const prefix = numbers.length === 1 ? numbers[0] : `${numbers[0]} até ${numbers[numbers.length - 1]}`;
   return anoReferencia ? `${prefix}/${anoReferencia}` : prefix;
 }
 
@@ -1930,12 +1930,13 @@ function getReinfQuarterLabel(months = []) {
 
 function getReinfPeriodDescription(months = [], periodicidade = 'Trimestral', anoReferencia = '') {
   const yearSuffix = anoReferencia ? ` de ${anoReferencia}` : '';
+  if (!months.length) return `período não informado${yearSuffix}`;
   if (periodicidade === 'Mensal' && months.length === 1) {
-    return `mes de ${getReinfMonthLabel(months[0]).toLowerCase()}${yearSuffix}`;
+    return `mês de ${getReinfMonthLabel(months[0]).toLowerCase()}${yearSuffix}`;
   }
   const quarterLabel = getReinfQuarterLabel(months);
   if (quarterLabel) return `${quarterLabel}${yearSuffix}`;
-  return `periodo ${getReinfPeriodLabel(months, anoReferencia)}`;
+  return `período ${getReinfPeriodLabel(months, anoReferencia)}`;
 }
 
 function formatCurrencyDisplay(value) {
@@ -1961,16 +1962,16 @@ function getClientDisplayName(client) {
 }
 
 function buildReinfFiscalSubject({ client, months = [], anoReferencia = '' }) {
-  return `Distribuicao de Lucro ${getReinfPeriodLabel(months, anoReferencia)} - ${getClientDisplayName(client)}`;
+  return `Distribuição de Lucro - ${getReinfPeriodLabel(months, anoReferencia)} - ${getClientDisplayName(client)}`;
 }
 
 function buildReinfFiscalBodyText({ client, months = [], anoReferencia = '', periodicidade = 'Trimestral' }) {
   return [
     'Prezados(as),',
     '',
-    `Segue os valores do ${getReinfPeriodDescription(months, periodicidade, anoReferencia)} referente a distribuicao de lucro dos socios da ${getClientDisplayName(client)} (${formatCnpj(client?.cnpj)}).`,
+    `Seguem os valores do ${getReinfPeriodDescription(months, periodicidade, anoReferencia)} referentes à distribuição de lucro dos sócios da ${getClientDisplayName(client)} (${formatCnpj(client?.cnpj)}).`,
     '',
-    'Qualquer duvida, estamos a disposicao.',
+    'Qualquer dúvida, estamos à disposição.',
     '',
     'Por favor, confirme o recebimento deste e-mail.',
     '',
@@ -2020,14 +2021,14 @@ function buildPlainTextTable(rows = []) {
 }
 
 function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
-  const header = ['SOCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
+  const header = ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
   const rows = reportSocios.length
     ? reportSocios.map((reportSocio) => [
-      reportSocio.socio?.nome || 'Socio nao informado',
+      reportSocio.socio?.nome || 'Sócio não informado',
       reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
       ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
     ])
-    : [['Sem socio', '', ...months.map(() => '')]];
+    : [['Sem sócio', '', ...months.map(() => '')]];
   const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
 
   return [
@@ -2048,13 +2049,13 @@ function buildReinfFiscalHtmlParagraphs(lines = []) {
 }
 
 function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
-  const headerCells = ['SOCIO', 'CPF', ...months.map(getReinfMonthShortLabel)]
+  const headerCells = ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)]
     .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
     .join('');
-  const bodyRows = (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem socio', cpf: '' }, valoresPorMes: {} }])
+  const bodyRows = (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {} }])
     .map((reportSocio) => {
       const cells = [
-        reportSocio.socio?.nome || 'Socio nao informado',
+        reportSocio.socio?.nome || 'Sócio não informado',
         reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
         ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
       ];
@@ -2087,7 +2088,7 @@ function buildReinfReportSociosSnapshot(reportSocios = [], months = []) {
     });
     return {
       socio_id: reportSocio.socio?.id ?? null,
-      nome: reportSocio.socio?.nome || 'Socio nao informado',
+      nome: reportSocio.socio?.nome || 'Sócio não informado',
       cpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
       valores_por_mes: valoresPorMes,
       total: total ? formatCurrencyDisplay(total) : '',
@@ -2118,7 +2119,7 @@ function buildReinfRelatoriosExportRows(relatorios = []) {
     const meses = Array.isArray(relatorio.meses) ? relatorio.meses : [];
     const socios = Array.isArray(relatorio.socios) && relatorio.socios.length
       ? relatorio.socios
-      : [{ nome: 'Socio nao informado', cpf: '', valores_por_mes: {}, total: '' }];
+      : [{ nome: 'Sócio não informado', cpf: '', valores_por_mes: {}, total: '' }];
 
     return socios.map((socio) => {
       const valoresPorMes = socio.valores_por_mes ?? socio.valoresPorMes ?? {};
@@ -2272,7 +2273,7 @@ function EcdEcfSentDateCell({ client, tipo = 'ecd' }) {
   const rawDate = getEcdEcfSentDateValue(client, tipo);
 
   if (!rawDate) {
-    return <span className="text-sm font-semibold text-slate-400 dark:text-gray-500">Nao informado</span>;
+    return <span className="text-sm font-semibold text-slate-400 dark:text-gray-500">Não informado</span>;
   }
 
   return <span className="font-semibold text-slate-700 dark:text-gray-200">{formatDateDisplay(rawDate)}</span>;
@@ -4472,19 +4473,19 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
   async function saveReport() {
     setSaveStatus('');
     if (!client?.id) {
-      setSaveStatus('Cliente invalido para salvar');
+      setSaveStatus('Cliente inválido para salvar');
       return;
     }
     if (!reportSociosHydrated.length) {
-      setSaveStatus('Inclua pelo menos um socio');
+      setSaveStatus('Inclua pelo menos um sócio');
       return;
     }
     if (!reportMonths.length) {
-      setSaveStatus('Selecione ao menos um mes');
+      setSaveStatus('Selecione ao menos um mês');
       return;
     }
     if (!onSaveReport) {
-      setSaveStatus('Salvamento indisponivel');
+      setSaveStatus('Salvamento indisponível');
       return;
     }
 
@@ -4516,7 +4517,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
       <div className="mx-auto my-6 max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-gray-700 dark:bg-gray-900">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparacao REINF</p>
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparação REINF</p>
             <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-gray-100">{getClientDisplayName(client)}</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">{formatCnpj(client.cnpj)}</p>
           </div>
@@ -4534,29 +4535,29 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
           <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Socios no relatorio</h3>
+                <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Sócios no relatório</h3>
                 <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                  Inclua um ou mais socios e informe valores especificos para cada um.
+                  Inclua um ou mais sócios e informe valores específicos para cada um.
                 </p>
               </div>
               <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500 dark:border-gray-700 dark:text-gray-300">
-                {reportSociosHydrated.length} socio(s)
+                {reportSociosHydrated.length} sócio(s)
               </span>
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                Adicionar socio
+                Adicionar sócio
                 <select
                   value={socioToAdd}
                   onChange={(event) => setSocioToAdd(event.target.value)}
                   disabled={!availableSociosToAdd.length}
                   className="form-control-shell mt-1 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {!availableSociosToAdd.length ? <option value="">Todos os socios ja foram incluidos</option> : null}
+                  {!availableSociosToAdd.length ? <option value="">Todos os sócios já foram incluídos</option> : null}
                   {availableSociosToAdd.map(({ socio, socioKey }) => (
                     <option key={socioKey} value={socioKey}>
-                      {socio.nome || 'Socio sem nome'}{socio.cpf ? ` - ${formatCpfInput(socio.cpf)}` : ''}
+                      {socio.nome || 'Sócio sem nome'}{socio.cpf ? ` - ${formatCpfInput(socio.cpf)}` : ''}
                     </option>
                   ))}
                 </select>
@@ -4574,7 +4575,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
           </section>
 
           <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
-            <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e periodo</h3>
+            <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e período</h3>
             <div className="mt-4 grid gap-3 lg:grid-cols-[220px_180px_minmax(0,1fr)]">
               <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
                 Periodicidade
@@ -4593,7 +4594,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                 </select>
               </label>
               <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                Ano de referencia
+                Ano de referência
                 <input
                   value={anoReferencia}
                   onChange={(event) => {
@@ -4609,9 +4610,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                 <span className="block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Regra sugerida</span>
                 <span>
-                  Mes com R$ 50.000,00 ou acima: mensal. Mes abaixo de R$ 50.000,00: trimestral.
+                  Mês com R$ 50.000,00 ou acima: mensal. Mês abaixo de R$ 50.000,00: trimestral.
                 </span>
-                <span className="mt-1 block text-xs text-slate-500 dark:text-gray-400">Sugestao atual: {suggestedPeriodicity}</span>
+                <span className="mt-1 block text-xs text-slate-500 dark:text-gray-400">Sugestão atual: {suggestedPeriodicity}</span>
               </div>
             </div>
 
@@ -4620,9 +4621,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                 <div key={reportSocio.socioKey} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-gray-700 dark:bg-gray-800/70">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black text-slate-950 dark:text-gray-100">{reportSocio.socio?.nome || 'Socio sem nome'}</p>
+                      <p className="text-sm font-black text-slate-950 dark:text-gray-100">{reportSocio.socio?.nome || 'Sócio sem nome'}</p>
                       <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                        CPF: {reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : 'CPF nao informado'}
+                        CPF: {reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : 'CPF não informado'}
                       </p>
                     </div>
                     <button
@@ -4636,7 +4637,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
 
                   <div className="mt-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Meses de referencia</p>
+                      <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Meses de referência</p>
                       <button
                         type="button"
                         onClick={() => clearMeses(reportSocio.socioKey)}
@@ -4668,7 +4669,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                   </div>
 
                   <div className="mt-4">
-                    <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores por mes selecionado</p>
+                    <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores por mês selecionado</p>
                     {reportSocio.meses.length ? (
                       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {REINF_MONTH_OPTIONS.filter((month) => reportSocio.meses.includes(month.value)).map((month) => (
@@ -4687,14 +4688,14 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                       </div>
                     ) : (
                       <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                        Selecione um ou mais meses para informar os valores deste socio.
+                        Selecione um ou mais meses para informar os valores deste sócio.
                       </div>
                     )}
                   </div>
                 </div>
               )) : (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-400">
-                  Nenhum socio incluido no relatorio. Cadastre socios no cliente ou adicione um socio acima.
+                  Nenhum sócio incluído no relatório. Cadastre sócios no cliente ou adicione um sócio acima.
                 </div>
               )}
             </div>
@@ -4718,7 +4719,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                 }}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
               >
-                Restaurar padrao
+                Restaurar padrão
               </button>
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -4753,9 +4754,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
               </div>
 
               <div>
-                <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Previa formatada</p>
+                <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Prévia formatada</p>
                 <div className="mt-1 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-950 shadow-sm dark:border-gray-700 dark:bg-white dark:text-slate-950">
-                  <p className="text-lg font-semibold leading-snug">{assunto || 'Assunto nao informado'}</p>
+                  <p className="text-lg font-semibold leading-snug">{assunto || 'Assunto não informado'}</p>
                   <div className="mt-4 space-y-3">
                     {previewBodyParts.introLines.map((line, index) => (
                       line.trim()
@@ -4767,7 +4768,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                     <table className="min-w-[520px] border-collapse border border-slate-950 bg-white text-left text-[13px] leading-5 text-slate-950">
                       <thead>
                         <tr>
-                          <th className="w-[42%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SOCIO</th>
+                          <th className="w-[42%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SÓCIO</th>
                           <th className="w-[22%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF</th>
                           {reportMonths.map((month) => (
                             <th key={month} className="border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">
@@ -4777,9 +4778,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                         </tr>
                       </thead>
                       <tbody>
-                        {(reportSociosHydrated.length ? reportSociosHydrated : [{ socio: { nome: 'Sem socio', cpf: '' }, valoresPorMes: {} }]).map((reportSocio, index) => (
+                        {(reportSociosHydrated.length ? reportSociosHydrated : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {} }]).map((reportSocio, index) => (
                           <tr key={reportSocio.socioKey ?? `empty-${index}`}>
-                            <td className="border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.nome || 'Socio nao informado'}</td>
+                            <td className="border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.nome || 'Sócio não informado'}</td>
                             <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : ''}</td>
                             {reportMonths.map((month) => (
                               <td key={month} className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">
@@ -4808,7 +4809,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
 
         <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
           <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
-            Esta etapa apenas prepara a mensagem. Nenhum e-mail sera enviado automaticamente.
+            Esta etapa apenas prepara a mensagem. Nenhum e-mail será enviado automaticamente.
           </p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
             <div className="min-h-4 min-w-[150px] text-right">
@@ -5021,7 +5022,7 @@ function ReinfPage({
              'data_envio_recibo_reinf',
            ]}
             columnLabels={{
-              reinf_socio: 'Socio',
+              reinf_socio: 'Sócio',
               reinf_socio_cpf: 'CPF',
               data_envio_recibo_reinf: 'Data enviada',
             }}
@@ -6380,17 +6381,17 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
     <section className="rounded-lg border border-slate-200 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-base font-black text-slate-950">Socios da Empresa</h3>
-          <p className="mt-1 text-xs font-semibold text-slate-500">Cadastre nome e CPF dos socios vinculados ao cliente.</p>
+          <h3 className="text-base font-black text-slate-950">Sócios da Empresa</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Cadastre nome e CPF dos sócios vinculados ao cliente.</p>
         </div>
         <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500">
-          {normalizedSocios.length} socio(s)
+          {normalizedSocios.length} sócio(s)
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
         <label className="text-xs font-black uppercase tracking-normal text-slate-500">
-          Nome do socio
+          Nome do sócio
           <input
             value={draft.nome}
             onChange={(event) => {
@@ -6433,7 +6434,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
           onClick={() => setListOpen((current) => !current)}
           className="flex w-full items-center justify-between gap-3 text-left text-sm font-black text-slate-100 light:text-slate-700"
         >
-          <span>Socios cadastrados</span>
+          <span>Sócios cadastrados</span>
           <ChevronDown size={16} className={`transition ${listOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
         {listOpen && normalizedSocios.length ? (
@@ -6444,7 +6445,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
                   value={socio.nome}
                   onChange={(event) => updateSocio(index, 'nome', event.target.value)}
                   disabled={disabled}
-                  aria-label="Nome do socio"
+                  aria-label="Nome do sócio"
                   className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
                 />
                 <input

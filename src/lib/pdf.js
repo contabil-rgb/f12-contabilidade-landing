@@ -8,8 +8,8 @@ const DEFAULT_LAYOUT = {
   columns: [
     { key: 'Cliente', label: 'Cliente', x: 40, width: 130 },
     { key: 'CNPJ', label: 'CNPJ', x: 180, width: 86 },
-    { key: 'Responsável', label: 'Responsavel', x: 276, width: 90 },
-    { key: 'Pendências/Observações', label: 'Pendencias/Observacoes', x: 376, width: 178 },
+    { key: 'Responsável', label: 'Responsável', x: 276, width: 90 },
+    { key: 'Pendências/Observações', label: 'Pendências/Observações', x: 376, width: 178 },
   ],
 };
 
@@ -22,9 +22,9 @@ const CLIENT_BASE_LAYOUT = {
   headerY: 548,
   columns: [
     { key: 'CNPJ', label: 'CNPJ', x: 28, width: 78 },
-    { key: 'Razão Social', label: 'Razao Social', x: 114, width: 138 },
-    { key: 'Nome/Identificação', label: 'Nome/Identificacao', x: 260, width: 104 },
-    { key: 'Responsável', label: 'Responsavel', x: 372, width: 60 },
+    { key: 'Razão Social', label: 'Razão Social', x: 114, width: 138 },
+    { key: 'Nome/Identificação', label: 'Nome/Identificação', x: 260, width: 104 },
+    { key: 'Responsável', label: 'Responsável', x: 372, width: 60 },
     { key: 'Revisor', label: 'Revisor', x: 440, width: 56 },
     { key: 'Tipo de Cliente', label: 'Tipo', x: 504, width: 72 },
     { key: 'Regime Tributário', label: 'Regime', x: 584, width: 84 },
@@ -43,13 +43,13 @@ const REINF_REPORT_LAYOUT = {
     { key: 'Gerado em', label: 'Gerado em', x: 24, width: 58 },
     { key: 'Cliente', label: 'Cliente', x: 88, width: 116 },
     { key: 'CNPJ', label: 'CNPJ', x: 210, width: 68 },
-    { key: 'Responsável', label: 'Responsavel', x: 284, width: 54 },
+    { key: 'Responsável', label: 'Responsável', x: 284, width: 54 },
     { key: 'Revisor', label: 'Revisor', x: 344, width: 46 },
-    { key: 'Periodicidade', label: 'Periodo', x: 396, width: 48 },
+    { key: 'Periodicidade', label: 'Período', x: 396, width: 48 },
     { key: 'Meses', label: 'Meses', x: 450, width: 74 },
-    { key: 'Sócio', label: 'Socio', x: 530, width: 92 },
+    { key: 'Sócio', label: 'Sócio', x: 530, width: 92 },
     { key: 'CPF', label: 'CPF', x: 628, width: 62 },
-    { key: 'Valores por mês', label: 'Valores por mes', x: 696, width: 122 },
+    { key: 'Valores por mês', label: 'Valores por mês', x: 696, width: 122 },
   ],
 };
 
@@ -183,7 +183,7 @@ function buildPages(rows, title, layout) {
   startPage();
 
   if (!rows.length) {
-    addText(commands, 'Nenhum registro encontrado para este relatorio.', layout.margin, y, 10);
+    addText(commands, 'Nenhum registro encontrado para este relatório.', layout.margin, y, 10);
     finishPage();
     return pages;
   }
@@ -238,7 +238,7 @@ function buildReinfReportPages(rows, title) {
     ? (availableWidth - socioWidth - cpfWidth - totalWidth) / months.length
     : availableWidth - socioWidth - cpfWidth - totalWidth;
   const columns = [
-    { key: 'Sócio', label: 'SOCIO', width: socioWidth },
+    { key: 'Sócio', label: 'SÓCIO', width: socioWidth },
     { key: 'CPF', label: 'CPF', width: cpfWidth },
     ...(months.length
       ? months.map((month) => ({ key: month, label: month, width: monthWidth }))
@@ -259,21 +259,22 @@ function buildReinfReportPages(rows, title) {
   };
 
   const addSummary = () => {
-    const cliente = firstRow.Cliente || 'Cliente nao informado';
-    const cnpj = firstRow.CNPJ || 'CNPJ nao informado';
-    const periodo = `${firstRow.Periodicidade || 'Sem periodicidade'} - ${firstRow.Meses || 'Meses nao informados'} ${firstRow.Ano || ''}`.trim();
+    const cliente = firstRow.Cliente || 'Cliente não informado';
+    const cnpj = firstRow.CNPJ || 'CNPJ não informado';
+    const periodo = `${firstRow.Periodicidade || 'Sem periodicidade'} - ${firstRow.Meses || 'Meses não informados'} ${firstRow.Ano || ''}`.trim();
+    const responsavel = firstRow['Responsável'] || 'Não informado';
 
     addWrappedText(commands, `Cliente: ${cliente}`, layout.margin, y, 360, 9, 12, 2);
     addWrappedText(commands, `CNPJ: ${cnpj}`, 420, y, 170, 9, 12, 2);
-    addWrappedText(commands, `Gerado em: ${firstRow['Gerado em'] || 'Nao informado'}`, 610, y, 190, 9, 12, 2);
+    addWrappedText(commands, `Gerado em: ${firstRow['Gerado em'] || 'Não informado'}`, 610, y, 190, 9, 12, 2);
     y -= 34;
-    addWrappedText(commands, `Responsavel: ${firstRow['Responsável'] || 'Nao informado'}`, layout.margin, y, 260, 8, 11, 2);
-    addWrappedText(commands, `Revisor: ${firstRow.Revisor || 'Nao informado'}`, 320, y, 180, 8, 11, 2);
-    addWrappedText(commands, `Periodo: ${periodo}`, 520, y, 290, 8, 11, 2);
+    addWrappedText(commands, `Responsável: ${responsavel}`, layout.margin, y, 260, 8, 11, 2);
+    addWrappedText(commands, `Revisor: ${firstRow.Revisor || 'Não informado'}`, 320, y, 180, 8, 11, 2);
+    addWrappedText(commands, `Período: ${periodo}`, 520, y, 290, 8, 11, 2);
     y -= 38;
     addWrappedText(
       commands,
-      `Segue valores referentes a distribuicao de lucro dos socios da ${cliente} (${cnpj}) no periodo ${firstRow.Meses || 'nao informado'} ${firstRow.Ano || ''}.`,
+      `Seguem os valores referentes à distribuição de lucro dos sócios da ${cliente} (${cnpj}) no período ${firstRow.Meses || 'não informado'} ${firstRow.Ano || ''}.`,
       layout.margin,
       y,
       availableWidth,
@@ -303,7 +304,7 @@ function buildReinfReportPages(rows, title) {
     }
 
     y -= 14;
-    addText(commands, 'Qualquer duvida, estamos a disposicao.', layout.margin, y, 9);
+    addText(commands, 'Qualquer dúvida, estamos à disposição.', layout.margin, y, 9);
     y -= 28;
     addText(commands, 'Por favor, confirme o recebimento deste e-mail.', layout.margin, y, 9);
     y -= 28;
@@ -313,7 +314,7 @@ function buildReinfReportPages(rows, title) {
   addReportHeader();
 
   if (!safeRows.length) {
-    addText(commands, 'Nenhum registro encontrado para este relatorio.', layout.margin, y, 10);
+    addText(commands, 'Nenhum registro encontrado para este relatório.', layout.margin, y, 10);
     pages.push(commands.join('\n'));
     return { pages, layout };
   }
@@ -394,7 +395,7 @@ function downloadBlob(content, filename) {
   URL.revokeObjectURL(url);
 }
 
-export function exportRowsToPdf(rows, filename = 'relatorio.pdf', title = 'Relatorio') {
+export function exportRowsToPdf(rows, filename = 'relatorio.pdf', title = 'Relatório') {
   const safeRows = Array.isArray(rows) ? rows : [];
   if (isReinfReportRows(safeRows)) {
     const { pages, layout } = buildReinfReportPages(safeRows, title);
