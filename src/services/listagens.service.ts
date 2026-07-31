@@ -56,19 +56,33 @@ function normalizeOptionValue(value: unknown) {
   return raw;
 }
 
-function normalizeListagemRow(row: Record<string, unknown>) {
+function normalizeNullableText(value: unknown) {
+  const normalized = String(value ?? '').trim();
+  return normalized || '';
+}
+
+function normalizeNullableTimestamp(value: unknown) {
+  return value ? String(value) : '';
+}
+
+export function normalizeListagemRow(row: Record<string, unknown>) {
   return {
     ...row,
     categoria: normalizeCategory(row.categoria),
     valor: normalizeOptionValue(row.valor),
     ativo: row.ativo !== false,
+    assinatura_email_path: normalizeNullableText(row.assinatura_email_path),
+    assinatura_email_nome_arquivo: normalizeNullableText(row.assinatura_email_nome_arquivo),
+    assinatura_email_atualizada_em: normalizeNullableTimestamp(row.assinatura_email_atualizada_em),
   };
 }
+
+const LISTAGENS_SELECT = 'id, categoria, valor, ordem, ativo, assinatura_email_path, assinatura_email_nome_arquivo, assinatura_email_atualizada_em';
 
 export async function listarTodasListagens({ incluirInativos = false } = {}) {
   let query = supabase
     .from('listagens')
-    .select('id, categoria, valor, ordem, ativo')
+    .select(LISTAGENS_SELECT)
     .order('ordem', { ascending: true })
     .order('valor', { ascending: true });
 
@@ -126,7 +140,7 @@ export async function criarValorListagem(categoria: unknown, valor: unknown, { o
   const { data, error } = await supabase
     .from('listagens')
     .insert(payload)
-    .select('id, categoria, valor, ordem, ativo')
+    .select(LISTAGENS_SELECT)
     .single();
 
   if (error) {
@@ -153,7 +167,7 @@ export async function atualizarValorListagem(id: string, patch: Record<string, u
     .from('listagens')
     .update(nextPatch)
     .eq('id', id)
-    .select('id, categoria, valor, ordem, ativo')
+    .select(LISTAGENS_SELECT)
     .single();
 
   if (error) {
@@ -174,7 +188,7 @@ export async function excluirValorListagem(id: string, categoria: unknown = 'res
     .delete()
     .eq('id', id)
     .eq('categoria', categoriaNormalizada)
-    .select('id, categoria, valor, ordem, ativo')
+    .select(LISTAGENS_SELECT)
     .single();
 
   if (error) {

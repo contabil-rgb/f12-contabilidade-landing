@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Edit3, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Edit3, Eye, Plus, RefreshCcw, Trash2, Upload } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import DataTableShell from '../ui/DataTableShell';
 import StatusBadge from '../ui/StatusBadge';
@@ -17,8 +17,14 @@ export default function UsersPage({
   onCreateResponsavel,
   onToggleResponsavel,
   onDeleteResponsavel,
+  onUploadResponsavelSignature,
+  onRemoveResponsavelSignature,
+  getResponsavelSignatureUrl,
 }) {
   const [novoResponsavel, setNovoResponsavel] = useState('');
+  const [signatureTarget, setSignatureTarget] = useState(null);
+  const [signatureBusyId, setSignatureBusyId] = useState('');
+  const signatureInputRef = useRef(null);
 
   const responsaveisOrdenados = useMemo(
     () => [...responsavelOptions].sort((a, b) => String(a.valor ?? '').localeCompare(String(b.valor ?? ''), 'pt-BR')),
@@ -32,6 +38,46 @@ export default function UsersPage({
     const created = await onCreateResponsavel(novoResponsavel);
     if (created !== false) {
       setNovoResponsavel('');
+    }
+  }
+
+  function openSignaturePicker(item) {
+    setSignatureTarget(item);
+    signatureInputRef.current?.click();
+  }
+
+  async function handleSignatureFileChange(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const target = signatureTarget;
+    setSignatureTarget(null);
+    if (!file || !target || !onUploadResponsavelSignature) return;
+
+    setSignatureBusyId(target.id ?? target.valor ?? '');
+    try {
+      await onUploadResponsavelSignature(target, file);
+    } finally {
+      setSignatureBusyId('');
+    }
+  }
+
+  async function handleRemoveSignature(item) {
+    if (!item?.assinatura_email_path || !onRemoveResponsavelSignature) return;
+    const confirmed = window.confirm(`Remover a assinatura de e-mail de ${item.valor}?`);
+    if (!confirmed) return;
+
+    setSignatureBusyId(item.id ?? item.valor ?? '');
+    try {
+      await onRemoveResponsavelSignature(item);
+    } finally {
+      setSignatureBusyId('');
+    }
+  }
+
+  function openSignature(item) {
+    const url = getResponsavelSignatureUrl?.(item?.assinatura_email_path);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   }
 
@@ -114,8 +160,8 @@ export default function UsersPage({
         </form>
 
         <DataTableShell
-          headers={['Responsável', 'Status', 'Ações']}
-          minWidth="min-w-[640px]"
+          headers={['Responsável', 'Status', 'Assinatura', 'Ações']}
+          minWidth="min-w-[920px]"
           hasRows={responsaveisOrdenados.length > 0}
           emptyTitle="Nenhum responsável cadastrado."
           emptyDescription="Quando houver valores gerenciados, eles aparecerão nesta lista."
@@ -130,6 +176,58 @@ export default function UsersPage({
                   <StatusBadge toneClass={chipClass(item.ativo ? 'success' : 'muted')}>
                     {item.ativo ? 'Ativo' : 'Inativo'}
                   </StatusBadge>
+                </td>
+                <td className="table-cell">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge toneClass={chipClass(item.assinatura_email_path ? 'success' : 'muted')}>
+                      {item.assinatura_email_path ? 'Cadastrada' : 'Sem assinatura'}
+                    </StatusBadge>
+                    {item.assinatura_email_path ? (
+                      <>
+                        <ActionButton
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openSignature(item)}
+                          disabled={responsavelBusy || signatureBusyId === item.id}
+                        >
+                          <Eye size={15} aria-hidden="true" />
+                          Visualizar
+                        </ActionButton>
+                        <ActionButton
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openSignaturePicker(item)}
+                          disabled={responsavelBusy || signatureBusyId === item.id || !item.id}
+                        >
+                          <Upload size={15} aria-hidden="true" />
+                          Substituir
+                        </ActionButton>
+                        <ActionButton
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleRemoveSignature(item)}
+                          disabled={responsavelBusy || signatureBusyId === item.id || !item.id}
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                          Remover
+                        </ActionButton>
+                      </>
+                    ) : (
+                      <ActionButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openSignaturePicker(item)}
+                        disabled={responsavelBusy || signatureBusyId === item.id || !item.id}
+                      >
+                        <Upload size={15} aria-hidden="true" />
+                        {signatureBusyId === item.id ? 'Enviando...' : 'Anexar'}
+                      </ActionButton>
+                    )}
+                  </div>
                 </td>
                 <td className="table-cell">
                   <div className="flex flex-wrap gap-2">
@@ -159,6 +257,13 @@ export default function UsersPage({
             ))}
           </tbody>
         </DataTableShell>
+        <input
+          ref={signatureInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={handleSignatureFileChange}
+        />
       </SurfacePanel>
     </div>
   );

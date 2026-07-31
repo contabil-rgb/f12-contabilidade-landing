@@ -112,6 +112,11 @@ import {
   salvarReinfRelatorio as salvarReinfRelatorioSupabase,
 } from './services/reinf-relatorios.service';
 import {
+  gerarUrlPublicaAssinaturaResponsavel,
+  removerAssinaturaResponsavel as removerAssinaturaResponsavelSupabase,
+  salvarAssinaturaResponsavel as salvarAssinaturaResponsavelSupabase,
+} from './services/assinaturas-responsaveis.service';
+import {
   criarValorListagem,
   excluirValorListagem,
   inativarValorListagem,
@@ -788,6 +793,9 @@ function normalizeSessionProfileSnapshot(profile) {
     bloqueado_ate: String(profile.bloqueado_ate ?? '').trim(),
     criado_em: String(profile.criado_em ?? '').trim(),
     atualizado_em: String(profile.atualizado_em ?? '').trim(),
+    assinatura_email_path: String(profile.assinatura_email_path ?? '').trim(),
+    assinatura_email_nome_arquivo: String(profile.assinatura_email_nome_arquivo ?? '').trim(),
+    assinatura_email_atualizada_em: String(profile.assinatura_email_atualizada_em ?? '').trim(),
   };
 }
 
@@ -2022,7 +2030,7 @@ function buildPlainTextTable(rows = []) {
   ].join('\n');
 }
 
-function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
+function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [], assinaturaNome = '' }) {
   const header = ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
   const rows = reportSocios.length
     ? reportSocios.map((reportSocio) => [
@@ -2041,6 +2049,7 @@ function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], mo
     buildPlainTextTable([header, ...rows]),
     '',
     closingLines.join('\n'),
+    assinaturaNome ? `\nAssinatura digital: ${assinaturaNome}` : '',
   ].filter((line) => line !== '').join('\n');
 }
 
@@ -2050,7 +2059,7 @@ function buildReinfFiscalHtmlParagraphs(lines = []) {
     .join('');
 }
 
-function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [] }) {
+function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [], assinaturaUrl = '', assinaturaNome = '' }) {
   const headerCells = ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)]
     .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
     .join('');
@@ -2075,6 +2084,7 @@ function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], mon
         <tbody>${bodyRows}</tbody>
       </table>
       ${buildReinfFiscalHtmlParagraphs(closingLines)}
+      ${assinaturaUrl ? `<div style="margin-top:18px;"><img src="${escapeHtml(assinaturaUrl)}" alt="${escapeHtml(assinaturaNome || 'Assinatura digital')}" style="max-width:520px;width:100%;height:auto;display:block;border:0;" /></div>` : ''}
     </div>
   `;
 }
@@ -4278,9 +4288,17 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
-function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onSaveReport, onSendEmail, onClose }) {
+function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOptions = [], onSelectSocio, onSaveReport, onSendEmail, onClose }) {
   const socios = getReinfSocios(client);
   const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
+  const responsavelAssinatura = useMemo(() => {
+    const responsavelNome = getResponsavelOperacional(client) || client?.responsavel || '';
+    return responsavelOptions.find((item) => normalizeText(item.valor) === normalizeText(responsavelNome)) ?? null;
+  }, [client?.responsavel, responsavelOptions]);
+  const assinaturaResponsavelUrl = responsavelAssinatura?.assinatura_email_path
+    ? gerarUrlPublicaAssinaturaResponsavel(responsavelAssinatura.assinatura_email_path)
+    : '';
+  const assinaturaResponsavelNome = responsavelAssinatura?.valor || getResponsavelOperacional(client) || client?.responsavel || '';
   const currentSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
   const currentSocioIndex = currentSocio ? socios.indexOf(currentSocio) : 0;
   const currentSocioKey = currentSocio ? getReinfSocioOptionKey(currentSocio, currentSocioIndex) : '';
@@ -4460,12 +4478,15 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
       bodyText: mensagem,
       reportSocios: reportSociosHydrated,
       months: reportMonths,
+      assinaturaNome: assinaturaResponsavelUrl ? assinaturaResponsavelNome : '',
     });
     const htmlText = buildReinfFiscalHtmlMessage({
       assunto,
       bodyText: mensagem,
       reportSocios: reportSociosHydrated,
       months: reportMonths,
+      assinaturaUrl: assinaturaResponsavelUrl,
+      assinaturaNome: assinaturaResponsavelNome,
     });
     try {
       await copyRichTextToClipboard({ htmlText, plainText });
@@ -4551,12 +4572,15 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
       bodyText: mensagem,
       reportSocios: reportSociosHydrated,
       months: reportMonths,
+      assinaturaNome: assinaturaResponsavelUrl ? assinaturaResponsavelNome : '',
     });
     const htmlText = buildReinfFiscalHtmlMessage({
       assunto,
       bodyText: mensagem,
       reportSocios: reportSociosHydrated,
       months: reportMonths,
+      assinaturaUrl: assinaturaResponsavelUrl,
+      assinaturaNome: assinaturaResponsavelNome,
     });
 
     setSendingEmail(true);
@@ -4866,18 +4890,27 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                       ))}
                     </div>
                   ) : null}
+                  {assinaturaResponsavelUrl ? (
+                    <div className="mt-5">
+                      <img
+                        src={assinaturaResponsavelUrl}
+                        alt={`Assinatura digital de ${assinaturaResponsavelNome || 'responsável'}`}
+                        className="max-h-40 max-w-full object-contain"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
           </section>
         </div>
 
-        <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
-          <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
-            Esta etapa apenas prepara a mensagem. Nenhum e-mail será enviado automaticamente.
+        <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+          <p className="w-full text-xs font-semibold leading-relaxed text-slate-500 dark:text-gray-400">
+            Esta etapa prepara a mensagem. O envio ocorre apenas ao clicar em Enviar e-mail.
           </p>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
-            <div className="min-h-4 min-w-[150px] text-right">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div className="min-h-4 text-left sm:min-w-[150px] sm:text-right">
               {sendStatus ? (
                 <span className={`text-xs font-black ${sendStatus === 'E-mail enviado' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
                   {sendStatus}
@@ -4894,7 +4927,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
                 </span>
               ) : null}
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
               <button
                 type="button"
                 onClick={saveReport}
@@ -4931,6 +4964,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
 
 function ReinfPage({
   clients,
+  responsavelOptions = [],
   onView,
   onSaveReport,
   onSendEmail,
@@ -5142,6 +5176,7 @@ function ReinfPage({
         <ReinfFiscalModal
           client={reinfModalClient}
           selectedSocioByClientId={selectedSocioByClientId}
+          responsavelOptions={responsavelOptions}
           onSelectSocio={updateSelectedSocio}
           onSaveReport={onSaveReport}
           onSendEmail={onSendEmail}
@@ -7266,6 +7301,9 @@ export default function App() {
         bloqueado_ate: perfil.bloqueado_ate ?? base.bloqueado_ate ?? '',
         criado_em: perfil.criado_em ?? base.criado_em ?? todayBr(),
         atualizado_em: perfil.atualizado_em ?? base.atualizado_em ?? todayBr(),
+        assinatura_email_path: perfil.assinatura_email_path ?? base.assinatura_email_path ?? '',
+        assinatura_email_nome_arquivo: perfil.assinatura_email_nome_arquivo ?? base.assinatura_email_nome_arquivo ?? '',
+        assinatura_email_atualizada_em: perfil.assinatura_email_atualizada_em ?? base.assinatura_email_atualizada_em ?? '',
       };
       const usuarios =
         idx >= 0
@@ -8454,6 +8492,62 @@ export default function App() {
     }
   }
 
+  async function uploadResponsavelSignature(item, file) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar assinaturas.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('salvar a assinatura do responsável')) return false;
+    if (!item?.id || !isUuid(item.id)) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de salvar a assinatura.' });
+      return false;
+    }
+
+    setResponsavelCatalogoBusy(true);
+    try {
+      const saved = await salvarAssinaturaResponsavelSupabase(item, file);
+      atualizarResponsavelCatalogoLocal(saved);
+      setToast({ title: 'Assinatura salva', message: saved.valor });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao salvar assinatura',
+        message: error.message || 'Não foi possível salvar a assinatura no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelCatalogoBusy(false);
+    }
+  }
+
+  async function removeResponsavelSignature(item) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar assinaturas.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('remover a assinatura do responsável')) return false;
+    if (!item?.id || !isUuid(item.id)) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de remover a assinatura.' });
+      return false;
+    }
+
+    setResponsavelCatalogoBusy(true);
+    try {
+      const saved = await removerAssinaturaResponsavelSupabase(item);
+      atualizarResponsavelCatalogoLocal(saved);
+      setToast({ title: 'Assinatura removida', message: saved.valor });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao remover assinatura',
+        message: error.message || 'Não foi possível remover a assinatura no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelCatalogoBusy(false);
+    }
+  }
+
   async function saveUser(userValues) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) return;
     if (!ensureSupabaseWriteReady('salvar o usuário')) return;
@@ -8658,6 +8752,7 @@ export default function App() {
     reinf: (
       <ReinfPage
         clients={enrichedClients}
+        responsavelOptions={responsavelCatalogo}
         onView={openClient}
         onSaveReport={salvarRelatorioReinf}
         onSendEmail={enviarEmailReinf}
@@ -8726,6 +8821,9 @@ export default function App() {
             onCreateResponsavel={createResponsavelCatalogo}
             onToggleResponsavel={toggleResponsavelCatalogo}
             onDeleteResponsavel={deleteResponsavelCatalogo}
+            onUploadResponsavelSignature={uploadResponsavelSignature}
+            onRemoveResponsavelSignature={removeResponsavelSignature}
+            getResponsavelSignatureUrl={gerarUrlPublicaAssinaturaResponsavel}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
             )}

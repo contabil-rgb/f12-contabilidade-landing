@@ -53,7 +53,7 @@ function normalizeNullableTimestamp(value: unknown) {
   return text.length ? text : '';
 }
 
-function normalizeUsuarioRow(row: Record<string, unknown>) {
+export function normalizeUsuarioRow(row: Record<string, unknown>) {
   return {
     ...row,
     nome: normalizeNullableText(row.nome),
@@ -68,6 +68,9 @@ function normalizeUsuarioRow(row: Record<string, unknown>) {
     bloqueado_ate: normalizeNullableTimestamp(row.bloqueado_ate),
     criado_em: normalizeNullableTimestamp(row.criado_em),
     atualizado_em: normalizeNullableTimestamp(row.atualizado_em),
+    assinatura_email_path: normalizeNullableText(row.assinatura_email_path),
+    assinatura_email_nome_arquivo: normalizeNullableText(row.assinatura_email_nome_arquivo),
+    assinatura_email_atualizada_em: normalizeNullableTimestamp(row.assinatura_email_atualizada_em),
   };
 }
 
