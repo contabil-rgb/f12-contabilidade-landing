@@ -106,6 +106,8 @@ import {
   salvarSociosCliente as salvarSociosClienteSupabase,
 } from './services/socios-clientes.service';
 import {
+  enviarReinfEmail as enviarReinfEmailSupabase,
+  excluirReinfRelatorio as excluirReinfRelatorioSupabase,
   listarReinfRelatorios as listarReinfRelatoriosSupabase,
   salvarReinfRelatorio as salvarReinfRelatorioSupabase,
 } from './services/reinf-relatorios.service';
@@ -4276,7 +4278,7 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
-function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onSaveReport, onClose }) {
+function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio, onSaveReport, onSendEmail, onClose }) {
   const socios = getReinfSocios(client);
   const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
   const currentSocio = getSelectedReinfSocio(client, selectedSocioByClientId);
@@ -4300,6 +4302,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
   const [copyStatus, setCopyStatus] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [savingReport, setSavingReport] = useState(false);
+  const [sendStatus, setSendStatus] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
   const reportSociosHydrated = useMemo(() => reportSocios
     .map((reportSocio) => ({
       ...reportSocio,
@@ -4325,6 +4329,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
     setCopyStatus('');
     setSaveStatus('');
     setSavingReport(false);
+    setSendStatus('');
+    setSendingEmail(false);
   }, [client?.id]);
 
   useEffect(() => {
@@ -4448,6 +4454,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
   }
 
   async function copyMessage() {
+    setSendStatus('');
     const plainText = buildReinfFiscalPlainMessage({
       assunto,
       bodyText: mensagem,
@@ -4472,6 +4479,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
 
   async function saveReport() {
     setSaveStatus('');
+    setSendStatus('');
     if (!client?.id) {
       setSaveStatus('Cliente inválido para salvar');
       return;
@@ -4507,6 +4515,63 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
       setSaveStatus(error?.message || 'Não foi possível salvar');
     } finally {
       setSavingReport(false);
+    }
+  }
+
+  async function sendEmail() {
+    setSendStatus('');
+    if (!client?.id) {
+      setSendStatus('Cliente inválido para envio');
+      return;
+    }
+    if (!reportSociosHydrated.length) {
+      setSendStatus('Inclua pelo menos um sócio');
+      return;
+    }
+    if (!reportMonths.length) {
+      setSendStatus('Selecione ao menos um mês');
+      return;
+    }
+    if (!onSendEmail) {
+      setSendStatus('Envio indisponível');
+      return;
+    }
+
+    const relatorio = buildReinfReportPayload({
+      client,
+      periodicidade,
+      anoReferencia,
+      months: reportMonths,
+      assunto,
+      mensagem,
+      reportSocios: reportSociosHydrated,
+    });
+    const plainText = buildReinfFiscalPlainMessage({
+      assunto,
+      bodyText: mensagem,
+      reportSocios: reportSociosHydrated,
+      months: reportMonths,
+    });
+    const htmlText = buildReinfFiscalHtmlMessage({
+      assunto,
+      bodyText: mensagem,
+      reportSocios: reportSociosHydrated,
+      months: reportMonths,
+    });
+
+    setSendingEmail(true);
+    try {
+      const sent = await onSendEmail({
+        assunto,
+        corpo_mensagem: plainText,
+        html_mensagem: htmlText,
+        relatorio,
+      });
+      setSendStatus(sent ? 'E-mail enviado' : 'Não foi possível enviar');
+    } catch (error) {
+      setSendStatus(error?.message || 'Não foi possível enviar');
+    } finally {
+      setSendingEmail(false);
     }
   }
 
@@ -4813,12 +4878,17 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
           </p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
             <div className="min-h-4 min-w-[150px] text-right">
-              {copyStatus ? (
+              {sendStatus ? (
+                <span className={`text-xs font-black ${sendStatus === 'E-mail enviado' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+                  {sendStatus}
+                </span>
+              ) : null}
+              {!sendStatus && copyStatus ? (
                 <span className={`text-xs font-black ${copied ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'}`}>
                   {copyStatus}
                 </span>
               ) : null}
-              {!copyStatus && saveStatus ? (
+              {!sendStatus && !copyStatus && saveStatus ? (
                 <span className={`text-xs font-black ${saveStatus === 'Relatório salvo' ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
                   {saveStatus}
                 </span>
@@ -4833,6 +4903,15 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, onSelectSocio,
               >
                 <Save size={16} aria-hidden="true" />
                 {savingReport ? 'Salvando...' : 'Salvar relatório'}
+              </button>
+              <button
+                type="button"
+                onClick={sendEmail}
+                disabled={sendingEmail}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Mail size={16} aria-hidden="true" />
+                {sendingEmail ? 'Enviando...' : 'Enviar e-mail'}
               </button>
               <button
                 type="button"
@@ -4854,6 +4933,7 @@ function ReinfPage({
   clients,
   onView,
   onSaveReport,
+  onSendEmail,
   supabaseStatus,
   metadata,
   onRefresh,
@@ -5064,6 +5144,7 @@ function ReinfPage({
           selectedSocioByClientId={selectedSocioByClientId}
           onSelectSocio={updateSelectedSocio}
           onSaveReport={onSaveReport}
+          onSendEmail={onSendEmail}
           onClose={() => setReinfModalClientId('')}
         />
       ) : null}
@@ -5427,7 +5508,9 @@ function ReportsPage({
   onExportXlsx,
   onExportCsv,
   onExportPdf,
+  onDeleteReinfReport,
   canExport,
+  canDeleteReinfReports = false,
   supabaseStatus,
   metadata,
   statusLabel,
@@ -5657,29 +5740,43 @@ function ReportsPage({
                       </td>
                       <td className="px-4 py-3 align-top font-black">{formatNumber(getReinfRelatorioSociosCount(relatorio))}</td>
                       <td className="px-4 py-3 align-top">
-                        {canExport ? (
+                        {canExport || canDeleteReinfReports ? (
                           <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
-                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                            >
-                              Excel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
-                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                            >
-                              CSV
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), title)}
-                              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                            >
-                              PDF
-                            </button>
+                            {canExport ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
+                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                                >
+                                  Excel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
+                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                                >
+                                  CSV
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), title)}
+                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                                >
+                                  PDF
+                                </button>
+                              </>
+                            ) : null}
+                            {canDeleteReinfReports ? (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteReinfReport?.(relatorio)}
+                                className="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 px-3 py-2 text-xs font-black text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/35 dark:text-red-300 dark:hover:bg-red-500/10"
+                              >
+                                <Trash2 size={13} aria-hidden="true" />
+                                Excluir
+                              </button>
+                            ) : null}
                           </div>
                         ) : (
                           <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
@@ -7961,6 +8058,55 @@ export default function App() {
     }
   }
 
+  async function excluirRelatorioReinf(relatorio) {
+    if (!ensureSupabaseWriteReady('excluir o relatorio REINF')) return false;
+    if (!relatorio?.id) {
+      setToast({
+        title: 'Relatorio REINF invalido',
+        message: 'Nao foi possivel identificar o relatorio para exclusao.',
+      });
+      return false;
+    }
+
+    const clienteNome = relatorio.razao_social || relatorio.nome_identificacao || 'este cliente';
+    const confirmed = window.confirm(`Excluir o relatorio REINF de ${clienteNome}? Esta acao nao pode ser desfeita.`);
+    if (!confirmed) return false;
+
+    try {
+      const deleted = await excluirReinfRelatorioSupabase(relatorio.id);
+      setReinfRelatorios((current) => current.filter((item) => item.id !== relatorio.id));
+      setToast({
+        title: 'Relatorio REINF excluido',
+        message: deleted?.razao_social || deleted?.nome_identificacao || 'Historico atualizado.',
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao excluir relatorio REINF',
+        message: error.message || 'Nao foi possivel excluir o relatorio agora.',
+      });
+      return false;
+    }
+  }
+
+  async function enviarEmailReinf(payload) {
+    if (!ensureSupabaseWriteReady('enviar o e-mail REINF')) return false;
+    try {
+      const sent = await enviarReinfEmailSupabase(payload);
+      setToast({
+        title: 'E-mail REINF enviado',
+        message: 'Mensagem enviada para o setor fiscal.',
+      });
+      return sent || true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao enviar e-mail REINF',
+        message: error.message || 'Não foi possível enviar o e-mail agora.',
+      });
+      return false;
+    }
+  }
+
   function canManageAttachment(client, fieldKey) {
     if (!currentUserFull || !client) return false;
     return canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey);
@@ -8514,6 +8660,7 @@ export default function App() {
         clients={enrichedClients}
         onView={openClient}
         onSaveReport={salvarRelatorioReinf}
+        onSendEmail={enviarEmailReinf}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
         statusLabel={supabaseStatusLabel}
@@ -8552,7 +8699,9 @@ export default function App() {
           onExportXlsx={exportXlsx}
           onExportCsv={exportCsv}
           onExportPdf={exportPdf}
+          onDeleteReinfReport={excluirRelatorioReinf}
           canExport={canExportReports}
+          canDeleteReinfReports={canWritePortalData && isAdmin(currentUserFull)}
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           statusLabel={supabaseStatusLabel}

@@ -197,4 +197,47 @@ $$;
 revoke all on function public.salvar_reinf_relatorio_portal(jsonb) from public;
 grant execute on function public.salvar_reinf_relatorio_portal(jsonb) to authenticated;
 
+create or replace function public.excluir_reinf_relatorio_portal(
+  p_relatorio_id uuid
+)
+returns public.reinf_relatorios
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_usuario public.usuarios%rowtype;
+  v_relatorio public.reinf_relatorios;
+begin
+  select *
+    into v_usuario
+  from public.usuarios u
+  where u.auth_user_id = auth.uid()
+    and u.status = 'Ativo'
+    and u.perfil_acesso = 'coordenador_administrador'
+  limit 1;
+
+  if v_usuario.id is null then
+    raise exception 'Usuario sem permissao para excluir relatorio REINF.';
+  end if;
+
+  if p_relatorio_id is null then
+    raise exception 'Relatorio REINF e obrigatorio para exclusao.';
+  end if;
+
+  delete from public.reinf_relatorios r
+  where r.id = p_relatorio_id
+  returning * into v_relatorio;
+
+  if v_relatorio.id is null then
+    raise exception 'Relatorio REINF nao encontrado.';
+  end if;
+
+  return v_relatorio;
+end;
+$$;
+
+revoke all on function public.excluir_reinf_relatorio_portal(uuid) from public;
+grant execute on function public.excluir_reinf_relatorio_portal(uuid) to authenticated;
+
 grant select on table public.reinf_relatorios to authenticated;

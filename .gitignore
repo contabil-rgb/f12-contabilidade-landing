@@ -6,6 +6,7 @@ vite-dev*.log
 vite-live*.log
 .vite-dev*.log
 .codex-vite*.log
+supabase/.temp/
 
 # Environment files
 .env

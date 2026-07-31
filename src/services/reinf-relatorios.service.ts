@@ -52,3 +52,32 @@ export async function salvarReinfRelatorio(relatorio: Record<string, unknown>) {
   const row = Array.isArray(data) ? data[0] : data;
   return normalizeRow(row as Record<string, unknown>);
 }
+
+export async function enviarReinfEmail(payload: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke('enviar-reinf-email', {
+    body: payload,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível enviar e-mail REINF: ${error.message}`);
+  }
+
+  if (data && typeof data === 'object' && 'error' in data) {
+    throw new Error(String((data as Record<string, unknown>).error || 'Não foi possível enviar e-mail REINF.'));
+  }
+
+  return data;
+}
+
+export async function excluirReinfRelatorio(relatorioId: string) {
+  const { data, error } = await supabase.rpc('excluir_reinf_relatorio_portal', {
+    p_relatorio_id: relatorioId,
+  });
+
+  if (error) {
+    throw new Error(`Nao foi possivel excluir relatorio REINF: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
+}
