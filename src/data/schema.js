@@ -227,7 +227,7 @@ export const DETAIL_SECTIONS = [
     fields: ['ecd', 'ultima_ecd_entregue', 'data_entrega_ecd', 'data_envio_ecd', 'responsavel_ecd', 'anexo_recibo_ecd'],
   },
   {
-    title: 'REINF',
+    title: 'Distribuição de Lucro',
     fields: ['data_enviada_reinf', 'anexo_recibo_reinf', 'precisa_ata', 'ata_entregue', 'data_entrega_ata'],
   },
   {

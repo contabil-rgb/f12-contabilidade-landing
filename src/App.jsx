@@ -169,7 +169,7 @@ const INITIAL_METADATA = Object.freeze({
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard Geral', icon: LayoutDashboard },
   { key: 'clientes', label: 'Base de Clientes', icon: Users },
-  { key: 'reinf', label: 'REINF', icon: FileSpreadsheet },
+  { key: 'reinf', label: 'Distribuição de Lucro', icon: FileSpreadsheet },
   { key: 'ecd', label: 'ECD / ECF', icon: BookOpenCheck },
   { key: 'relatorios', label: 'Relatórios', icon: FileDown },
   { key: 'usuarios', label: 'Gestão de Usuários', icon: UserCog, permission: PERMISSIONS.USERS_MANAGE },
@@ -179,7 +179,7 @@ const NAV_ITEMS = [
 const PAGE_DESCRIPTIONS = {
   dashboard: 'Visão geral da carteira contábil',
   clientes: 'Controle dos clientes, competências e obrigações',
-  reinf: 'Acompanhamento de recibos e envio da REINF',
+  reinf: 'Preparação e envio da distribuição de lucro ao setor fiscal',
   ecd: 'Controle das obrigações anuais e responsáveis',
   relatorios: 'Relatórios operacionais e exportação',
   usuarios: 'Gestão dos usuários do portal',
@@ -234,8 +234,8 @@ const ALERT_FILTER_LABELS = {
   atraso: 'Clientes em atraso',
   critico: 'Situação crítica',
   tecnica: 'Pendência técnica',
-  reinf: 'REINF pendente',
-  recibo_reinf: 'Recibo REINF pendente',
+  reinf: 'Distribuição de lucro pendente',
+  recibo_reinf: 'Comprovante de distribuição de lucro pendente',
   ecd: 'ECD pendente',
   ecd_envio: 'Aguardando envio da ECD',
   ecd_responsavel: 'Responsável ECD pendente',
@@ -316,7 +316,7 @@ const EDIT_MODAL_HIDDEN_GROUPS = new Set([
 ]);
 
 const EDIT_MODAL_FIELD_LABEL_OVERRIDES = {
-  data_enviada_reinf: 'Data de entrega de REINF',
+  data_enviada_reinf: 'Data enviada da distribuição de lucro',
   precisa_ata: 'Precisa de ata',
   ata_entregue: 'Ata entregue',
   data_entrega_ata: 'Data de entrega da ata',
@@ -1704,8 +1704,8 @@ function getClientAlertSignals(client) {
       tone: 'danger',
     },
     isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
-    isReinfPendente(client) && { key: 'reinf', label: 'REINF pendente', tone: 'warning' },
-    isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Recibo REINF pendente', tone: 'warning' },
+    isReinfPendente(client) && { key: 'reinf', label: 'Distribuição de lucro pendente', tone: 'warning' },
+    isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Comprovante de distribuição de lucro pendente', tone: 'warning' },
     isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
     isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
@@ -1729,8 +1729,8 @@ function getClientAlerts(client) {
   return getClientAlertSignals(client);
 }
 const PENDENCIA_ACTION_BY_SIGNAL = {
-  reinf: { key: 'reinf', area: 'REINF', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da REINF.' },
-  recibo_reinf: { key: 'reinf', area: 'REINF', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar recibo da REINF.' },
+  reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da distribuição de lucro.' },
+  recibo_reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar comprovante da distribuição de lucro.' },
   ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
   ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
   ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Media', nextAction: 'Definir responsável pela ECD.' },
@@ -3159,7 +3159,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   const actions = [
     { key: 'clientes', label: 'Base de Clientes', icon: Users, accent: 'text-sky-500', accentBg: 'bg-sky-500/10', route: 'clientes' },
     { key: 'ecd', label: 'ECD / ECF', icon: BookOpenCheck, accent: 'text-cyan-500', accentBg: 'bg-cyan-500/10', route: 'ecd' },
-    { key: 'reinf', label: 'REINF', icon: FileSpreadsheet, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10', route: 'reinf' },
+    { key: 'reinf', label: 'Distribuição de Lucro', icon: FileSpreadsheet, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10', route: 'reinf' },
     { key: 'relatorios', label: 'Relatórios', icon: FileDown, accent: 'text-violet-500', accentBg: 'bg-violet-500/10', route: 'relatorios' },
   ];
 
@@ -4606,7 +4606,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       <div className="mx-auto my-6 max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-gray-700 dark:bg-gray-900">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparação REINF</p>
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparação da Distribuição de Lucro</p>
             <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-gray-100">{getClientDisplayName(client)}</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">{formatCnpj(client.cnpj)}</p>
           </div>
@@ -4614,7 +4614,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
             type="button"
             onClick={onClose}
             className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
-            aria-label="Fechar modal REINF"
+            aria-label="Fechar modal de distribuição de lucro"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -5028,8 +5028,8 @@ function ReinfPage({
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
-        title="REINF"
-        description="Acompanhamento do envio da REINF e dos comprovantes anexados."
+        title="Distribuição de Lucro"
+        description="Preparação e envio da distribuição de lucro ao setor fiscal."
         right={(
           <>
             <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
@@ -5054,7 +5054,7 @@ function ReinfPage({
         <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
-              REINF aberto a partir da triagem operacional:
+              Distribuição de Lucro aberta a partir da triagem operacional:
               {' '}
               <span className="font-black text-slate-900 dark:text-gray-100">{focusedClientLabel || 'cliente selecionado'}</span>
             </p>
@@ -5075,7 +5075,7 @@ function ReinfPage({
       <section className="surface-card p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de REINF</h2>
+            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de Distribuição de Lucro</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
             <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Localize clientes por nome, razão social ou CNPJ.</p>
           </div>
@@ -5712,11 +5712,11 @@ function ReportsPage({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Histórico REINF
+              Histórico de Distribuição de Lucro
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatórios REINF por empresa</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatórios de Distribuição de Lucro por empresa</h2>
             <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
-              Cada linha representa um relatório salvo pelo modal da REINF, com exportação individual em Excel, CSV ou PDF.
+              Cada linha representa um relatório salvo pelo modal de distribuição de lucro, com exportação individual em Excel, CSV ou PDF.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -5751,7 +5751,7 @@ function ReportsPage({
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 dark:divide-gray-800 dark:text-gray-200">
                 {visibleReinfRelatorioCards.map(({ relatorio, exportRows }) => {
-                  const title = `Relatório REINF - ${relatorio.razao_social || relatorio.nome_identificacao || 'Cliente'}`;
+                  const title = `Relatório de Distribuição de Lucro - ${relatorio.razao_social || relatorio.nome_identificacao || 'Cliente'}`;
                   const key = relatorio.id || `${relatorio.cliente_id}-${relatorio.criado_em}`;
 
                   return (
@@ -5832,7 +5832,7 @@ function ReportsPage({
           </div>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-400">
-            Nenhum relatório REINF salvo até o momento.
+            Nenhum relatório de distribuição de lucro salvo até o momento.
           </div>
         )}
       </section>
@@ -8016,7 +8016,7 @@ export default function App() {
     const valorNovo = anexoToFieldValue(anexo);
 
     function getOrigemAnexoByPage() {
-      if (page === 'reinf') return 'REINF';
+      if (page === 'reinf') return 'Distribuição de Lucro';
       if (page === 'ecd') return 'ECD / ECF';
       if (page === 'detalhe') return 'Detalhe do Cliente';
       return 'Base de Clientes';
@@ -8073,7 +8073,7 @@ export default function App() {
   }
 
   async function salvarRelatorioReinf(payload) {
-    if (!ensureSupabaseWriteReady('salvar o relatório REINF')) return false;
+    if (!ensureSupabaseWriteReady('salvar o relatório de distribuição de lucro')) return false;
     try {
       const saved = await salvarReinfRelatorioSupabase(payload);
       if (saved?.id) {
@@ -8083,13 +8083,13 @@ export default function App() {
         ]);
       }
       setToast({
-        title: 'Relatório REINF salvo',
+        title: 'Relatório de distribuição de lucro salvo',
         message: saved?.razao_social || saved?.nome_identificacao || 'Historico atualizado.',
       });
       return saved || true;
     } catch (error) {
       setToast({
-        title: 'Falha ao salvar relatório REINF',
+        title: 'Falha ao salvar relatório de distribuição de lucro',
         message: error.message || 'Não foi possível salvar o relatório agora.',
       });
       return false;
@@ -8097,30 +8097,30 @@ export default function App() {
   }
 
   async function excluirRelatorioReinf(relatorio) {
-    if (!ensureSupabaseWriteReady('excluir o relatorio REINF')) return false;
+    if (!ensureSupabaseWriteReady('excluir o relatorio de distribuicao de lucro')) return false;
     if (!relatorio?.id) {
       setToast({
-        title: 'Relatorio REINF invalido',
+        title: 'Relatorio de distribuicao de lucro invalido',
         message: 'Nao foi possivel identificar o relatorio para exclusao.',
       });
       return false;
     }
 
     const clienteNome = relatorio.razao_social || relatorio.nome_identificacao || 'este cliente';
-    const confirmed = window.confirm(`Excluir o relatorio REINF de ${clienteNome}? Esta acao nao pode ser desfeita.`);
+    const confirmed = window.confirm(`Excluir o relatorio de distribuicao de lucro de ${clienteNome}? Esta acao nao pode ser desfeita.`);
     if (!confirmed) return false;
 
     try {
       const deleted = await excluirReinfRelatorioSupabase(relatorio.id);
       setReinfRelatorios((current) => current.filter((item) => item.id !== relatorio.id));
       setToast({
-        title: 'Relatorio REINF excluido',
+        title: 'Relatorio de distribuicao de lucro excluido',
         message: deleted?.razao_social || deleted?.nome_identificacao || 'Historico atualizado.',
       });
       return true;
     } catch (error) {
       setToast({
-        title: 'Falha ao excluir relatorio REINF',
+        title: 'Falha ao excluir relatorio de distribuicao de lucro',
         message: error.message || 'Nao foi possivel excluir o relatorio agora.',
       });
       return false;
@@ -8128,17 +8128,17 @@ export default function App() {
   }
 
   async function enviarEmailReinf(payload) {
-    if (!ensureSupabaseWriteReady('enviar o e-mail REINF')) return false;
+    if (!ensureSupabaseWriteReady('enviar o e-mail de distribuição de lucro')) return false;
     try {
       const sent = await enviarReinfEmailSupabase(payload);
       setToast({
-        title: 'E-mail REINF enviado',
+        title: 'E-mail de distribuição de lucro enviado',
         message: 'Mensagem enviada para o setor fiscal.',
       });
       return sent || true;
     } catch (error) {
       setToast({
-        title: 'Falha ao enviar e-mail REINF',
+        title: 'Falha ao enviar e-mail de distribuição de lucro',
         message: error.message || 'Não foi possível enviar o e-mail agora.',
       });
       return false;
