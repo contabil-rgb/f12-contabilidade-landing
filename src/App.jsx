@@ -1813,31 +1813,32 @@ function ReinfSocioDropdownCell({ client, selectedSocioByClientId, onSelect }) {
 
   if (!socios.length) {
     return (
-      <select
+      <DropdownFilterSelect
+        label=""
         value=""
+        options={[]}
+        includeBlank
+        emptyLabel="Sem sócio"
         disabled
-        className="input-shell reinf-socio-select h-10 text-sm"
-        aria-label="Sócio da empresa"
-      >
-        <option value="">Sem sócio</option>
-      </select>
+        labelClassName="block"
+        buttonClassName="input-shell reinf-socio-select h-10 text-sm"
+      />
     );
   }
 
   return (
-    <select
+    <DropdownFilterSelect
+      label=""
       value={value}
-      onClick={(event) => event.stopPropagation()}
-      onChange={(event) => onSelect?.(clientKey, event.target.value)}
-      className="input-shell reinf-socio-select h-10 text-sm"
-      aria-label={`Sócio de ${client?.nome_identificacao || client?.razao_social || 'cliente'}`}
-    >
-      {socios.map((socio, index) => (
-        <option key={getReinfSocioOptionKey(socio, index)} value={getReinfSocioOptionKey(socio, index)}>
-          {socio.nome || 'Sócio sem nome'}
-        </option>
-      ))}
-    </select>
+      options={socios.map((socio, index) => ({
+        value: getReinfSocioOptionKey(socio, index),
+        label: socio.nome || 'Sócio sem nome',
+      }))}
+      onChange={(nextValue) => onSelect?.(clientKey, nextValue)}
+      includeBlank={false}
+      labelClassName="block"
+      buttonClassName="input-shell reinf-socio-select h-10 text-sm"
+    />
   );
 }
 
@@ -3757,22 +3758,17 @@ function BaseClientesPage(props) {
               </button>
             </div>
 
-            <label className="mt-5 block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-              Novo responsável
-              <select
-                value={batchResponsavelValue}
-                onChange={(event) => setBatchResponsavelValue(event.target.value)}
-                disabled={batchResponsavelBusy}
-                className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              >
-                <option value="">Selecione um responsável ativo</option>
-                {activeResponsavelOptions.map((responsavel) => (
-                  <option key={responsavel} value={responsavel}>
-                    {responsavel}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <DropdownFilterSelect
+              label="Novo responsável"
+              value={batchResponsavelValue}
+              options={activeResponsavelOptions}
+              onChange={setBatchResponsavelValue}
+              includeBlank
+              emptyLabel="Selecione um responsável ativo"
+              disabled={batchResponsavelBusy}
+              labelClassName="mt-5 block text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
+              buttonClassName="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
 
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               A alteração atualiza somente o campo responsável dos clientes selecionados e registra histórico para auditoria.
@@ -3891,17 +3887,21 @@ function DropdownFilterSelect({
   options,
   onChange,
   includeBlank = true,
+  emptyLabel,
+  disabled = false,
+  disabledReason,
   labelClassName = 'text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400',
   buttonClassName = 'select-shell mt-1 normal-case',
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const blankLabel = emptyLabel ?? (includeBlank ? 'Todos' : 'Não informado');
   const normalizedOptions = [
-    ...(includeBlank ? [{ value: '', label: 'Todos' }] : []),
+    ...(includeBlank ? [{ value: '', label: blankLabel }] : []),
     ...options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option)),
   ];
   const selectedOption = normalizedOptions.find((option) => option.value === value);
-  const selectedLabel = selectedOption?.label ?? 'Todos';
+  const selectedLabel = selectedOption?.label ?? blankLabel;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -3927,6 +3927,7 @@ function DropdownFilterSelect({
   }, [open]);
 
   function handleSelect(nextValue) {
+    if (disabled) return;
     onChange(nextValue);
     setOpen(false);
   }
@@ -3936,8 +3937,13 @@ function DropdownFilterSelect({
       <span>{label}</span>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
-        className={`${buttonClassName} flex items-center justify-between gap-2 text-left`}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!disabled) setOpen((current) => !current);
+        }}
+        disabled={disabled}
+        title={disabled ? disabledReason : undefined}
+        className={`${buttonClassName} flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -3957,7 +3963,10 @@ function DropdownFilterSelect({
                 type="button"
                 role="option"
                 aria-selected={selected}
-                onClick={() => handleSelect(option.value)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelect(option.value);
+                }}
                 className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
               >
                 <span className="truncate">{option.label}</span>
@@ -4327,22 +4336,20 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-              <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                Adicionar sócio
-                <select
-                  value={socioToAdd}
-                  onChange={(event) => setSocioToAdd(event.target.value)}
-                  disabled={!availableSociosToAdd.length}
-                  className="form-control-shell mt-1 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {!availableSociosToAdd.length ? <option value="">Todos os sócios já foram incluídos</option> : null}
-                  {availableSociosToAdd.map(({ socio, socioKey }) => (
-                    <option key={socioKey} value={socioKey}>
-                      {socio.nome || 'Sócio sem nome'}{socio.cpf ? ` - ${formatCpfInput(socio.cpf)}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <DropdownFilterSelect
+                label="Adicionar sócio"
+                value={socioToAdd}
+                options={availableSociosToAdd.map(({ socio, socioKey }) => ({
+                  value: socioKey,
+                  label: `${socio.nome || 'Sócio sem nome'}${socio.cpf ? ` - ${formatCpfInput(socio.cpf)}` : ''}`,
+                }))}
+                onChange={setSocioToAdd}
+                includeBlank={!availableSociosToAdd.length}
+                emptyLabel="Todos os sócios já foram incluídos"
+                disabled={!availableSociosToAdd.length}
+                labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
+                buttonClassName="form-control-shell mt-1 disabled:cursor-not-allowed disabled:opacity-70"
+              />
               <button
                 type="button"
                 onClick={addReportSocio}
@@ -4358,22 +4365,20 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
             <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e período</h3>
             <div className="mt-4 grid gap-3 lg:grid-cols-[220px_180px_minmax(0,1fr)]">
-              <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                Periodicidade
-                <select
-                  value={periodicidade}
-                  onChange={(event) => {
-                    setPeriodicidade(event.target.value);
-                    setPeriodicidadeManual(true);
-                    setCopied(false);
-                    setCopyStatus('');
-                  }}
-                  className="form-control-shell mt-1"
-                >
-                  <option value="Mensal">Mensal</option>
-                  <option value="Trimestral">Trimestral</option>
-                </select>
-              </label>
+              <DropdownFilterSelect
+                label="Periodicidade"
+                value={periodicidade}
+                options={['Mensal', 'Trimestral']}
+                onChange={(nextValue) => {
+                  setPeriodicidade(nextValue);
+                  setPeriodicidadeManual(true);
+                  setCopied(false);
+                  setCopyStatus('');
+                }}
+                includeBlank={false}
+                labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
+                buttonClassName="form-control-shell mt-1"
+              />
               <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
                 Ano de referência
                 <input
@@ -4785,28 +4790,18 @@ function ReinfPage({
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
-            Responsável
-            <select value={filters.responsavel} onChange={(event) => updateFilter({ responsavel: event.target.value })} className="input-shell mt-1 h-10 normal-case">
-              <option value="">Todos</option>
-              {uniqueValues(clients.map((client) => client.responsavel)).map((responsavel) => (
-                <option key={responsavel} value={responsavel}>
-                  {responsavel}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
-            Revisor
-            <select value={filters.revisor} onChange={(event) => updateFilter({ revisor: event.target.value })} className="input-shell mt-1 h-10 normal-case">
-              <option value="">Todos</option>
-              {uniqueValues(clients.map((client) => client.revisor)).map((revisor) => (
-                <option key={revisor} value={revisor}>
-                  {revisor}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FilterSelect
+            label="Responsável"
+            value={filters.responsavel}
+            options={uniqueValues(clients.map((client) => client.responsavel))}
+            onChange={(value) => updateFilter({ responsavel: value })}
+          />
+          <FilterSelect
+            label="Revisor"
+            value={filters.revisor}
+            options={uniqueValues(clients.map((client) => client.revisor))}
+            onChange={(value) => updateFilter({ revisor: value })}
+          />
         </div>
       </section>
 
@@ -5940,26 +5935,24 @@ function UserModal({ user, users, onClose, onSave }) {
             <AuthTextField label="E-mail profissional" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} disabled />
             <AuthTextField label="Cargo / funcao" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} />
             <AuthTextField label="Setor" value={form.setor} onChange={(value) => setForm((current) => ({ ...current, setor: value }))} />
-            <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-              Perfil de acesso
-              <select value={form.perfil_acesso} onChange={(event) => setForm((current) => ({ ...current, perfil_acesso: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                {ACCESS_PROFILE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-              Status
-              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                {USER_STATUS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <DropdownFilterSelect
+              label="Perfil de acesso"
+              value={form.perfil_acesso}
+              options={ACCESS_PROFILE_OPTIONS}
+              onChange={(nextValue) => setForm((current) => ({ ...current, perfil_acesso: nextValue }))}
+              includeBlank={false}
+              labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
+              buttonClassName="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+            <DropdownFilterSelect
+              label="Status"
+              value={form.status}
+              options={USER_STATUS}
+              onChange={(nextValue) => setForm((current) => ({ ...current, status: nextValue }))}
+              includeBlank={false}
+              labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
+              buttonClassName="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -6406,20 +6399,18 @@ function FormField({
     return (
       <label className="text-xs font-black uppercase tracking-normal text-slate-500">
         {label}
-        <select
+        <DropdownFilterSelect
+          label=""
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          options={options}
+          onChange={onChange}
+          includeBlank
+          emptyLabel="Não informado"
           disabled={computedDisabled}
-          title={computedDisabled ? computedDisabledReason : undefined}
-          className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
-        >
-          <option value="">Não informado</option>
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          disabledReason={computedDisabledReason}
+          labelClassName="block"
+          buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+        />
         {computedDisabledReason ? (
           <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
         ) : null}
