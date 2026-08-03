@@ -85,7 +85,6 @@ export default function UsersPage({
     <div className="min-w-0 space-y-5">
       <SurfacePanel
         title="Usuários institucionais"
-        description="Perfis sincronizados com o Supabase para gestão real do acesso ao portal."
         right={<span className="pill-shell">{users.length} usuário(s) sincronizado(s)</span>}
       />
 

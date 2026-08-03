@@ -3323,9 +3323,6 @@ function SearchAndFilters({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
-              <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
-                Localize clientes por nome, CNPJ ou razão social.
-              </p>
             </div>
             <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-black text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
@@ -3350,9 +3347,6 @@ function SearchAndFilters({
               {activeFilterItems.length
                 ? `${formatNumber(activeFilterItems.length)} filtro(s) ativo(s) nesta carteira`
                 : 'Nenhum filtro manual ativo no momento.'}
-            </p>
-            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-gray-400">
-              Ajuste a triagem e revise a carteira sem perder o contexto da listagem.
             </p>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
@@ -3418,9 +3412,6 @@ function SearchAndFilters({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-gray-800">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
-            <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
-              Refine a listagem por acompanhamento, perfil e operação da base.
-            </p>
           </div>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             {activeFilterItems.length ? `${formatNumber(activeFilterItems.length)} ativo(s)` : 'Sem filtros'}
@@ -3454,12 +3445,6 @@ function SearchAndFilters({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold text-slate-500 dark:text-gray-400">
-        <p>Clique no cliente para abrir o detalhe completo ou use os botões da última coluna para editar e inativar.</p>
-        <p className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          Visual pensado para triagem rápida
-        </p>
-      </div>
     </SurfacePanel>
   );
 }
@@ -4573,9 +4558,6 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Sócios no relatório</h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                  Inclua um ou mais sócios e informe valores específicos para cada um.
-                </p>
               </div>
               <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500 dark:border-gray-700 dark:text-gray-300">
                 {reportSociosHydrated.length} sócio(s)
@@ -4649,7 +4631,6 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                 <span>
                   Mês com R$ 50.000,00 ou acima: mensal. Mês abaixo de R$ 50.000,00: trimestral.
                 </span>
-                <span className="mt-1 block text-xs text-slate-500 dark:text-gray-400">Sugestão atual: {suggestedPeriodicity}</span>
               </div>
             </div>
 
@@ -4742,7 +4723,6 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Mensagem para o setor fiscal</h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">O assunto, o texto e a tabela acompanham os campos acima e podem ser copiados para o e-mail.</p>
               </div>
               <button
                 type="button"
@@ -4854,9 +4834,6 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
         </div>
 
         <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
-          <p className="w-full text-xs font-semibold leading-relaxed text-slate-500 dark:text-gray-400">
-            Esta etapa prepara a mensagem. O envio ocorre apenas ao clicar em Enviar e-mail.
-          </p>
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="min-h-4 text-left sm:min-w-[150px] sm:text-right">
               {sendStatus ? (
@@ -5025,7 +5002,6 @@ function ReinfPage({
           <div>
             <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de Distribuição de Lucro</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Localize clientes por nome, razão social ou CNPJ.</p>
           </div>
           <button
             type="button"
@@ -5242,7 +5218,6 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
           <div>
             <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Controle de ECD / ECF</h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{formatNumber(rows.length)} cliente(s) conforme os filtros aplicados.</p>
-            <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">Separe rapidamente por situação, responsável e comprovantes pendentes.</p>
           </div>
           <button
             type="button"
@@ -6474,7 +6449,6 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-base font-black text-slate-950">Sócios da Empresa</h3>
-          <p className="mt-1 text-xs font-semibold text-slate-500">Cadastre nome e CPF dos sócios vinculados ao cliente.</p>
         </div>
         <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500">
           {normalizedSocios.length} sócio(s)
@@ -6645,11 +6619,6 @@ function FormField({
           placeholder="Cole um link ou identificador do anexo"
           className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
         />
-        <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">
-          {canUpload
-            ? 'Upload real via Supabase Storage privado. Links de visualização são temporários.'
-            : 'Salve primeiro o cliente no Supabase para anexar arquivos.'}
-        </span>
       </div>
     );
   }
