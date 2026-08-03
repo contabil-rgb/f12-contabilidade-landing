@@ -103,9 +103,14 @@ export function canEditClientField(user, fieldKey) {
 export function canEditClient(user, client) {
   if (!canViewClient(user, client)) return false;
   if (can(user, PERMISSIONS.CLIENTS_EDIT_ALL)) return true;
-  return [...STATUS_CLIENT_FIELDS, ...OPERATIONAL_CLIENT_FIELDS, ...SIMPLE_OPERATIONAL_CLIENT_FIELDS].some((field) =>
-    canEditClientField(user, field),
-  );
+  const editableFields = [
+    'responsavel',
+    'revisor',
+    ...STATUS_CLIENT_FIELDS,
+    ...OPERATIONAL_CLIENT_FIELDS,
+    ...SIMPLE_OPERATIONAL_CLIENT_FIELDS,
+  ];
+  return editableFields.some((field) => canEditClientField(user, field));
 }
 
 export function deniedReasonForField(user, fieldKey) {
