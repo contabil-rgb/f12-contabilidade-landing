@@ -3813,26 +3813,6 @@ function BaseClientesPage(props) {
   const [batchResponsavelOpen, setBatchResponsavelOpen] = useState(false);
   const [batchResponsavelValue, setBatchResponsavelValue] = useState('');
   const [batchResponsavelBusy, setBatchResponsavelBusy] = useState(false);
-  const acompanhamentoMetrics = [
-    {
-      key: 'comunicacao',
-      title: 'Comunicação pendente',
-      value: countWhere(props.clients, (client) => isComunicacaoPendente(client)),
-      detail: 'Clientes com comunicação pendente registrada',
-      icon: Mail,
-      tone: 'info',
-      patch: { alerta: 'comunicacao' },
-    },
-    {
-      key: 'retorno',
-      title: 'Aguardando retorno',
-      value: countWhere(props.clients, (client) => isAguardandoRetorno(client)),
-      detail: 'Clientes notificados sem retorno concluído',
-      icon: Mail,
-      tone: 'warning',
-      patch: { alerta: 'retorno' },
-    },
-  ];
 
   const activeFilterCount = useMemo(
     () => Object.entries(props.filters || {}).reduce((count, [key, value]) => {
@@ -3842,14 +3822,6 @@ function BaseClientesPage(props) {
     }, 0),
     [props.filters],
   );
-
-  function applyAlertFilter(patch) {
-    props.setFilters((current) => ({
-      ...current,
-      ...patch,
-    }));
-    props.onManualFilter?.();
-  }
 
   const canSelectClientForBatch = (client) => Boolean(props.canBatchUpdateResponsavel?.(client));
   const selectedClientIdSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
@@ -3902,7 +3874,7 @@ function BaseClientesPage(props) {
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="Base de Clientes"
-        description="Carteira central com filtros rápidos, alertas visíveis e atalhos para edição."
+        description="Carteira central com filtros rápidos e atalhos para edição."
         right={(
           <>
             <span className="pill-shell">{formatNumber(props.clients.length)} cliente(s) visível(is)</span>
@@ -3913,17 +3885,6 @@ function BaseClientesPage(props) {
         )}
       />
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {acompanhamentoMetrics.map((metric) => (
-          <MetricCard
-            key={metric.key}
-            title={metric.title}
-            value={metric.value}
-            detail={metric.detail}
-            icon={metric.icon}
-            tone={metric.tone}
-            onClick={() => applyAlertFilter(metric.patch)}
-          />
-        ))}
         <MetricCard
           title="Carteira exibida"
           value={props.clients.length}
