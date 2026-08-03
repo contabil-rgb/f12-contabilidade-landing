@@ -5390,8 +5390,13 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   );
 }
 
+function isInteractiveTableClick(target) {
+  return Boolean(target?.closest?.('button, a, input, select, textarea, label, [role="button"], [data-row-click-ignore="true"]'));
+}
+
 function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels = {}, tableClassName = 'min-w-[920px] xl:min-w-[1080px]' }) {
   const hasTrailingColumn = typeof trailing === 'function';
+  const canOpenRow = typeof onView === 'function';
 
   return (
     <>
@@ -5413,7 +5418,14 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
           </thead>
           <tbody>
             {rows.map((client) => (
-              <tr key={client.id} className="table-row">
+              <tr
+                key={client.id}
+                onClick={(event) => {
+                  if (!canOpenRow || isInteractiveTableClick(event.target)) return;
+                  onView(client.id);
+                }}
+                className={`table-row ${canOpenRow ? 'cursor-pointer' : ''}`}
+              >
                 {columns.map((column) => (
                   <td key={column} className="table-cell">
                     {renderCell?.(client, column) ?? (column === 'nome_identificacao' ? (
