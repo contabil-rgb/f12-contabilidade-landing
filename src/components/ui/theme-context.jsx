@@ -4,9 +4,10 @@ const STORAGE_KEY = 'portal-theme-preference';
 const ThemeContext = createContext(null);
 
 function readInitialTheme() {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'dark';
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'dark' ? 'dark' : 'light';
+  if (stored === 'light' || stored === 'dark') return stored;
+  return 'dark';
 }
 
 export function ThemeProvider({ children }) {
