@@ -309,6 +309,14 @@ const EDIT_MODAL_HIDDEN_FIELDS = new Set([
   'precisa_ata',
   'ata_entregue',
   'data_entrega_ata',
+  'revisado_coordenador',
+  'lancamentos_padrao',
+  'motivo_atraso',
+  'pendencia_tecnica',
+  'cliente_notificado',
+  'data_notificacao_cliente',
+  'status_retorno_cliente',
+  'data_retorno_cliente',
 ]);
 
 const EDIT_MODAL_HIDDEN_GROUPS = new Set([
