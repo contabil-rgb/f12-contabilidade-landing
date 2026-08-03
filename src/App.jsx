@@ -5360,7 +5360,17 @@ function ReportsPage({
   );
   const obrigacaoOptions = ['ECD', 'ECF'];
   const situacaoOptions = ['Entregues/Concluidos', 'Pendentes/Sem anexo'];
-  const previewRows = reportScope.slice(0, 5);
+  const baseClientesReportRows = reportScope.filter((client) => {
+    const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
+    const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
+    return responsavelOk && regimeOk;
+  });
+  const currentReportRows = selectedReportType === 'clientes' ? baseClientesReportRows : [];
+  const currentReportExportRows = selectedReportType === 'clientes' ? buildBaseCompletaClientesRows(currentReportRows) : [];
+  const previewRows = currentReportRows.slice(0, 10);
+  const canGenerateReportPreview = selectedReportType === 'clientes';
+  const canDownloadCurrentReport = canGenerateReportPreview && canExport && currentReportExportRows.length > 0;
+  const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
 
   function updateReportFilter(key, value) {
     setReportFilters((current) => ({ ...current, [key]: value }));
@@ -5385,6 +5395,25 @@ function ReportsPage({
       situacao: '',
       meses: [],
     });
+  }
+
+  function handleGeneratePreview() {
+    if (!canGenerateReportPreview) return;
+    setPreviewGeneratedAt(new Date());
+  }
+
+  function exportCurrentReport(format) {
+    if (!canDownloadCurrentReport) return;
+    const filenameBase = 'relatorio-base-clientes';
+    if (format === 'xlsx') {
+      onExportXlsx(currentReportExportRows, `${filenameBase}.xlsx`);
+      return;
+    }
+    if (format === 'csv') {
+      onExportCsv(currentReportExportRows, `${filenameBase}.csv`);
+      return;
+    }
+    onExportPdf(currentReportExportRows, `${filenameBase}.pdf`, 'Relatorio - Base de Clientes');
   }
 
   function renderReportFilters() {
@@ -5571,36 +5600,69 @@ function ReportsPage({
               Previa
             </p>
             <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Pre-visualizacao do relatorio</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">
+              {canGenerateReportPreview
+                ? `${formatNumber(currentReportRows.length)} cliente(s) neste relatorio.`
+                : 'Este relatorio sera conectado em uma proxima etapa.'}
+            </p>
+            {previewGeneratedAt && canGenerateReportPreview ? (
+              <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                Previa gerada em {previewGeneratedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-black text-slate-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500"
+              onClick={handleGeneratePreview}
+              disabled={!canGenerateReportPreview}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300 dark:disabled:border-gray-800 dark:disabled:bg-gray-900 dark:disabled:text-gray-500"
             >
               <Eye size={15} aria-hidden="true" />
               Gerar previa
             </button>
             <button
               type="button"
-              disabled
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-black text-slate-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500"
+              onClick={() => exportCurrentReport('pdf')}
+              disabled={!canDownloadCurrentReport}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-blue px-4 py-2 text-sm font-black text-white transition hover:bg-[#0056d6] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-gray-900 dark:disabled:text-gray-500"
             >
               <Download size={15} aria-hidden="true" />
-              Baixar
+              PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => exportCurrentReport('xlsx')}
+              disabled={!canDownloadCurrentReport}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300 dark:disabled:border-gray-800 dark:disabled:bg-gray-900 dark:disabled:text-gray-500"
+            >
+              <FileSpreadsheet size={15} aria-hidden="true" />
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => exportCurrentReport('csv')}
+              disabled={!canDownloadCurrentReport}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300 dark:disabled:border-gray-800 dark:disabled:bg-gray-900 dark:disabled:text-gray-500"
+            >
+              <FileDown size={15} aria-hidden="true" />
+              CSV
             </button>
           </div>
         </div>
 
         <TableScrollArea className="mt-5">
-          <table className="min-w-full text-left text-sm">
+          <table className="min-w-[980px] text-left text-sm">
             <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
               <tr>
                 <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Razao social</th>
                 <th className="px-4 py-3">CNPJ</th>
                 <th className="px-4 py-3">Responsavel</th>
+                <th className="px-4 py-3">Revisor</th>
                 <th className="px-4 py-3">Regime</th>
-                <th className="px-4 py-3">Origem</th>
+                <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Atividade</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
@@ -5608,15 +5670,18 @@ function ReportsPage({
                 previewRows.map((client) => (
                   <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
                     <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.cnpj || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.razao_social || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
                     <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.revisor || '-'}</td>
                     <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{selectedReport.label}</td>
+                    <td className="px-4 py-3 font-semibold">{client.tipo_cliente || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.atividades || '-'}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
                     Nenhum registro disponivel para pre-visualizacao.
                   </td>
                 </tr>
@@ -8602,4 +8667,3 @@ export default function App() {
     </>
   );
 }
-
