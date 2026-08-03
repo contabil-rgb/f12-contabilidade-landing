@@ -2612,14 +2612,14 @@ function AppShell({
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-gray-100">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-900/10 bg-[#0c1528] text-white dark:border-gray-800 dark:bg-gray-950 lg:block xl:w-72">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-5 py-5 dark:border-gray-800 xl:px-6 xl:py-6">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 overflow-y-auto overflow-x-hidden border-r border-slate-900/10 bg-[#0c1528] text-white dark:border-gray-800 dark:bg-gray-950 lg:block xl:w-64 2xl:w-72 sidebar-scroll">
+        <div className="flex min-h-full flex-col">
+          <div className="border-b border-white/10 px-4 py-4 dark:border-gray-800 xl:px-5 2xl:px-6 2xl:py-6">
             <div className="flex items-center gap-3">
               <img
                 src={f12Logo}
                 alt="F12 Contabilidade Estratégica"
-                className="h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left xl:h-14 xl:w-40"
+                className="h-11 w-32 rounded-lg bg-[#080c2b] object-contain object-left xl:h-12 xl:w-36 2xl:h-14 2xl:w-40"
               />
               <div className="sr-only">
                 <p>Portal Contábil</p>
@@ -2628,16 +2628,16 @@ function AppShell({
             </div>
           </div>
 
-          <nav className="flex-1 space-y-4 overflow-auto px-3 py-4 xl:space-y-5 xl:px-4 xl:py-5" aria-label="Navegação principal">
+          <nav className="flex-1 space-y-3 px-3 py-3 xl:px-4 2xl:space-y-5 2xl:py-5" aria-label="Navegação principal">
             {groupedNav.map((group) => (
-              <div key={group.title} className="space-y-1.5">
-                <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{group.title}</p>
+              <div key={group.title} className="space-y-1 2xl:space-y-1.5">
+                <p className="px-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-500 2xl:text-[11px]">{group.title}</p>
                 {group.items.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
                     type="button"
                     onClick={() => setPage(key)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-bold transition 2xl:gap-3 2xl:py-2.5 2xl:text-sm ${
                       page === key ? 'bg-brand-blue text-white shadow-sm shadow-blue-950/20' : 'text-slate-300 hover:bg-white/10 hover:text-white dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
                     }`}
                   >
@@ -2649,36 +2649,36 @@ function AppShell({
             ))}
           </nav>
 
-          <div className="border-t border-white/10 p-4 dark:border-gray-800 xl:p-5">
-            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-4 dark:border-gray-800 dark:bg-gray-900">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Usuário conectado</p>
-              <p className="mt-2 truncate text-sm font-black">{currentUser?.nome ?? 'Sessão em validação'}</p>
+          <div className="border-t border-white/10 p-3 dark:border-gray-800 xl:p-4 2xl:p-5">
+            <div className="mb-2.5 rounded-lg border border-white/10 bg-white/5 p-3 dark:border-gray-800 dark:bg-gray-900 2xl:mb-3 2xl:p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 2xl:text-xs">Usuário conectado</p>
+              <p className="mt-1.5 truncate text-sm font-black 2xl:mt-2">{currentUser?.nome ?? 'Sessão em validação'}</p>
               <p className="mt-1 truncate text-xs text-slate-400">{profile.label}</p>
               <button
                 type="button"
                 onClick={onLogout}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white hover:text-slate-950 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-100 dark:hover:text-gray-950"
+                className="mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white hover:text-slate-950 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-100 dark:hover:text-gray-950 2xl:mt-3"
               >
                 <LogOut size={15} aria-hidden="true" />
                 Sair
               </button>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4 dark:border-gray-800 dark:bg-gray-900">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Base carregada</p>
-              <p className="mt-2 text-2xl font-black">{formatNumber(totalClientes)}</p>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 dark:border-gray-800 dark:bg-gray-900 2xl:p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 2xl:text-xs">Base carregada</p>
+              <p className="mt-1.5 text-2xl font-black 2xl:mt-2">{formatNumber(totalClientes)}</p>
               <p className="mt-1 text-xs text-slate-400">{getMetadataSourceDisplay(metadata?.source)}</p>
               <p className={`mt-2 text-xs font-bold ${statusToneTextClass}`}>
                 {supabaseStatusLabel}
               </p>
             </div>
-            <div className="mt-3">
+            <div className="mt-2.5 2xl:mt-3">
               <ThemeToggle className="w-full justify-center dark:border-gray-800 dark:bg-gray-900" />
             </div>
           </div>
         </div>
       </aside>
 
-      <div className="min-w-0 lg:pl-64 xl:pl-72">
+      <div className="min-w-0 lg:pl-60 xl:pl-64 2xl:pl-72">
         <header className="z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80 lg:sticky lg:top-0">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-6 xl:px-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="min-w-0">
