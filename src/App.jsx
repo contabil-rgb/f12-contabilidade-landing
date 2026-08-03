@@ -85,7 +85,7 @@ import { AnexosClienteSection } from './components/anexos/AnexosClienteSection';
 import { UploadAnexoButton } from './components/anexos/UploadAnexoButton';
 import ActionButton from './components/ui/ActionButton';
 import AlertBanner from './components/ui/AlertBanner';
-import DataTableShell from './components/ui/DataTableShell';
+import DataTableShell, { TableScrollArea } from './components/ui/DataTableShell';
 import MetricTile, { getMetricPanelToneClass } from './components/ui/MetricTile';
 import StatusBadge from './components/ui/StatusBadge';
 import SurfacePanel from './components/ui/SurfacePanel';
@@ -3687,7 +3687,7 @@ function ClientsTable({
           </span>
         </div>
       </div>
-      <div className="table-scroll-shell overflow-soft border-x-0 border-b-0 rounded-none">
+      <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-3">
         <table className="table-base min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
@@ -3808,7 +3808,7 @@ function ClientsTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
 
       {!clients.length ? (
         <div className="empty-state min-h-64">
@@ -4134,7 +4134,7 @@ function DetailPage({
         ) : !historicoRows.length ? (
           <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma alteração registrada para este cliente.</p>
         ) : (
-          <div className="table-scroll-shell mt-4 overflow-soft">
+          <TableScrollArea className="mt-4">
             <table className="table-base min-w-[860px] lg:min-w-[980px]">
               <thead className="table-head">
                 <tr>
@@ -4176,7 +4176,7 @@ function DetailPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScrollArea>
         )}
       </section>
 
@@ -5408,7 +5408,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
 
   return (
     <>
-      <div className="table-scroll-shell overflow-soft">
+      <TableScrollArea>
         <table className={`table-base ${tableClassName}`}>
           <thead className="table-head">
             <tr>
@@ -5443,7 +5443,7 @@ function DataTable({ rows, columns, onView, trailing, renderCell, columnLabels =
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
       {!rows.length ? (
         <div className="empty-state">
           <Search className="text-slate-300 dark:text-gray-600" size={40} aria-hidden="true" />
