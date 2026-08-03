@@ -2612,14 +2612,14 @@ function AppShell({
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-gray-100">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-900/10 bg-[#0c1528] text-white dark:border-gray-800 dark:bg-gray-950 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-900/10 bg-[#0c1528] text-white dark:border-gray-800 dark:bg-gray-950 lg:block xl:w-72">
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-6 py-6 dark:border-gray-800">
+          <div className="border-b border-white/10 px-5 py-5 dark:border-gray-800 xl:px-6 xl:py-6">
             <div className="flex items-center gap-3">
               <img
                 src={f12Logo}
                 alt="F12 Contabilidade Estratégica"
-                className="h-14 w-40 rounded-lg bg-[#080c2b] object-contain object-left"
+                className="h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left xl:h-14 xl:w-40"
               />
               <div className="sr-only">
                 <p>Portal Contábil</p>
@@ -2628,7 +2628,7 @@ function AppShell({
             </div>
           </div>
 
-          <nav className="flex-1 space-y-5 overflow-auto px-4 py-5" aria-label="Navegação principal">
+          <nav className="flex-1 space-y-4 overflow-auto px-3 py-4 xl:space-y-5 xl:px-4 xl:py-5" aria-label="Navegação principal">
             {groupedNav.map((group) => (
               <div key={group.title} className="space-y-1.5">
                 <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{group.title}</p>
@@ -2649,7 +2649,7 @@ function AppShell({
             ))}
           </nav>
 
-          <div className="border-t border-white/10 p-5 dark:border-gray-800">
+          <div className="border-t border-white/10 p-4 dark:border-gray-800 xl:p-5">
             <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-4 dark:border-gray-800 dark:bg-gray-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Usuário conectado</p>
               <p className="mt-2 truncate text-sm font-black">{currentUser?.nome ?? 'Sessão em validação'}</p>
@@ -2678,26 +2678,26 @@ function AppShell({
         </div>
       </aside>
 
-      <div className="min-w-0 lg:pl-72">
+      <div className="min-w-0 lg:pl-64 xl:pl-72">
         <header className="z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80 lg:sticky lg:top-0">
-          <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
-            <div>
+          <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-6 xl:px-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <div className="min-w-0">
               <img
                 src={f12Logo}
                 alt="F12 Contabilidade Estratégica"
                 className="mb-4 h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left lg:hidden"
               />
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
-              <h1 className={`mt-1 font-black tracking-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
+              <h1 className={`mt-1 max-w-full font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
               <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5 2xl:justify-end">
               <div className="hidden xl:block">
                 <div ref={searchRef} className="relative">
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
                   <input
-                    className="input-shell w-80 pl-9"
+                    className="input-shell w-72 pl-9 2xl:w-80"
                     value={globalQuery}
                     onFocus={() => setGlobalOpen(true)}
                     onChange={(event) => {
@@ -2707,7 +2707,7 @@ function AppShell({
                     placeholder="Busca por CNPJ, razão social ou nome"
                   />
                   {globalOpen ? (
-                    <div className="absolute right-0 z-50 mt-2 max-h-80 w-[34rem] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft dark:border-gray-700 dark:bg-gray-800">
+                    <div className="absolute right-0 z-50 mt-2 max-h-80 w-[min(34rem,calc(100vw-20rem))] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft dark:border-gray-700 dark:bg-gray-800">
                       {!globalQuery.trim() ? (
                         <p className="px-2 py-2 text-sm font-semibold text-slate-500">
                           Digite para buscar clientes e histórico.
@@ -2789,7 +2789,7 @@ function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">{children}</main>
       </div>
     </div>
   );
@@ -2942,16 +2942,16 @@ function DashboardTotalCard({ total, onClick }) {
       as={onClick ? 'button' : 'section'}
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`relative overflow-hidden p-8 text-left ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
+      className={`relative overflow-hidden p-6 text-left xl:p-8 ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
     >
-      <div className="relative z-10 flex min-h-[300px] flex-col justify-between">
+      <div className="relative z-10 flex min-h-[220px] flex-col justify-between xl:min-h-[260px] 2xl:min-h-[300px]">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-300">Total de clientes</p>
-          <p className="mt-5 text-5xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.5rem]">{formatNumber(total)}</p>
+          <p className="mt-4 text-5xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.25rem] 2xl:text-[3.5rem]">{formatNumber(total)}</p>
         </div>
         <div className="flex items-end justify-center">
-          <span className="flex h-28 w-28 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_24px_60px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-            <Users size={52} aria-hidden="true" />
+          <span className="flex h-24 w-24 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_24px_60px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 2xl:h-28 2xl:w-28">
+            <Users className="h-11 w-11 2xl:h-[52px] 2xl:w-[52px]" aria-hidden="true" />
           </span>
         </div>
       </div>
@@ -2974,22 +2974,22 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     : '';
 
   return (
-    <SurfacePanel className={`p-6 sm:p-7 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className={`p-6 2xl:p-7 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Carteira por regime tributário</h2>
+          <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Carteira por regime tributário</h2>
         </div>
       </div>
       <div className="mt-7 grid gap-6">
         <div className="flex justify-center">
           <div
-            className="relative flex h-40 w-40 items-center justify-center rounded-full sm:h-44 sm:w-44"
+            className="relative flex h-36 w-36 items-center justify-center rounded-full 2xl:h-44 2xl:w-44"
             style={{
               background: gradient || 'conic-gradient(#2563eb 0% 100%)',
             }}
           >
-            <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95">
-              <span className="text-4xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 xl:text-[2.85rem]">{formatNumber(total)}</span>
+            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95 2xl:h-28 2xl:w-28">
+              <span className="text-4xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 2xl:text-[2.85rem]">{formatNumber(total)}</span>
               <span className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">clientes</span>
             </div>
           </div>
@@ -3039,7 +3039,7 @@ function DashboardSituationCard({ values, total }) {
   return (
     <SurfacePanel className={`overflow-hidden p-6 sm:p-7 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Situação da carteira</h2>
+        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Situação da carteira</h2>
         <span className="inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-lg font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           {formatNumber(total)}
         </span>
@@ -3111,7 +3111,7 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
   return (
     <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">{title}</h2>
+        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">{title}</h2>
         <button
           type="button"
           onClick={onViewAll}
@@ -3166,7 +3166,7 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   return (
     <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.55rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.65rem]">Ações rápidas</h2>
+        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Ações rápidas</h2>
       </div>
       <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-4">
         {actions.map((action) => {
@@ -3230,7 +3230,7 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-6">
+      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-5 2xl:gap-6">
         <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
         <DashboardRegimeCard
           rows={regimeRows}
@@ -3241,7 +3241,7 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
         <DashboardSituationCard values={situationValues} total={total} />
       </section>
 
-      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-6">
+      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-5 2xl:gap-6">
         <DashboardRankingPanel
           title="Clientes por responsável"
           rows={responsavelRows}

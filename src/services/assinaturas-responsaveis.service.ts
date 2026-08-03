@@ -3,7 +3,7 @@ import { normalizarNomeArquivo, timestampParaCaminho } from '../utils/normalizar
 import { normalizeListagemRow } from './listagens.service';
 
 const BUCKET_ASSINATURAS_EMAIL = 'assinaturas-email';
-const MAX_ASSINATURA_BYTES = 1024 * 1024;
+const MAX_ASSINATURA_BYTES = 5 * 1024 * 1024;
 const MIME_TYPES_PERMITIDOS = new Set(['image/png', 'image/jpeg', 'image/webp']);
 function normalizarTexto(value: unknown) {
   return String(value ?? '').trim();
@@ -19,7 +19,7 @@ function validarArquivoAssinatura(file: File) {
   }
 
   if (file.size > MAX_ASSINATURA_BYTES) {
-    throw new Error('A assinatura deve ter no maximo 1 MB.');
+    throw new Error('A assinatura deve ter no maximo 5 MB.');
   }
 }
 
