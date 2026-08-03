@@ -3688,7 +3688,7 @@ function ClientsTable({
         </div>
       </div>
       <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-3">
-        <table className="table-base min-w-[1220px] xl:min-w-[1440px] 2xl:min-w-[1660px]">
+        <table className="table-base min-w-[1040px] xl:min-w-[1260px] 2xl:min-w-[1480px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
               <th className="table-head-cell table-sticky-left w-80 px-5">
@@ -3704,9 +3704,6 @@ function ClientsTable({
                   />
                   <span>Cliente</span>
                 </div>
-              </th>
-              <th className="table-head-cell w-48">
-                Alertas
               </th>
               {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                 <th key={field.key} className="table-head-cell">
@@ -3727,9 +3724,6 @@ function ClientsTable({
           </thead>
           <tbody>
             {clients.map((client) => (
-              (() => {
-                const alerts = getClientAlerts(client);
-                return (
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
@@ -3754,11 +3748,6 @@ function ClientsTable({
                         <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{client.cnpj}</p>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-gray-400">{client.razao_social}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="table-cell">
-                    <div className="max-w-56">
-                      <AlertsList alerts={alerts} />
                     </div>
                   </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
@@ -3802,9 +3791,7 @@ function ClientsTable({
                     ) : null}
                   </div>
                 </td>
-              </tr>
-                );
-              })()
+                </tr>
             ))}
           </tbody>
         </table>
