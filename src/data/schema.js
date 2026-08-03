@@ -219,7 +219,7 @@ export const DETAIL_SECTIONS = [
     fields: ['cnpj', 'anexo_cartao_cnpj', 'anexo_cartao_qsa', 'razao_social', 'nome_identificacao', 'tipo_cliente', 'regime_tributario', 'atividades', 'dificuldade'],
   },
   {
-    title: 'Obrigações e Escrituração',
+    title: 'ECF',
     fields: ['ecf', 'ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'primeira_competencia', 'ultima_competencia_entregue', 'competencia_em_dia', 'dias_atraso', 'situacao'],
   },
   {

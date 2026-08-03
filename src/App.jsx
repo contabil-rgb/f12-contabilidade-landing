@@ -1725,9 +1725,6 @@ function getClientAlertSignals(client) {
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
-function getClientAlerts(client) {
-  return getClientAlertSignals(client);
-}
 const PENDENCIA_ACTION_BY_SIGNAL = {
   reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da distribuição de lucro.' },
   recibo_reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar comprovante da distribuição de lucro.' },
@@ -3449,170 +3446,6 @@ function SearchAndFilters({
   );
 }
 
-function AlertsList({ alerts }) {
-  if (!alerts?.length) {
-    return (
-      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass('success')}`}>
-        Sem alertas
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {alerts.slice(0, 3).map((alert) => (
-        <span key={alert.key} className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(alert.tone)}`}>
-          {alert.label}
-        </span>
-      ))}
-      {alerts.length > 3 ? (
-        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass('neutral')}`}>
-          +{alerts.length - 3}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function DetailStatusCard({ title, label, detail, icon: Icon, tone = 'neutral' }) {
-  return (
-    <SurfacePanel as="article" className="min-h-[176px] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
-          <div className="mt-3">
-            <StatusBadge toneClass={chipClass(tone)}>
-              {label}
-            </StatusBadge>
-          </div>
-          {detail ? <p className="mt-3 max-w-[28ch] text-sm font-semibold leading-6 text-slate-600">{detail}</p> : null}
-        </div>
-        <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-white/90 shadow-sm ${chipClass(tone)}`}>
-          <Icon size={21} aria-hidden="true" />
-        </span>
-      </div>
-    </SurfacePanel>
-  );
-}
-
-function getObrigacoesPendentesCount(client) {
-  const persisted = getObrigacoesPersistidas(client)?.pendencias_obrigacoes_total;
-  if (typeof persisted === 'number' && Number.isFinite(persisted)) return persisted;
-  if (hasObrigacoesPersistidas(client)) {
-    return [
-      isReinfPendente(client),
-      isReciboReinfPendente(client),
-      isEcdPendente(client),
-      isEcdAguardandoEnvio(client),
-      isEcdResponsavelPendente(client),
-      isReciboEcdPendente(client),
-      isEcfPendente(client),
-      isReciboEcfPendente(client),
-    ].filter(Boolean).length;
-  }
-  return [
-    isReinfPendente(client),
-    isReciboReinfPendente(client),
-    isEcdPendente(client),
-    isEcdAguardandoEnvio(client),
-    isEcdResponsavelPendente(client),
-    isReciboEcdPendente(client),
-    isEcfPendente(client),
-    isReciboEcfPendente(client),
-    isComunicacaoPendente(client),
-  ].filter(Boolean).length;
-}
-
-function getDetailAcompanhamentoSummary(client) {
-  const code = getStatusAcompanhamentoCodigo(client);
-  const label = getStatusAcompanhamentoLabel(client);
-  const dataNotificacao = getDataNotificacaoClienteValue(client);
-  const dataRetorno = getDataRetornoClienteValue(client);
-  const diasSemRetorno = getDiasSemRetorno(client);
-  const toneMap = {
-    sem_retorno: 'danger',
-    aguardando_retorno: 'warning',
-    em_aberto: 'info',
-    concluido: 'success',
-    retorno_recebido: 'success',
-    notificado: 'info',
-    sem_notificacao: 'neutral',
-  };
-
-  let detail = 'Sem notificação registrada.';
-  if (isAguardandoRetorno(client) && dataNotificacao) {
-    detail = diasSemRetorno !== null
-      ? `${diasSemRetorno} dia(s) sem retorno desde ${formatDateDisplay(dataNotificacao)}.`
-      : `Aguardando retorno desde ${formatDateDisplay(dataNotificacao)}.`;
-  } else if (hasRetornoConcluido(client) && dataRetorno) {
-    detail = `Retorno registrado em ${formatDateDisplay(dataRetorno)}.`;
-  } else if (isClienteNotificado(client) && dataNotificacao) {
-    detail = `Cliente notificado em ${formatDateDisplay(dataNotificacao)}.`;
-  }
-
-  return {
-    label,
-    detail,
-    tone: toneMap[code] || 'neutral',
-  };
-}
-
-function getDetailRiscoSummary(client) {
-  const fallbackCode = isPendenciaCritica(client) || isSituacaoCritica(client) || isPendenciaTecnica(client)
-    ? 'danger'
-    : hasPendenciaOperacional(client)
-      ? 'warning'
-      : 'ok';
-  const code = hasRiscoPersistido(client)
-    ? getPersistedRiscoCode(client) || fallbackCode
-    : fallbackCode;
-  const label = hasRiscoPersistido(client)
-    ? getPersistedRiscoLabel(client) || (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia')
-    : (fallbackCode === 'danger' ? 'Critico' : fallbackCode === 'warning' ? 'Atencao' : 'Em dia');
-  const toneMap = {
-    danger: 'danger',
-    warning: 'warning',
-    ok: 'success',
-  };
-  const detalhes = [];
-  const diasAtraso = getDiasAtrasoValue(client);
-  if (diasAtraso > 0) detalhes.push(`${diasAtraso} dia(s) de atraso`);
-  if (isPendenciaTecnica(client)) detalhes.push('Pendência técnica');
-  if (isDocumentoAtrasado(client)) detalhes.push('Documentação atrasada');
-  if (isAtaPendente(client)) detalhes.push('Ata pendente');
-  if (!detalhes.length) detalhes.push('Sem sinais operacionais críticos no momento');
-  return {
-    label,
-    detail: detalhes.join(' | '),
-    tone: toneMap[code] || 'neutral',
-  };
-}
-
-function getDetailObrigacoesSummary(client) {
-  const count = getObrigacoesPendentesCount(client);
-  const fallbackCode = count > 0 ? 'obrigacao_pendente' : 'em_dia';
-  const code = hasObrigacoesPersistidas(client)
-    ? getPersistedObrigacoesStatusCode(client) || fallbackCode
-    : fallbackCode;
-  const label = hasObrigacoesPersistidas(client)
-    ? getPersistedObrigacoesStatusLabel(client) || (count > 0 ? 'Obrigacoes pendentes' : 'Em dia')
-    : (count > 0 ? 'Obrigacoes pendentes' : 'Em dia');
-  const toneMap = {
-    obrigacao_pendente: 'warning',
-    aguardando_envio: 'warning',
-    responsavel_pendente: 'warning',
-    comprovante_pendente: 'warning',
-    em_dia: 'success',
-  };
-  const responsavel = getObrigacaoResponsavel(client);
-  const detail = `${count} pendência(s) em obrigações${responsavel ? ` | Resp. ${responsavel}` : ''}`;
-  return {
-    label,
-    detail,
-    tone: toneMap[code] || 'neutral',
-  };
-}
-
 function ClientsTable({
   clients,
   sort,
@@ -3985,9 +3818,9 @@ function DetailPage({
     );
   }
 
-  const acompanhamentoSummary = getDetailAcompanhamentoSummary(client);
-  const riscoSummary = getDetailRiscoSummary(client);
-  const obrigacoesSummary = getDetailObrigacoesSummary(client);
+  const visibleDetailSections = DETAIL_SECTIONS.filter(
+    (section) => !['Documentação', 'Responsáveis e Revisão', 'Alertas e Pendências'].includes(section.title),
+  );
 
   return (
     <div className="min-w-0 space-y-5">
@@ -4013,37 +3846,10 @@ function DetailPage({
             </button>
           ) : null}
         </div>
-        <div className="mt-5">
-          <AlertsList alerts={getClientAlerts(client)} />
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DetailStatusCard
-          title="Acompanhamento"
-          label={acompanhamentoSummary.label}
-          detail={acompanhamentoSummary.detail}
-          icon={Mail}
-          tone={acompanhamentoSummary.tone}
-        />
-        <DetailStatusCard
-          title="Risco operacional"
-          label={riscoSummary.label}
-          detail={riscoSummary.detail}
-          icon={ShieldAlert}
-          tone={riscoSummary.tone}
-        />
-        <DetailStatusCard
-          title="Obrigacoes"
-          label={obrigacoesSummary.label}
-          detail={obrigacoesSummary.detail}
-          icon={BookOpenCheck}
-          tone={obrigacoesSummary.tone}
-        />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        {DETAIL_SECTIONS.map((section) => (
+        {visibleDetailSections.map((section) => (
           <article key={section.title} className="surface-card p-5">
             <h3 className="text-lg font-black text-slate-950 dark:text-gray-100">{section.title}</h3>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -4059,58 +3865,6 @@ function DetailPage({
             </dl>
           </article>
         ))}
-      </section>
-      <section className="surface-card p-5">
-        <h3 className="text-lg font-black text-slate-950 dark:text-gray-100">Histórico de Alterações</h3>
-        {historicoLoading ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Carregando histórico...</p>
-        ) : !historicoRows.length ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-300">Nenhuma alteração registrada para este cliente.</p>
-        ) : (
-          <TableScrollArea className="mt-4">
-            <table className="table-base min-w-[860px] lg:min-w-[980px]">
-              <thead className="table-head">
-                <tr>
-                  {['Data/hora', 'Usuário', 'Campo', 'Anterior', 'Novo', 'Tipo', 'Origem'].map((header) => (
-                    <th key={header} className="table-head-cell table-cell-compact">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {historicoRows.map((item) => (
-                  <tr key={item.id} className="table-row">
-                    <td className="table-cell table-cell-compact table-cell-muted">
-                      {formatDateTime(item.data_alteracao)}
-                    </td>
-                    <td className="table-cell table-cell-compact">
-                      <p className="font-black text-slate-900 dark:text-gray-100">{item.usuario_nome || 'Usuário'}</p>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">{item.usuario_email || '-'}</p>
-                    </td>
-                    <td className="table-cell table-cell-compact text-xs font-black">
-                      {item.campo_alterado}
-                    </td>
-                    <td className="table-cell table-cell-compact table-cell-muted">
-                      {valueOrDash(item.valor_anterior, 'text')}
-                    </td>
-                    <td className="table-cell table-cell-compact table-cell-strong">
-                      {valueOrDash(item.valor_novo, 'text')}
-                    </td>
-                    <td className="table-cell table-cell-compact">
-                      <span className={`rounded-full border px-2 py-1 text-xs font-black ${chipClass('info')}`}>
-                        {item.tipo_acao || '-'}
-                      </span>
-                    </td>
-                    <td className="table-cell table-cell-compact table-cell-muted">
-                      {item.origem || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScrollArea>
-        )}
       </section>
 
       <AnexosClienteSection

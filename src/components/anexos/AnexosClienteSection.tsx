@@ -19,6 +19,15 @@ type Props = {
 };
 
 const EMPTY_ANEXOS: AnexoCliente[] = [];
+const TIPOS_ANEXO_VISIVEIS_DETALHE = TIPOS_ANEXO_OPTIONS.filter(
+  (option) => ![
+    TIPOS_ANEXO.RECIBO_REINF,
+    TIPOS_ANEXO.RECIBO_LUCROS,
+    TIPOS_ANEXO.DOCUMENTACAO_MENSAL,
+    TIPOS_ANEXO.OUTROS,
+  ].includes(option.value),
+);
+
 const ATTACHMENT_FIELD_BY_TYPE: Record<TipoAnexo, string> = {
   [TIPOS_ANEXO.CARTAO_CNPJ]: 'anexo_cartao_cnpj',
   [TIPOS_ANEXO.CARTAO_QSA]: 'anexo_cartao_qsa',
@@ -61,7 +70,7 @@ function parseAttachmentValue(value: unknown) {
 
 function getFallbackAnexosFromClient(cliente: ClienteAnexoRef) {
   const source = cliente as ClienteAnexoRef & Record<string, unknown>;
-  return TIPOS_ANEXO_OPTIONS.map((option) => {
+  return TIPOS_ANEXO_VISIVEIS_DETALHE.map((option) => {
     const tipo = option.value;
     const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipo];
     const parsed = parseAttachmentValue(source[fieldKey]);
@@ -193,7 +202,7 @@ export function AnexosClienteSection({
       ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {TIPOS_ANEXO_OPTIONS.map((option) => {
+        {TIPOS_ANEXO_VISIVEIS_DETALHE.map((option) => {
           const tipo = option.value;
           const anexo = anexosPorTipo.get(tipo);
           return (
