@@ -5245,6 +5245,16 @@ function ReportsPage({
   onRefresh,
   loading = false,
 }) {
+  const [selectedReportType, setSelectedReportType] = useState('clientes');
+  const [reportFilters, setReportFilters] = useState({
+    responsavel: '',
+    regime: '',
+    empresa: '',
+    socio: '',
+    obrigacao: '',
+    situacao: '',
+    meses: [],
+  });
   const reportScope = Array.isArray(filteredClients) ? filteredClients : clients;
   const clientesComAtraso = reportScope.filter((client) => hasPendenciaAtrasada(client));
   const clientesComPendencias = reportScope.filter((client) => hasPendenciaAtiva(client));
@@ -5333,6 +5343,110 @@ function ReportsPage({
     ? reinfRelatorioCards
     : reinfRelatorioCards.slice(0, 5);
   const hasHiddenReinfRelatorios = reinfRelatorioCards.length > visibleReinfRelatorioCards.length;
+  const reportTypes = [
+    { value: 'clientes', label: 'Base de Clientes', eyebrow: 'Carteira', description: 'Clientes, CNPJ, responsavel e regime tributario.' },
+    { value: 'lucros', label: 'Distribuicao de Lucro', eyebrow: 'Valores', description: 'Socios, CPF, empresa e valores por mes.' },
+    { value: 'ecd_ecf', label: 'ECD / ECF', eyebrow: 'Obrigacoes', description: 'Entrega, anexos, pendencias e conclusoes.' },
+    { value: 'observacoes', label: 'Pendencias/Observacoes', eyebrow: 'Registros', description: 'Observacoes registradas nos clientes.' },
+  ];
+  const selectedReport = reportTypes.find((item) => item.value === selectedReportType) ?? reportTypes[0];
+  const responsavelOptions = uniqueValues(reportScope.map((client) => client.responsavel).filter(Boolean));
+  const regimeOptions = uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
+  const empresaOptions = uniqueValues(reportScope.map((client) => client.nome_identificacao || client.razao_social).filter(Boolean));
+  const socioOptions = uniqueValues(
+    reportScope
+      .flatMap((client) => getReinfSocios(client).map((socio) => socio.nome))
+      .filter(Boolean)
+  );
+  const obrigacaoOptions = ['ECD', 'ECF'];
+  const situacaoOptions = ['Entregues/Concluidos', 'Pendentes/Sem anexo'];
+  const previewRows = reportScope.slice(0, 5);
+
+  function updateReportFilter(key, value) {
+    setReportFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleReportMonth(month) {
+    setReportFilters((current) => {
+      const meses = current.meses.includes(month)
+        ? current.meses.filter((item) => item !== month)
+        : [...current.meses, month];
+      return { ...current, meses };
+    });
+  }
+
+  function clearReportFilters() {
+    setReportFilters({
+      responsavel: '',
+      regime: '',
+      empresa: '',
+      socio: '',
+      obrigacao: '',
+      situacao: '',
+      meses: [],
+    });
+  }
+
+  function renderReportFilters() {
+    if (selectedReportType === 'lucros') {
+      return (
+        <>
+          <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+          <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} />
+          <DropdownFilterSelect label="Socio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} />
+          <div className="sm:col-span-2 xl:col-span-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Periodo</span>
+              <button
+                type="button"
+                onClick={() => updateReportFilter('meses', [])}
+                className="text-xs font-black text-brand-blue hover:text-blue-300"
+              >
+                Todos
+              </button>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {REINF_MONTH_OPTIONS.map((month) => {
+                const selected = reportFilters.meses.includes(month.value);
+                return (
+                  <button
+                    key={month.value}
+                    type="button"
+                    onClick={() => toggleReportMonth(month.value)}
+                    className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition ${
+                      selected
+                        ? 'border-brand-blue bg-brand-blue text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'
+                    }`}
+                  >
+                    {month.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (selectedReportType === 'ecd_ecf') {
+      return (
+        <>
+          <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+          <DropdownFilterSelect label="Regime tributario" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+          <DropdownFilterSelect label="Obrigacao" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} />
+          <DropdownFilterSelect label="Situacao" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+        <DropdownFilterSelect label="Regime tributario" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+      </>
+    );
+  }
   return (
     <div className="min-w-0 space-y-5">
       <section className="surface-card p-6">
@@ -5400,233 +5514,118 @@ function ReportsPage({
         </div>
       </section>
 
-      <section className="surface-card p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Histórico de Distribuição de Lucro
-            </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatórios de Distribuição de Lucro por empresa</h2>
-            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
-              Cada linha representa um relatório salvo pelo modal de distribuição de lucro, com exportação individual em Excel, CSV ou PDF.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-500/20 dark:text-gray-100">
-              {formatNumber(reinfRelatorios.length)} relatório(s) salvo(s)
-            </span>
-            {reinfRelatorioCards.length > 5 ? (
+      <section className="surface-card p-6">
+        <div className="grid gap-3 lg:grid-cols-4">
+          {reportTypes.map((type) => {
+            const selected = selectedReportType === type.value;
+            return (
               <button
+                key={type.value}
                 type="button"
-                onClick={() => setShowAllReinfReports((current) => !current)}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                onClick={() => setSelectedReportType(type.value)}
+                className={`rounded-xl border p-4 text-left transition ${
+                  selected
+                    ? 'border-brand-blue bg-brand-blue text-white shadow-soft'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                }`}
               >
-                {showAllReinfReports ? 'Mostrar menos' : 'Ver todos'}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {reinfRelatorioCards.length ? (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-gray-800">
-            <table className="w-full min-w-[980px] table-fixed text-left text-sm">
-              <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:bg-gray-900/80 dark:text-gray-400">
-                <tr>
-                  <th className="w-[24%] px-4 py-3">Cliente</th>
-                  <th className="w-[14%] px-4 py-3">CNPJ</th>
-                  <th className="w-[13%] px-4 py-3">Responsável</th>
-                  <th className="w-[13%] px-4 py-3">Revisor</th>
-                  <th className="w-[14%] px-4 py-3">Período</th>
-                  <th className="w-[8%] px-4 py-3">Sócios</th>
-                  <th className="w-[14%] px-4 py-3">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 dark:divide-gray-800 dark:text-gray-200">
-                {visibleReinfRelatorioCards.map(({ relatorio, exportRows }) => {
-                  const title = `Relatório de Distribuição de Lucro - ${relatorio.razao_social || relatorio.nome_identificacao || 'Cliente'}`;
-                  const key = relatorio.id || `${relatorio.cliente_id}-${relatorio.criado_em}`;
-
-                  return (
-                    <tr key={key} className="transition hover:bg-slate-50/80 dark:hover:bg-gray-800/55">
-                      <td className="px-4 py-3 align-top">
-                        <p className="truncate font-black text-slate-950 dark:text-gray-100">
-                          {relatorio.razao_social || relatorio.nome_identificacao || 'Cliente sem identificação'}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                          Gerado em {formatDateTime(relatorio.criado_em)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top font-bold">{formatCnpj(relatorio.cnpj)}</td>
-                      <td className="px-4 py-3 align-top font-semibold">{relatorio.responsavel || 'Não informado'}</td>
-                      <td className="px-4 py-3 align-top font-semibold">{relatorio.revisor || 'Não informado'}</td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="font-black">{relatorio.periodicidade || 'Sem periodicidade'}</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                          {getReinfRelatorioMonthsLabel(relatorio)} {relatorio.ano_referencia || ''}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top font-black">{formatNumber(getReinfRelatorioSociosCount(relatorio))}</td>
-                      <td className="px-4 py-3 align-top">
-                        {canExport || canDeleteReinfReports ? (
-                          <div className="flex flex-wrap gap-2">
-                            {canExport ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
-                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                                >
-                                  Excel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
-                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                                >
-                                  CSV
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), title)}
-                                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                                >
-                                  PDF
-                                </button>
-                              </>
-                            ) : null}
-                            {canDeleteReinfReports ? (
-                              <button
-                                type="button"
-                                onClick={() => onDeleteReinfReport?.(relatorio)}
-                                className="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 px-3 py-2 text-xs font-black text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/35 dark:text-red-300 dark:hover:bg-red-500/10"
-                              >
-                                <Trash2 size={13} aria-hidden="true" />
-                                Excluir
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                            Exportação bloqueada
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {hasHiddenReinfRelatorios ? (
-              <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-900/70 dark:text-gray-400">
-                Mostrando os 5 relatórios mais recentes. Use “Ver todos” para carregar o histórico completo.
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-400">
-            Nenhum relatório de distribuição de lucro salvo até o momento.
-          </div>
-        )}
-      </section>
-
-      <section>
-        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Relatórios prontos
-            </p>
-            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Recortes operacionais úteis</h2>
-          </div>
-          <p className="max-w-xl text-sm font-semibold text-slate-500 dark:text-gray-400">
-            Cards focados em pendências, obrigações e retorno do cliente.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {reportCards.map(({ title, exportRows, Icon, count, tone, pdf }) => (
-            <article key={title} className={`surface-card p-5 ${getMetricPanelToneClass(tone)}`}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-900 dark:text-gray-100">{title}</p>
-                  <p className="mt-3 text-3xl font-black text-slate-950 dark:text-gray-100">{formatNumber(count)}</p>
-                  <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                    {count === 1 ? '1 registro neste recorte' : `${formatNumber(count)} registros neste recorte`}
-                  </p>
-                </div>
-                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-white/90 shadow-sm dark:border-gray-600 dark:bg-gray-800/90 ${chipClass(tone)}`}>
-                  <Icon size={19} aria-hidden="true" />
+                <span className={`text-[10px] font-black uppercase tracking-[0.16em] ${selected ? 'text-blue-100' : 'text-slate-500 dark:text-gray-400'}`}>
+                  {type.eyebrow}
                 </span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {canExport ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onExportXlsx(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.xlsx`)}
-                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                    >
-                      Excel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onExportCsv(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.csv`)}
-                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                    >
-                      CSV
-                    </button>
-                    {pdf ? (
-                      <button
-                        type="button"
-                        onClick={() => onExportPdf(exportRows, `${title.toLowerCase().replaceAll(' ', '-')}.pdf`, title)}
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                      >
-                        PDF
-                      </button>
-                    ) : null}
-                  </>
-                ) : (
-                  <span className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                    Exportação bloqueada
-                  </span>
-                )}
-              </div>
-            </article>
-          ))}
+                <span className="mt-2 block text-base font-black">{type.label}</span>
+                <span className={`mt-2 block text-xs font-semibold leading-5 ${selected ? 'text-blue-50' : 'text-slate-500 dark:text-gray-400'}`}>
+                  {type.description}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      <section>
-        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <section className="surface-card p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Indicadores de acompanhamento
+              Filtros
             </p>
-            <h2 className="text-lg font-black text-slate-950 dark:text-gray-100">Status, retorno, pendências e atrasos</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">{selectedReport.label}</h2>
           </div>
-          <p className="max-w-xl text-sm font-semibold text-slate-500 dark:text-gray-400">
-            Leitura complementar do mesmo recorte usado nas exportações.
-          </p>
+          <button
+            type="button"
+            onClick={clearReportFilters}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+          >
+            <RefreshCcw size={15} aria-hidden="true" />
+            Limpar filtros
+          </button>
         </div>
-        <div className="grid gap-5 xl:grid-cols-3">
-          <StaticBreakdownPanel
-            title="Status do acompanhamento"
-            rows={acompanhamentoStatusRows}
-            total={reportScope.length}
-            icon={Mail}
-          />
-          <StaticBreakdownPanel
-            title="Retorno do cliente"
-            rows={retornoRows}
-            total={reportScope.length}
-            icon={ClipboardList}
-          />
-          <StaticBreakdownPanel
-            title="Pendências e atrasos"
-            rows={pendenciasEAtrasosRows}
-            total={reportScope.length}
-            icon={ShieldAlert}
-          />
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {renderReportFilters()}
         </div>
       </section>
+
+      <section className="surface-card p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
+              Previa
+            </p>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Pre-visualizacao do relatorio</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-black text-slate-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500"
+            >
+              <Eye size={15} aria-hidden="true" />
+              Gerar previa
+            </button>
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-black text-slate-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500"
+            >
+              <Download size={15} aria-hidden="true" />
+              Baixar
+            </button>
+          </div>
+        </div>
+
+        <TableScrollArea className="mt-5">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+              <tr>
+                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">CNPJ</th>
+                <th className="px-4 py-3">Responsavel</th>
+                <th className="px-4 py-3">Regime</th>
+                <th className="px-4 py-3">Origem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              {previewRows.length ? (
+                previewRows.map((client) => (
+                  <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
+                    <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.cnpj || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{selectedReport.label}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                    Nenhum registro disponivel para pre-visualizacao.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </TableScrollArea>
+      </section>
+
     </div>
   );
 }
@@ -8603,7 +8602,4 @@ export default function App() {
     </>
   );
 }
-
-
-
 
