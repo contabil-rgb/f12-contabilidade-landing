@@ -65,6 +65,7 @@ import {
 import {
   AUTH_SESSION_KEY,
   ACCESS_PROFILE_OPTIONS,
+  ACCESS_PROFILE_KEYS,
   ACCESS_PROFILES,
   PERMISSIONS,
   USER_STATUS,
@@ -5470,6 +5471,19 @@ function ReportsPage({
     ? reinfRelatorioCards
     : reinfRelatorioCards.slice(0, 5);
   const hasHiddenReinfRelatorios = reinfRelatorioCards.length > visibleReinfRelatorioCards.length;
+  const [selectedReinfReportIds, setSelectedReinfReportIds] = useState([]);
+  const [reinfReportDeleteStatus, setReinfReportDeleteStatus] = useState('');
+  const reinfRelatorioIds = reinfRelatorioCards.map(({ relatorio }) => relatorio?.id).filter(Boolean);
+  const reinfRelatorioIdsKey = reinfRelatorioIds.join('|');
+  const selectedReinfReportIdSet = new Set(selectedReinfReportIds);
+  const selectedReinfReportCards = reinfRelatorioCards.filter(({ relatorio }) => selectedReinfReportIdSet.has(relatorio?.id));
+  const visibleReinfReportIds = visibleReinfRelatorioCards.map(({ relatorio }) => relatorio?.id).filter(Boolean);
+  const allVisibleReinfReportsSelected = visibleReinfReportIds.length > 0
+    && visibleReinfReportIds.every((id) => selectedReinfReportIdSet.has(id));
+  useEffect(() => {
+    const validIds = new Set(reinfRelatorioIds);
+    setSelectedReinfReportIds((current) => current.filter((id) => validIds.has(id)));
+  }, [reinfRelatorioIdsKey]);
   const reportTypes = [
     { value: 'clientes', label: 'Base de Clientes', eyebrow: 'Carteira', description: 'Clientes, CNPJ, responsavel e regime tributario.' },
     { value: 'lucros', label: 'Distribuicao de Lucro', eyebrow: 'Valores', description: 'Socios, CPF, empresa e valores por mes.' },
@@ -5492,8 +5506,8 @@ function ReportsPage({
       .filter(Boolean)
   );
   const socioOptions = uniqueValues(
-    reinfRelatoriosEnriquecidos
-      .flatMap((relatorio) => (Array.isArray(relatorio.socios) ? relatorio.socios : []).map((socio) => socio.nome))
+    reportScope
+      .flatMap((client) => getReinfSocios(client).map((socio) => socio.nome))
       .filter(Boolean)
   );
   const obrigacaoOptions = ['ECD', 'ECF'];
@@ -5645,12 +5659,73 @@ function ReportsPage({
     setReportFilters({
       responsavel: '',
       regime: '',
+      atividade: '',
       empresa: '',
       socio: '',
       obrigacao: '',
       situacao: '',
       meses: [],
     });
+  }
+
+  function toggleReinfReportSelection(reportId) {
+    if (!reportId) return;
+    setReinfReportDeleteStatus('');
+    setSelectedReinfReportIds((current) =>
+      current.includes(reportId)
+        ? current.filter((id) => id !== reportId)
+        : [...current, reportId]
+    );
+  }
+
+  function toggleVisibleReinfReportsSelection() {
+    setReinfReportDeleteStatus('');
+    setSelectedReinfReportIds((current) => {
+      if (allVisibleReinfReportsSelected) {
+        return current.filter((id) => !visibleReinfReportIds.includes(id));
+      }
+
+      return uniqueValues([...current, ...visibleReinfReportIds]);
+    });
+  }
+
+  function selectAllReinfReports() {
+    setReinfReportDeleteStatus('');
+    setSelectedReinfReportIds(reinfRelatorioIds);
+  }
+
+  function clearSelectedReinfReports() {
+    setReinfReportDeleteStatus('');
+    setSelectedReinfReportIds([]);
+  }
+
+  async function deleteSelectedReinfReports() {
+    if (!canDeleteReinfReports || !selectedReinfReportCards.length) return;
+    const count = selectedReinfReportCards.length;
+    const confirmed = window.confirm(`Excluir ${count} relatorio(s) de distribuicao de lucro selecionado(s)? Esta acao nao pode ser desfeita.`);
+    if (!confirmed) return;
+
+    setReinfReportDeleteStatus('Excluindo relatorios selecionados...');
+    let deletedCount = 0;
+    let failedCount = 0;
+
+    for (const { relatorio } of selectedReinfReportCards) {
+      const deleted = await onDeleteReinfReport?.(relatorio, { skipConfirm: true, silent: true });
+      if (deleted) {
+        deletedCount += 1;
+      } else {
+        failedCount += 1;
+      }
+    }
+
+    setSelectedReinfReportIds((current) =>
+      current.filter((id) => !selectedReinfReportCards.some(({ relatorio }) => relatorio?.id === id))
+    );
+    setReinfReportDeleteStatus(
+      failedCount
+        ? `${deletedCount} relatorio(s) excluido(s), ${failedCount} com falha.`
+        : `${deletedCount} relatorio(s) excluido(s).`
+    );
   }
 
   function handleGeneratePreview() {
@@ -6122,6 +6197,195 @@ function ReportsPage({
 
         {renderPreviewTable()}
       </section>
+
+      {selectedReportType === 'lucros' ? (
+        <section className="surface-card p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
+                Historico salvo
+              </p>
+              <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatorios de Distribuicao de Lucro</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">
+                {formatNumber(reinfRelatorioCards.length)} relatorio(s) salvo(s).
+              </p>
+              {reinfReportDeleteStatus ? (
+                <p className="mt-1 text-xs font-black text-emerald-600 dark:text-emerald-300">{reinfReportDeleteStatus}</p>
+              ) : null}
+            </div>
+            {canDeleteReinfReports ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={toggleVisibleReinfReportsSelection}
+                  disabled={!visibleReinfReportIds.length}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                >
+                  {allVisibleReinfReportsSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+                </button>
+                <button
+                  type="button"
+                  onClick={selectAllReinfReports}
+                  disabled={!reinfRelatorioIds.length}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelectedReinfReports}
+                  disabled={!selectedReinfReportIds.length}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                >
+                  Limpar selecao
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelectedReinfReports}
+                  disabled={!selectedReinfReportCards.length}
+                  className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  Excluir selecionados ({selectedReinfReportCards.length})
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+            {reinfRelatorioCards.length ? (
+              <TableScrollArea>
+                <table className="min-w-[1120px] text-left text-sm">
+                  <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+                    <tr>
+                      {canDeleteReinfReports ? (
+                        <th className="w-14 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={allVisibleReinfReportsSelected}
+                            onChange={toggleVisibleReinfReportsSelection}
+                            aria-label="Selecionar relatorios visiveis"
+                            className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue dark:border-gray-700 dark:bg-gray-900"
+                          />
+                        </th>
+                      ) : null}
+                      <th className="px-4 py-3">Cliente</th>
+                      <th className="px-4 py-3">CNPJ</th>
+                      <th className="px-4 py-3">Responsavel</th>
+                      <th className="px-4 py-3">Revisor</th>
+                      <th className="px-4 py-3">Periodo</th>
+                      <th className="px-4 py-3">Socios</th>
+                      <th className="px-4 py-3">Gerado em</th>
+                      <th className="px-4 py-3">Acoes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+                    {visibleReinfRelatorioCards.map(({ relatorio, exportRows }) => {
+                      const selected = selectedReinfReportIdSet.has(relatorio.id);
+                      return (
+                        <tr key={relatorio.id} className="text-slate-700 dark:text-gray-200">
+                          {canDeleteReinfReports ? (
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleReinfReportSelection(relatorio.id)}
+                                aria-label={`Selecionar relatorio de ${relatorio.razao_social || relatorio.nome_identificacao || 'cliente'}`}
+                                className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue dark:border-gray-700 dark:bg-gray-900"
+                              />
+                            </td>
+                          ) : null}
+                          <td className="px-4 py-3">
+                            <p className="font-black">{relatorio.razao_social || relatorio.nome_identificacao || 'Nao informado'}</p>
+                            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                              {relatorio.nome_identificacao || '-'}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 font-semibold">{formatCnpj(relatorio.cnpj)}</td>
+                          <td className="px-4 py-3 font-semibold">{relatorio.responsavel || '-'}</td>
+                          <td className="px-4 py-3 font-semibold">{relatorio.revisor || '-'}</td>
+                          <td className="px-4 py-3 font-semibold">
+                            <p className="font-black">{relatorio.periodicidade || '-'}</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">
+                              {getReinfRelatorioMonthsLabel(relatorio)} {relatorio.ano_referencia || ''}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 font-black">{getReinfRelatorioSociosCount(relatorio)}</td>
+                          <td className="px-4 py-3 font-semibold">{formatDateTime(relatorio.criado_em)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
+                                disabled={!canExport}
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                              >
+                                Excel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
+                                disabled={!canExport}
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                              >
+                                CSV
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), 'Relatorio - Distribuicao de Lucro')}
+                                disabled={!canExport}
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                              >
+                                PDF
+                              </button>
+                              {canDeleteReinfReports ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteReinfReport?.(relatorio)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-red-300 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10"
+                                >
+                                  <Trash2 size={13} aria-hidden="true" />
+                                  Excluir
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </TableScrollArea>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-500 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-400">
+                Nenhum relatorio de distribuicao de lucro foi salvo ainda.
+              </div>
+            )}
+          </div>
+
+          {hasHiddenReinfRelatorios ? (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAllReinfReports(true)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                Ver todos
+              </button>
+            </div>
+          ) : showAllReinfReports && reinfRelatorioCards.length > 5 ? (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAllReinfReports(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+              >
+                Mostrar ultimos 5
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
     </div>
   );
@@ -8277,33 +8541,42 @@ export default function App() {
     }
   }
 
-  async function excluirRelatorioReinf(relatorio) {
+  async function excluirRelatorioReinf(relatorio, options = {}) {
+    const { skipConfirm = false, silent = false } = options;
     if (!ensureSupabaseWriteReady('excluir o relatorio de distribuicao de lucro')) return false;
     if (!relatorio?.id) {
-      setToast({
-        title: 'Relatorio de distribuicao de lucro invalido',
-        message: 'Nao foi possivel identificar o relatorio para exclusao.',
-      });
+      if (!silent) {
+        setToast({
+          title: 'Relatorio de distribuicao de lucro invalido',
+          message: 'Nao foi possivel identificar o relatorio para exclusao.',
+        });
+      }
       return false;
     }
 
     const clienteNome = relatorio.razao_social || relatorio.nome_identificacao || 'este cliente';
-    const confirmed = window.confirm(`Excluir o relatorio de distribuicao de lucro de ${clienteNome}? Esta acao nao pode ser desfeita.`);
-    if (!confirmed) return false;
+    if (!skipConfirm) {
+      const confirmed = window.confirm(`Excluir o relatorio de distribuicao de lucro de ${clienteNome}? Esta acao nao pode ser desfeita.`);
+      if (!confirmed) return false;
+    }
 
     try {
       const deleted = await excluirReinfRelatorioSupabase(relatorio.id);
       setReinfRelatorios((current) => current.filter((item) => item.id !== relatorio.id));
-      setToast({
-        title: 'Relatorio de distribuicao de lucro excluido',
-        message: deleted?.razao_social || deleted?.nome_identificacao || 'Historico atualizado.',
-      });
+      if (!silent) {
+        setToast({
+          title: 'Relatorio de distribuicao de lucro excluido',
+          message: deleted?.razao_social || deleted?.nome_identificacao || 'Historico atualizado.',
+        });
+      }
       return true;
     } catch (error) {
-      setToast({
-        title: 'Falha ao excluir relatorio de distribuicao de lucro',
-        message: error.message || 'Nao foi possivel excluir o relatorio agora.',
-      });
+      if (!silent) {
+        setToast({
+          title: 'Falha ao excluir relatorio de distribuicao de lucro',
+          message: error.message || 'Nao foi possivel excluir o relatorio agora.',
+        });
+      }
       return false;
     }
   }
@@ -8977,7 +9250,13 @@ export default function App() {
           onExportPdf={exportPdf}
           onDeleteReinfReport={excluirRelatorioReinf}
           canExport={canExportReports}
-          canDeleteReinfReports={canWritePortalData && isAdmin(currentUserFull)}
+          canDeleteReinfReports={
+            canWritePortalData
+              && [
+                ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN,
+                ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL,
+              ].includes(currentUserFull?.perfil_acesso)
+          }
           supabaseStatus={supabaseStatus}
           metadata={metadata}
           statusLabel={supabaseStatusLabel}

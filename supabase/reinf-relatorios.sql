@@ -214,7 +214,10 @@ begin
   from public.usuarios u
   where u.auth_user_id = auth.uid()
     and u.status = 'Ativo'
-    and u.perfil_acesso = 'coordenador_administrador'
+    and u.perfil_acesso in (
+      'coordenador_administrador',
+      'setor_contabil_operacional'
+    )
   limit 1;
 
   if v_usuario.id is null then
