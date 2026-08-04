@@ -5228,6 +5228,89 @@ function buildBaseCompletaClientesRows(clients) {
   }));
 }
 
+function isEcdEcfTipoAplicavel(client, tipo) {
+  if (tipo === 'ECD') {
+    return (
+      isYes(client?.ecd)
+      || !isBlank(client?.ultima_ecd_entregue)
+      || !isBlank(client?.data_entrega_ecd)
+      || !isBlank(client?.data_envio_ecd)
+      || hasAttachment(client?.anexo_recibo_ecd)
+      || hasPendenciaObrigacaoEcd(client)
+    );
+  }
+
+  return (
+    isYes(client?.ecf)
+    || !isBlank(client?.ultima_ecf_entregue)
+    || !isBlank(client?.data_entrega_ecf)
+    || !isBlank(client?.data_envio_ecf)
+    || hasAttachment(client?.anexo_recibo_ecf)
+    || hasPendenciaObrigacaoEcf(client)
+  );
+}
+
+function getEcdEcfReportInfo(client, tipo) {
+  const isEcd = tipo === 'ECD';
+  const tipoKey = isEcd ? 'ecd' : 'ecf';
+  const attachmentKey = isEcd ? 'anexo_recibo_ecd' : 'anexo_recibo_ecf';
+  const statusKey = isEcd ? 'ecd_comprovante_anexado' : 'ecf_comprovante_anexado';
+  const pending = isEcd ? hasPendenciaObrigacaoEcd(client) : hasPendenciaObrigacaoEcf(client);
+  const attached = hasObrigacaoComprovante(client, statusKey, attachmentKey);
+  const attachment = parseAttachment(client?.[attachmentKey]);
+  const sentDate = getEcdEcfSentDateValue(client, tipoKey);
+  const deliveryDate = getEcdEcfDeliveryDateValue(client, tipoKey);
+  const latestDelivered = isEcd ? client?.ultima_ecd_entregue : client?.ultima_ecf_entregue;
+  const concluded = !pending && (attached || !isBlank(sentDate));
+
+  return {
+    obrigacao: tipo,
+    ultima_entregue: valueOrDash(latestDelivered),
+    data_entrega: formatDateDisplay(deliveryDate),
+    data_enviada: formatDateDisplay(sentDate),
+    recibo: attached ? attachment.name || 'Anexado' : 'Sem anexo',
+    situacao: concluded ? 'Entregue/Concluido' : 'Pendente/Sem anexo',
+    situacao_codigo: concluded ? 'concluido' : 'pendente',
+  };
+}
+
+function buildEcdEcfReportRows(clients, filters = {}) {
+  const selectedTypes = filters.obrigacao ? [filters.obrigacao] : ['ECD', 'ECF'];
+  const selectedSituation = normalizeText(filters.situacao || '');
+
+  return (clients ?? []).flatMap((client) => {
+    const responsavel = getObrigacaoResponsavel(client) || client?.responsavel || '';
+    const responsavelOk = !filters.responsavel || normalizeText(responsavel) === normalizeText(filters.responsavel);
+    const regimeOk = !filters.regime || normalizeText(client?.regime_tributario) === normalizeText(filters.regime);
+    if (!responsavelOk || !regimeOk) return [];
+
+    return selectedTypes
+      .filter((tipo) => isEcdEcfTipoAplicavel(client, tipo))
+      .map((tipo) => {
+        const info = getEcdEcfReportInfo(client, tipo);
+        return {
+          id: `${client?.id ?? client?.cnpj ?? 'cliente'}-${tipo}`,
+          cliente: client?.nome_identificacao || client?.razao_social || 'Nao informado',
+          razao_social: client?.razao_social || '',
+          cnpj: client?.cnpj || '',
+          responsavel,
+          regime: client?.regime_tributario || '',
+          ...info,
+        };
+      })
+      .filter((row) => {
+        if (!selectedSituation) return true;
+        if (selectedSituation.includes('entregues') || selectedSituation.includes('concluidos')) {
+          return row.situacao_codigo === 'concluido';
+        }
+        if (selectedSituation.includes('pendentes') || selectedSituation.includes('sem anexo')) {
+          return row.situacao_codigo === 'pendente';
+        }
+        return true;
+      });
+  });
+}
+
 function ReportsPage({
   clients,
   filteredClients,
@@ -5350,8 +5433,14 @@ function ReportsPage({
     { value: 'observacoes', label: 'Pendencias/Observacoes', eyebrow: 'Registros', description: 'Observacoes registradas nos clientes.' },
   ];
   const selectedReport = reportTypes.find((item) => item.value === selectedReportType) ?? reportTypes[0];
-  const responsavelOptions = uniqueValues(reportScope.map((client) => client.responsavel).filter(Boolean));
-  const regimeOptions = uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
+  const responsavelOptions = uniqueValues(
+    reportScope
+      .map((client) => (selectedReportType === 'ecd_ecf' ? getObrigacaoResponsavel(client) : client.responsavel))
+      .filter(Boolean)
+  );
+  const regimeOptions = selectedReportType === 'ecd_ecf'
+    ? ['Lucro Real', 'Lucro Presumido']
+    : uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
   const empresaOptions = uniqueValues(
     (selectedReportType === 'lucros' ? reinfRelatoriosEnriquecidos : reportScope)
       .map((item) => item.nome_identificacao || item.razao_social)
@@ -5444,18 +5533,36 @@ function ReportsPage({
       Total: row.total,
     };
   });
+  const ecdEcfReportRows = buildEcdEcfReportRows(reportScope, reportFilters);
+  const ecdEcfExportRows = ecdEcfReportRows.map((row) => ({
+    Cliente: row.cliente,
+    'Razao social': row.razao_social,
+    CNPJ: formatCnpj(row.cnpj),
+    Responsavel: row.responsavel,
+    Regime: row.regime,
+    Obrigacao: row.obrigacao,
+    'Ultima entregue': row.ultima_entregue,
+    'Data de entrega': row.data_entrega,
+    'Data enviada': row.data_enviada,
+    Recibo: row.recibo,
+    Situacao: row.situacao,
+  }));
   const currentReportRows = selectedReportType === 'clientes'
     ? baseClientesReportRows
     : selectedReportType === 'lucros'
       ? lucrosReportRows
-      : [];
+      : selectedReportType === 'ecd_ecf'
+        ? ecdEcfReportRows
+        : [];
   const currentReportExportRows = selectedReportType === 'clientes'
     ? buildBaseCompletaClientesRows(currentReportRows)
     : selectedReportType === 'lucros'
       ? lucrosExportRows
-      : [];
+      : selectedReportType === 'ecd_ecf'
+        ? ecdEcfExportRows
+        : [];
   const previewRows = currentReportRows.slice(0, 10);
-  const canGenerateReportPreview = selectedReportType === 'clientes' || selectedReportType === 'lucros';
+  const canGenerateReportPreview = selectedReportType === 'clientes' || selectedReportType === 'lucros' || selectedReportType === 'ecd_ecf';
   const canDownloadCurrentReport = canGenerateReportPreview && canExport && currentReportExportRows.length > 0;
   const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
   const previewResultRef = useRef(null);
@@ -5498,10 +5605,14 @@ function ReportsPage({
     if (!canDownloadCurrentReport) return;
     const filenameBase = selectedReportType === 'lucros'
       ? 'relatorio-distribuicao-lucro'
-      : 'relatorio-base-clientes';
+      : selectedReportType === 'ecd_ecf'
+        ? 'relatorio-ecd-ecf'
+        : 'relatorio-base-clientes';
     const pdfTitle = selectedReportType === 'lucros'
       ? 'Relatorio - Distribuicao de Lucro'
-      : 'Relatorio - Base de Clientes';
+      : selectedReportType === 'ecd_ecf'
+        ? 'Relatorio - ECD ECF'
+        : 'Relatorio - Base de Clientes';
     if (format === 'xlsx') {
       onExportXlsx(currentReportExportRows, `${filenameBase}.xlsx`);
       return;
@@ -5562,6 +5673,55 @@ function ReportsPage({
                 ) : (
                   <tr>
                     <td colSpan={7 + lucrosSelectedMonths.length} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                      Nenhum registro encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </TableScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedReportType === 'ecd_ecf') {
+      return (
+        <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+          <TableScrollArea>
+            <table className="min-w-[1180px] text-left text-sm">
+              <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3">Cliente</th>
+                  <th className="px-4 py-3">CNPJ</th>
+                  <th className="px-4 py-3">Responsavel</th>
+                  <th className="px-4 py-3">Regime</th>
+                  <th className="px-4 py-3">Obrigacao</th>
+                  <th className="px-4 py-3">Ultima entregue</th>
+                  <th className="px-4 py-3">Data de entrega</th>
+                  <th className="px-4 py-3">Data enviada</th>
+                  <th className="px-4 py-3">Recibo</th>
+                  <th className="px-4 py-3">Situacao</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+                {previewRows.length ? (
+                  previewRows.map((row) => (
+                    <tr key={row.id} className="text-slate-700 dark:text-gray-200">
+                      <td className="px-4 py-3 font-black">{row.cliente || 'Nao informado'}</td>
+                      <td className="px-4 py-3 font-semibold">{formatCnpj(row.cnpj)}</td>
+                      <td className="px-4 py-3 font-semibold">{row.responsavel || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.regime || '-'}</td>
+                      <td className="px-4 py-3 font-black">{row.obrigacao || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.ultima_entregue || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.data_entrega || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.data_enviada || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.recibo || '-'}</td>
+                      <td className="px-4 py-3 font-black">{row.situacao || '-'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
                       Nenhum registro encontrado para os filtros selecionados.
                     </td>
                   </tr>
@@ -5803,7 +5963,7 @@ function ReportsPage({
             <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Pre-visualizacao do relatorio</h2>
             <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">
               {canGenerateReportPreview
-                ? `${formatNumber(currentReportRows.length)} cliente(s) neste relatorio.`
+                ? `${formatNumber(currentReportRows.length)} ${selectedReportType === 'ecd_ecf' ? 'linha(s)' : 'cliente(s)'} neste relatorio.`
                 : 'Este relatorio sera conectado em uma proxima etapa.'}
             </p>
             {previewGeneratedAt && canGenerateReportPreview ? (
