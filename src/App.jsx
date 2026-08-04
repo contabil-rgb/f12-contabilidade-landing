@@ -5458,6 +5458,12 @@ function ReportsPage({
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
     return responsavelOk && regimeOk;
   });
+  const observacoesReportRows = reportScope.filter((client) => {
+    if (!hasPendenciasObservacoes(client)) return false;
+    const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
+    const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
+    return responsavelOk && regimeOk;
+  });
   const lucrosReportRows = reinfRelatoriosEnriquecidos.flatMap((relatorio) => {
     const relatorioMeses = Array.isArray(relatorio.meses) ? relatorio.meses : [];
     const mesesSelecionados = reportFilters.meses.length
@@ -5547,22 +5553,30 @@ function ReportsPage({
     Recibo: row.recibo,
     Situacao: row.situacao,
   }));
+  const observacoesExportRows = buildPendenciasObservacoesRows(observacoesReportRows);
   const currentReportRows = selectedReportType === 'clientes'
     ? baseClientesReportRows
     : selectedReportType === 'lucros'
       ? lucrosReportRows
       : selectedReportType === 'ecd_ecf'
         ? ecdEcfReportRows
-        : [];
+        : selectedReportType === 'observacoes'
+          ? observacoesReportRows
+          : [];
   const currentReportExportRows = selectedReportType === 'clientes'
     ? buildBaseCompletaClientesRows(currentReportRows)
     : selectedReportType === 'lucros'
       ? lucrosExportRows
       : selectedReportType === 'ecd_ecf'
         ? ecdEcfExportRows
-        : [];
+        : selectedReportType === 'observacoes'
+          ? observacoesExportRows
+          : [];
   const previewRows = currentReportRows.slice(0, 10);
-  const canGenerateReportPreview = selectedReportType === 'clientes' || selectedReportType === 'lucros' || selectedReportType === 'ecd_ecf';
+  const canGenerateReportPreview = selectedReportType === 'clientes'
+    || selectedReportType === 'lucros'
+    || selectedReportType === 'ecd_ecf'
+    || selectedReportType === 'observacoes';
   const canDownloadCurrentReport = canGenerateReportPreview && canExport && currentReportExportRows.length > 0;
   const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
   const previewResultRef = useRef(null);
@@ -5607,12 +5621,16 @@ function ReportsPage({
       ? 'relatorio-distribuicao-lucro'
       : selectedReportType === 'ecd_ecf'
         ? 'relatorio-ecd-ecf'
-        : 'relatorio-base-clientes';
+        : selectedReportType === 'observacoes'
+          ? 'relatorio-pendencias-observacoes'
+          : 'relatorio-base-clientes';
     const pdfTitle = selectedReportType === 'lucros'
       ? 'Relatorio - Distribuicao de Lucro'
       : selectedReportType === 'ecd_ecf'
         ? 'Relatorio - ECD ECF'
-        : 'Relatorio - Base de Clientes';
+        : selectedReportType === 'observacoes'
+          ? 'Relatorio - Pendencias e Observacoes'
+          : 'Relatorio - Base de Clientes';
     if (format === 'xlsx') {
       onExportXlsx(currentReportExportRows, `${filenameBase}.xlsx`);
       return;
@@ -5722,6 +5740,47 @@ function ReportsPage({
                 ) : (
                   <tr>
                     <td colSpan={10} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                      Nenhum registro encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </TableScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedReportType === 'observacoes') {
+      return (
+        <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+          <TableScrollArea>
+            <table className="min-w-[1050px] text-left text-sm">
+              <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3">Cliente</th>
+                  <th className="px-4 py-3">CNPJ</th>
+                  <th className="px-4 py-3">Responsavel</th>
+                  <th className="px-4 py-3">Regime</th>
+                  <th className="px-4 py-3">Pendencias/Observacoes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+                {previewRows.length ? (
+                  previewRows.map((client) => (
+                    <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
+                      <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
+                      <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
+                      <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
+                      <td className="max-w-[460px] whitespace-pre-wrap px-4 py-3 font-semibold leading-6">
+                        {client.pendencias_observacoes || '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
                       Nenhum registro encontrado para os filtros selecionados.
                     </td>
                   </tr>
