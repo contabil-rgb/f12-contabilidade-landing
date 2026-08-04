@@ -6264,14 +6264,25 @@ function ReportsPage({
             ) : null}
           </div>
 
-          <div className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+          <div className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-2 dark:border-gray-800 dark:bg-gray-950/50">
             {reinfRelatorioCards.length ? (
               <TableScrollArea>
-                <table className="min-w-[1120px] text-left text-sm">
-                  <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+                <table className="w-full table-fixed text-left text-xs">
+                  <colgroup>
+                    {canDeleteReinfReports ? <col className="w-[4%]" /> : null}
+                    <col className={canDeleteReinfReports ? 'w-[22%]' : 'w-[24%]'} />
+                    <col className="w-[14%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[10%]" />
+                  </colgroup>
+                  <thead className="bg-slate-100 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
                     <tr>
                       {canDeleteReinfReports ? (
-                        <th className="w-14 px-4 py-3">
+                        <th className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={allVisibleReinfReportsSelected}
@@ -6281,23 +6292,23 @@ function ReportsPage({
                           />
                         </th>
                       ) : null}
-                      <th className="px-4 py-3">Cliente</th>
-                      <th className="px-4 py-3">CNPJ</th>
-                      <th className="px-4 py-3">Responsavel</th>
-                      <th className="px-4 py-3">Revisor</th>
-                      <th className="px-4 py-3">Periodo</th>
-                      <th className="px-4 py-3">Socios</th>
-                      <th className="px-4 py-3">Gerado em</th>
-                      <th className="px-4 py-3">Acoes</th>
+                      <th className="px-3 py-3">Cliente</th>
+                      <th className="px-3 py-3">CNPJ</th>
+                      <th className="px-3 py-3">Responsavel</th>
+                      <th className="px-3 py-3">Revisor</th>
+                      <th className="px-3 py-3">Periodo</th>
+                      <th className="px-3 py-3 text-center">Socios</th>
+                      <th className="px-3 py-3">Gerado em</th>
+                      <th className="px-3 py-3 text-center">Acoes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-                    {visibleReinfRelatorioCards.map(({ relatorio, exportRows }) => {
+                    {visibleReinfRelatorioCards.map(({ relatorio }) => {
                       const selected = selectedReinfReportIdSet.has(relatorio.id);
                       return (
                         <tr key={relatorio.id} className="text-slate-700 dark:text-gray-200">
                           {canDeleteReinfReports ? (
-                            <td className="px-4 py-3">
+                            <td className="px-3 py-3">
                               <input
                                 type="checkbox"
                                 checked={selected}
@@ -6307,60 +6318,36 @@ function ReportsPage({
                               />
                             </td>
                           ) : null}
-                          <td className="px-4 py-3">
-                            <p className="font-black">{relatorio.razao_social || relatorio.nome_identificacao || 'Nao informado'}</p>
-                            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                          <td className="break-words px-3 py-3">
+                            <p className="font-black leading-snug">{relatorio.razao_social || relatorio.nome_identificacao || 'Nao informado'}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                               {relatorio.nome_identificacao || '-'}
                             </p>
                           </td>
-                          <td className="px-4 py-3 font-semibold">{formatCnpj(relatorio.cnpj)}</td>
-                          <td className="px-4 py-3 font-semibold">{relatorio.responsavel || '-'}</td>
-                          <td className="px-4 py-3 font-semibold">{relatorio.revisor || '-'}</td>
-                          <td className="px-4 py-3 font-semibold">
+                          <td className="break-words px-3 py-3 font-semibold leading-snug">{formatCnpj(relatorio.cnpj)}</td>
+                          <td className="break-words px-3 py-3 font-semibold leading-snug">{relatorio.responsavel || '-'}</td>
+                          <td className="break-words px-3 py-3 font-semibold leading-snug">{relatorio.revisor || '-'}</td>
+                          <td className="break-words px-3 py-3 font-semibold leading-snug">
                             <p className="font-black">{relatorio.periodicidade || '-'}</p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                               {getReinfRelatorioMonthsLabel(relatorio)} {relatorio.ano_referencia || ''}
                             </p>
                           </td>
-                          <td className="px-4 py-3 font-black">{getReinfRelatorioSociosCount(relatorio)}</td>
-                          <td className="px-4 py-3 font-semibold">{formatDateTime(relatorio.criado_em)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-2">
+                          <td className="px-3 py-3 text-center font-black">{getReinfRelatorioSociosCount(relatorio)}</td>
+                          <td className="break-words px-3 py-3 font-semibold leading-snug">{formatDateTime(relatorio.criado_em)}</td>
+                          <td className="px-3 py-3 text-center">
+                            {canDeleteReinfReports ? (
                               <button
                                 type="button"
-                                onClick={() => onExportXlsx(exportRows, buildReinfRelatorioFilename(relatorio, 'xlsx'))}
-                                disabled={!canExport}
-                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                                onClick={() => onDeleteReinfReport?.(relatorio)}
+                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-red-300 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10"
                               >
-                                Excel
+                                <Trash2 size={13} aria-hidden="true" />
+                                Excluir
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => onExportCsv(exportRows, buildReinfRelatorioFilename(relatorio, 'csv'))}
-                                disabled={!canExport}
-                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                              >
-                                CSV
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onExportPdf(exportRows, buildReinfRelatorioFilename(relatorio, 'pdf'), 'Relatorio - Distribuicao de Lucro')}
-                                disabled={!canExport}
-                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                              >
-                                PDF
-                              </button>
-                              {canDeleteReinfReports ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteReinfReport?.(relatorio)}
-                                  className="inline-flex items-center gap-1 rounded-xl border border-red-300 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10"
-                                >
-                                  <Trash2 size={13} aria-hidden="true" />
-                                  Excluir
-                                </button>
-                              ) : null}
-                            </div>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-400 dark:text-gray-500">-</span>
+                            )}
                           </td>
                         </tr>
                       );
