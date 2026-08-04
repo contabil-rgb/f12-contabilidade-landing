@@ -55,12 +55,22 @@ const REINF_REPORT_LAYOUT = {
 
 const REINF_REPORT_MONTH_KEYS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
+function getField(row, keys, fallback = '') {
+  const source = row ?? {};
+  const aliases = Array.isArray(keys) ? keys : [keys];
+  const key = aliases.find((item) => Object.hasOwn(source, item));
+  return key ? source[key] : fallback;
+}
+
 function isReinfReportRows(rows) {
   const firstRow = rows.find(Boolean) ?? {};
   return (
     Object.hasOwn(firstRow, 'Gerado em') &&
-    Object.hasOwn(firstRow, 'Sócio') &&
-    Object.hasOwn(firstRow, 'Valores por mês')
+    (Object.hasOwn(firstRow, 'Socio') || Object.hasOwn(firstRow, 'Sócio')) &&
+    (
+      Object.hasOwn(firstRow, 'Valores por mês') ||
+      REINF_REPORT_MONTH_KEYS.some((month) => Object.hasOwn(firstRow, month))
+    )
   );
 }
 
@@ -228,18 +238,25 @@ function buildReinfReportPages(rows, title) {
   };
   const pages = [];
   const safeRows = Array.isArray(rows) ? rows : [];
-  const firstRow = safeRows[0] ?? {};
   const months = getReinfReportMonthKeys(safeRows);
   const availableWidth = layout.pageWidth - layout.margin * 2;
-  const socioWidth = months.length > 6 ? 150 : 210;
-  const cpfWidth = months.length > 6 ? 78 : 92;
-  const totalWidth = 74;
+  const empresaWidth = months.length > 6 ? 82 : 96;
+  const cnpjWidth = months.length > 6 ? 58 : 66;
+  const responsavelWidth = months.length > 6 ? 48 : 54;
+  const socioWidth = months.length > 6 ? 74 : 98;
+  const cpfWidth = months.length > 6 ? 56 : 64;
+  const periodoWidth = months.length > 6 ? 56 : 70;
+  const totalWidth = months.length > 6 ? 54 : 62;
   const monthWidth = months.length
-    ? (availableWidth - socioWidth - cpfWidth - totalWidth) / months.length
-    : availableWidth - socioWidth - cpfWidth - totalWidth;
+    ? (availableWidth - empresaWidth - cnpjWidth - responsavelWidth - socioWidth - cpfWidth - periodoWidth - totalWidth) / months.length
+    : availableWidth - empresaWidth - cnpjWidth - responsavelWidth - socioWidth - cpfWidth - periodoWidth - totalWidth;
   const columns = [
-    { key: 'Sócio', label: 'SÓCIO', width: socioWidth },
+    { key: 'Empresa', label: 'EMPRESA', width: empresaWidth },
+    { key: 'CNPJ', label: 'CNPJ', width: cnpjWidth },
+    { key: 'Responsavel', label: 'RESP.', width: responsavelWidth },
+    { key: 'Socio', label: 'SÓCIO', width: socioWidth },
     { key: 'CPF', label: 'CPF', width: cpfWidth },
+    { key: 'Periodo', label: 'PERIODO', width: periodoWidth },
     ...(months.length
       ? months.map((month) => ({ key: month, label: month, width: monthWidth }))
       : [{ key: 'Valores por mês', label: 'VALORES POR MES', width: monthWidth }]),
@@ -259,30 +276,14 @@ function buildReinfReportPages(rows, title) {
   };
 
   const addSummary = () => {
-    const cliente = firstRow.Cliente || 'Cliente não informado';
-    const cnpj = firstRow.CNPJ || 'CNPJ não informado';
-    const periodo = `${firstRow.Periodicidade || 'Sem periodicidade'} - ${firstRow.Meses || 'Meses não informados'} ${firstRow.Ano || ''}`.trim();
-    const responsavel = firstRow['Responsável'] || 'Não informado';
+    const empresas = new Set(safeRows.map((row) => getField(row, ['Empresa', 'Cliente'])).filter(Boolean));
+    const socios = new Set(safeRows.map((row) => getField(row, ['Socio', 'Sócio'])).filter(Boolean));
+    const mesesSelecionados = months.length ? months.join(', ') : 'Meses não informados';
 
-    addWrappedText(commands, `Cliente: ${cliente}`, layout.margin, y, 360, 9, 12, 2);
-    addWrappedText(commands, `CNPJ: ${cnpj}`, 420, y, 170, 9, 12, 2);
-    addWrappedText(commands, `Gerado em: ${firstRow['Gerado em'] || 'Não informado'}`, 610, y, 190, 9, 12, 2);
+    addWrappedText(commands, `Empresas no relatório: ${empresas.size || safeRows.length}`, layout.margin, y, 230, 9, 12, 2);
+    addWrappedText(commands, `Sócios no relatório: ${socios.size || safeRows.length}`, 290, y, 210, 9, 12, 2);
+    addWrappedText(commands, `Meses: ${mesesSelecionados}`, 520, y, 290, 9, 12, 2);
     y -= 34;
-    addWrappedText(commands, `Responsável: ${responsavel}`, layout.margin, y, 260, 8, 11, 2);
-    addWrappedText(commands, `Revisor: ${firstRow.Revisor || 'Não informado'}`, 320, y, 180, 8, 11, 2);
-    addWrappedText(commands, `Período: ${periodo}`, 520, y, 290, 8, 11, 2);
-    y -= 38;
-    addWrappedText(
-      commands,
-      `Seguem os valores referentes à distribuição de lucro dos sócios da ${cliente} (${cnpj}) no período ${firstRow.Meses || 'não informado'} ${firstRow.Ano || ''}.`,
-      layout.margin,
-      y,
-      availableWidth,
-      9,
-      12,
-      3,
-    );
-    y -= 52;
   };
 
   const addTableHeader = () => {
@@ -295,20 +296,6 @@ function buildReinfReportPages(rows, title) {
       x += column.width;
     });
     y -= 24;
-  };
-
-  const addClosing = () => {
-    if (y < 92) {
-      pages.push(commands.join('\n'));
-      addReportHeader(true);
-    }
-
-    y -= 14;
-    addText(commands, 'Qualquer dúvida, estamos à disposição.', layout.margin, y, 9);
-    y -= 28;
-    addText(commands, 'Por favor, confirme o recebimento deste e-mail.', layout.margin, y, 9);
-    y -= 28;
-    addText(commands, 'Atenciosamente,', layout.margin, y, 9);
   };
 
   addReportHeader();
@@ -324,7 +311,7 @@ function buildReinfReportPages(rows, title) {
 
   safeRows.forEach((row) => {
     const lineCounts = columns.map((column) =>
-      wrapText(row[column.key], Math.max(8, Math.floor((column.width - 10) / 4.2))).slice(0, 4).length,
+      wrapText(getField(row, column.key), Math.max(8, Math.floor((column.width - 10) / 4.2))).slice(0, 4).length,
     );
     const rowHeight = Math.max(26, Math.max(...lineCounts, 1) * 11 + 10);
 
@@ -336,13 +323,12 @@ function buildReinfReportPages(rows, title) {
 
     let x = layout.margin;
     columns.forEach((column) => {
-      addCell(commands, row[column.key] ?? '', x, y, column.width, rowHeight, layout.fontSize);
+      addCell(commands, getField(row, column.key), x, y, column.width, rowHeight, layout.fontSize);
       x += column.width;
     });
     y -= rowHeight;
   });
 
-  addClosing();
   pages.push(commands.join('\n'));
   return { pages, layout };
 }

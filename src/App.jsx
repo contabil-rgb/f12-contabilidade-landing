@@ -5352,10 +5352,14 @@ function ReportsPage({
   const selectedReport = reportTypes.find((item) => item.value === selectedReportType) ?? reportTypes[0];
   const responsavelOptions = uniqueValues(reportScope.map((client) => client.responsavel).filter(Boolean));
   const regimeOptions = uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
-  const empresaOptions = uniqueValues(reportScope.map((client) => client.nome_identificacao || client.razao_social).filter(Boolean));
+  const empresaOptions = uniqueValues(
+    (selectedReportType === 'lucros' ? reinfRelatoriosEnriquecidos : reportScope)
+      .map((item) => item.nome_identificacao || item.razao_social)
+      .filter(Boolean)
+  );
   const socioOptions = uniqueValues(
-    reportScope
-      .flatMap((client) => getReinfSocios(client).map((socio) => socio.nome))
+    reinfRelatoriosEnriquecidos
+      .flatMap((relatorio) => (Array.isArray(relatorio.socios) ? relatorio.socios : []).map((socio) => socio.nome))
       .filter(Boolean)
   );
   const obrigacaoOptions = ['ECD', 'ECF'];
@@ -5365,12 +5369,97 @@ function ReportsPage({
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
     return responsavelOk && regimeOk;
   });
-  const currentReportRows = selectedReportType === 'clientes' ? baseClientesReportRows : [];
-  const currentReportExportRows = selectedReportType === 'clientes' ? buildBaseCompletaClientesRows(currentReportRows) : [];
+  const lucrosReportRows = reinfRelatoriosEnriquecidos.flatMap((relatorio) => {
+    const relatorioMeses = Array.isArray(relatorio.meses) ? relatorio.meses : [];
+    const mesesSelecionados = reportFilters.meses.length
+      ? relatorioMeses.filter((month) => reportFilters.meses.includes(month))
+      : relatorioMeses;
+    const socios = Array.isArray(relatorio.socios) && relatorio.socios.length
+      ? relatorio.socios
+      : [{ nome: 'Sem socio', cpf: '', valores_por_mes: {}, total: '' }];
+    const empresaNome = relatorio.nome_identificacao || relatorio.razao_social || '';
+    const responsavelOk = !reportFilters.responsavel || normalizeText(relatorio.responsavel) === normalizeText(reportFilters.responsavel);
+    const empresaOk = !reportFilters.empresa || normalizeText(empresaNome) === normalizeText(reportFilters.empresa);
+    const mesesOk = !reportFilters.meses.length || mesesSelecionados.length > 0;
+
+    if (!responsavelOk || !empresaOk || !mesesOk) return [];
+
+    return socios
+      .filter((socio) => !reportFilters.socio || normalizeText(socio.nome) === normalizeText(reportFilters.socio))
+      .map((socio) => {
+        const valoresPorMes = socio.valores_por_mes ?? socio.valoresPorMes ?? {};
+        const valoresSelecionados = {};
+        let total = 0;
+        mesesSelecionados.forEach((month) => {
+          const valor = valoresPorMes[month] ?? '';
+          valoresSelecionados[month] = valor;
+          total += parseCurrencyNumber(valor);
+        });
+
+        return {
+          id: `${relatorio.id ?? relatorio.cliente_id}-${socio.socio_id ?? socio.nome ?? 'socio'}-${mesesSelecionados.join('-')}`,
+          criado_em: relatorio.criado_em,
+          cliente: empresaNome || 'Nao informado',
+          razao_social: relatorio.razao_social || '',
+          cnpj: relatorio.cnpj || '',
+          responsavel: relatorio.responsavel || '',
+          revisor: relatorio.revisor || '',
+          periodicidade: relatorio.periodicidade || '',
+          ano_referencia: relatorio.ano_referencia || '',
+          meses: mesesSelecionados,
+          socio: socio.nome || 'Sem socio',
+          cpf: socio.cpf || '',
+          valores_por_mes: valoresSelecionados,
+          total: total ? formatCurrencyDisplay(total) : '',
+        };
+      });
+  });
+  const lucrosSelectedMonths = reportFilters.meses.length
+    ? reportFilters.meses
+    : REINF_MONTH_OPTIONS
+      .map((month) => month.value)
+      .filter((month) => lucrosReportRows.some((row) => row.meses.includes(month)));
+  const lucrosExportRows = lucrosReportRows.map((row) => {
+    const exportRow = {
+      'Gerado em': formatDateTime(row.criado_em),
+      Empresa: row.cliente,
+      'Razao social': row.razao_social,
+      CNPJ: formatCnpj(row.cnpj),
+      Responsavel: row.responsavel,
+      Revisor: row.revisor,
+      Periodicidade: row.periodicidade,
+      Ano: row.ano_referencia,
+      Meses: row.meses.map(getReinfMonthLabel).join(', '),
+      Periodo: row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Nao informado',
+      Socio: row.socio,
+      CPF: row.cpf,
+    };
+
+    lucrosSelectedMonths.forEach((month) => {
+      exportRow[getReinfMonthShortLabel(month)] = row.valores_por_mes[month] ?? '';
+    });
+
+    return {
+      ...exportRow,
+      Total: row.total,
+    };
+  });
+  const currentReportRows = selectedReportType === 'clientes'
+    ? baseClientesReportRows
+    : selectedReportType === 'lucros'
+      ? lucrosReportRows
+      : [];
+  const currentReportExportRows = selectedReportType === 'clientes'
+    ? buildBaseCompletaClientesRows(currentReportRows)
+    : selectedReportType === 'lucros'
+      ? lucrosExportRows
+      : [];
   const previewRows = currentReportRows.slice(0, 10);
-  const canGenerateReportPreview = selectedReportType === 'clientes';
+  const canGenerateReportPreview = selectedReportType === 'clientes' || selectedReportType === 'lucros';
   const canDownloadCurrentReport = canGenerateReportPreview && canExport && currentReportExportRows.length > 0;
   const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
+  const previewResultRef = useRef(null);
+  const hasGeneratedPreview = Boolean(previewGeneratedAt) && canGenerateReportPreview;
 
   function updateReportFilter(key, value) {
     setReportFilters((current) => ({ ...current, [key]: value }));
@@ -5400,11 +5489,19 @@ function ReportsPage({
   function handleGeneratePreview() {
     if (!canGenerateReportPreview) return;
     setPreviewGeneratedAt(new Date());
+    window.setTimeout(() => {
+      previewResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   }
 
   function exportCurrentReport(format) {
     if (!canDownloadCurrentReport) return;
-    const filenameBase = 'relatorio-base-clientes';
+    const filenameBase = selectedReportType === 'lucros'
+      ? 'relatorio-distribuicao-lucro'
+      : 'relatorio-base-clientes';
+    const pdfTitle = selectedReportType === 'lucros'
+      ? 'Relatorio - Distribuicao de Lucro'
+      : 'Relatorio - Base de Clientes';
     if (format === 'xlsx') {
       onExportXlsx(currentReportExportRows, `${filenameBase}.xlsx`);
       return;
@@ -5413,7 +5510,111 @@ function ReportsPage({
       onExportCsv(currentReportExportRows, `${filenameBase}.csv`);
       return;
     }
-    onExportPdf(currentReportExportRows, `${filenameBase}.pdf`, 'Relatorio - Base de Clientes');
+    onExportPdf(currentReportExportRows, `${filenameBase}.pdf`, pdfTitle);
+  }
+
+  function renderPreviewTable() {
+    if (!hasGeneratedPreview) {
+      return (
+        <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-500 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-400">
+          Selecione os filtros desejados e clique em Gerar previa para visualizar os dados do relatorio nesta area.
+        </div>
+      );
+    }
+
+    if (selectedReportType === 'lucros') {
+      return (
+        <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+          <TableScrollArea>
+            <table className="min-w-[1120px] text-left text-sm">
+              <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3">Empresa</th>
+                  <th className="px-4 py-3">CNPJ</th>
+                  <th className="px-4 py-3">Responsavel</th>
+                  <th className="px-4 py-3">Socio</th>
+                  <th className="px-4 py-3">CPF</th>
+                  <th className="px-4 py-3">Periodo</th>
+                  {lucrosSelectedMonths.map((month) => (
+                    <th key={month} className="px-4 py-3">{getReinfMonthShortLabel(month)}</th>
+                  ))}
+                  <th className="px-4 py-3">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+                {previewRows.length ? (
+                  previewRows.map((row) => (
+                    <tr key={row.id} className="text-slate-700 dark:text-gray-200">
+                      <td className="px-4 py-3 font-black">{row.cliente || 'Nao informado'}</td>
+                      <td className="px-4 py-3 font-semibold">{formatCnpj(row.cnpj)}</td>
+                      <td className="px-4 py-3 font-semibold">{row.responsavel || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.socio || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">{row.cpf || '-'}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Nao informado'}
+                      </td>
+                      {lucrosSelectedMonths.map((month) => (
+                        <td key={month} className="px-4 py-3 font-semibold">{row.valores_por_mes[month] || '-'}</td>
+                      ))}
+                      <td className="px-4 py-3 font-black">{row.total || '-'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7 + lucrosSelectedMonths.length} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                      Nenhum registro encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </TableScrollArea>
+        </div>
+      );
+    }
+
+    return (
+      <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+        <TableScrollArea>
+          <table className="min-w-[980px] text-left text-sm">
+            <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+              <tr>
+                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Razao social</th>
+                <th className="px-4 py-3">CNPJ</th>
+                <th className="px-4 py-3">Responsavel</th>
+                <th className="px-4 py-3">Revisor</th>
+                <th className="px-4 py-3">Regime</th>
+                <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Atividade</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              {previewRows.length ? (
+                previewRows.map((client) => (
+                  <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
+                    <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.razao_social || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
+                    <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.revisor || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.tipo_cliente || '-'}</td>
+                    <td className="px-4 py-3 font-semibold">{client.atividades || '-'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
+                    Nenhum registro encontrado para os filtros selecionados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </TableScrollArea>
+      </div>
+    );
   }
 
   function renderReportFilters() {
@@ -5651,44 +5852,7 @@ function ReportsPage({
           </div>
         </div>
 
-        <TableScrollArea className="mt-5">
-          <table className="min-w-[980px] text-left text-sm">
-            <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
-              <tr>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Razao social</th>
-                <th className="px-4 py-3">CNPJ</th>
-                <th className="px-4 py-3">Responsavel</th>
-                <th className="px-4 py-3">Revisor</th>
-                <th className="px-4 py-3">Regime</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Atividade</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-              {previewRows.length ? (
-                previewRows.map((client) => (
-                  <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
-                    <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.razao_social || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
-                    <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.revisor || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.tipo_cliente || '-'}</td>
-                    <td className="px-4 py-3 font-semibold">{client.atividades || '-'}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm font-bold text-slate-500 dark:text-gray-400">
-                    Nenhum registro disponivel para pre-visualizacao.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </TableScrollArea>
+        {renderPreviewTable()}
       </section>
 
     </div>
