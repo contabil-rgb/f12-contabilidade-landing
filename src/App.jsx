@@ -5774,39 +5774,51 @@ function ReportsPage({
 
     if (selectedReportType === 'lucros') {
       return (
-        <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+        <div ref={previewResultRef} className="mt-5 rounded-xl border border-slate-200 bg-white/70 p-2 dark:border-gray-800 dark:bg-gray-950/50">
           <TableScrollArea>
-            <table className="min-w-[1120px] text-left text-sm">
-              <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
+            <table className="min-w-[980px] table-fixed text-left text-xs">
+              <colgroup>
+                <col className="w-[150px]" />
+                <col className="w-[120px]" />
+                <col className="w-[95px]" />
+                <col className="w-[145px]" />
+                <col className="w-[120px]" />
+                <col className="w-[105px]" />
+                {lucrosSelectedMonths.map((month) => (
+                  <col key={month} className="w-[82px]" />
+                ))}
+                <col className="w-[95px]" />
+              </colgroup>
+              <thead className="bg-slate-100 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
                 <tr>
-                  <th className="px-4 py-3">Empresa</th>
-                  <th className="px-4 py-3">CNPJ</th>
-                  <th className="px-4 py-3">Responsavel</th>
-                  <th className="px-4 py-3">Socio</th>
-                  <th className="px-4 py-3">CPF</th>
-                  <th className="px-4 py-3">Periodo</th>
+                  <th className="px-3 py-2">Empresa</th>
+                  <th className="px-3 py-2">CNPJ</th>
+                  <th className="px-3 py-2">Responsavel</th>
+                  <th className="px-3 py-2">Socio</th>
+                  <th className="px-3 py-2">CPF</th>
+                  <th className="px-3 py-2">Periodo</th>
                   {lucrosSelectedMonths.map((month) => (
-                    <th key={month} className="px-4 py-3">{getReinfMonthShortLabel(month)}</th>
+                    <th key={month} className="px-3 py-2 text-right">{getReinfMonthShortLabel(month)}</th>
                   ))}
-                  <th className="px-4 py-3">Total</th>
+                  <th className="px-3 py-2 text-right">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
                 {previewRows.length ? (
                   previewRows.map((row) => (
                     <tr key={row.id} className="text-slate-700 dark:text-gray-200">
-                      <td className="px-4 py-3 font-black">{row.cliente || 'Nao informado'}</td>
-                      <td className="px-4 py-3 font-semibold">{formatCnpj(row.cnpj)}</td>
-                      <td className="px-4 py-3 font-semibold">{row.responsavel || '-'}</td>
-                      <td className="px-4 py-3 font-semibold">{row.socio || '-'}</td>
-                      <td className="px-4 py-3 font-semibold">{row.cpf || '-'}</td>
-                      <td className="px-4 py-3 font-semibold">
+                      <td className="break-words px-3 py-2 font-black leading-snug">{row.cliente || 'Nao informado'}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">{formatCnpj(row.cnpj)}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">{row.responsavel || '-'}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">{row.socio || '-'}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">{row.cpf || '-'}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">
                         {row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Nao informado'}
                       </td>
                       {lucrosSelectedMonths.map((month) => (
-                        <td key={month} className="px-4 py-3 font-semibold">{row.valores_por_mes[month] || '-'}</td>
+                        <td key={month} className="px-3 py-2 text-right font-semibold tabular-nums">{row.valores_por_mes[month] || '-'}</td>
                       ))}
-                      <td className="px-4 py-3 font-black">{row.total || '-'}</td>
+                      <td className="px-3 py-2 text-right font-black tabular-nums">{row.total || '-'}</td>
                     </tr>
                   ))
                 ) : (
