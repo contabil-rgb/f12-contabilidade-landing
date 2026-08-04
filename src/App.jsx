@@ -4024,6 +4024,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   const [copyStatus, setCopyStatus] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [savingReport, setSavingReport] = useState(false);
+  const [savedReportKey, setSavedReportKey] = useState('');
   const [sendStatus, setSendStatus] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const reportSociosHydrated = useMemo(() => reportSocios
@@ -4051,6 +4052,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setCopyStatus('');
     setSaveStatus('');
     setSavingReport(false);
+    setSavedReportKey('');
     setSendStatus('');
     setSendingEmail(false);
   }, [client?.id]);
@@ -4202,6 +4204,17 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     }
   }
 
+  function getReportSaveKey(payload) {
+    return JSON.stringify({
+      cliente_id: payload?.cliente_id ?? '',
+      periodicidade: payload?.periodicidade ?? '',
+      ano_referencia: payload?.ano_referencia ?? '',
+      meses: payload?.meses ?? [],
+      assunto: payload?.assunto ?? '',
+      socios: payload?.socios ?? [],
+    });
+  }
+
   async function saveReport() {
     setSaveStatus('');
     setSendStatus('');
@@ -4235,6 +4248,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setSavingReport(true);
     try {
       const saved = await onSaveReport(payload);
+      if (saved) setSavedReportKey(getReportSaveKey(payload));
       setSaveStatus(saved ? 'Relatório salvo' : 'Não foi possível salvar');
     } catch (error) {
       setSaveStatus(error?.message || 'Não foi possível salvar');
@@ -4295,10 +4309,39 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
         html_mensagem: htmlText,
         relatorio,
       });
+      if (sent) {
+        if (!onSaveReport) {
+          setSendStatus('E-mail enviado, salvamento indisponível');
+          return;
+        }
+
+        const reportKey = getReportSaveKey(relatorio);
+        if (savedReportKey === reportKey) {
+          setSendStatus('E-mail enviado');
+          return;
+        }
+
+        setSavingReport(true);
+        try {
+          const saved = await onSaveReport(relatorio);
+          if (saved) {
+            setSavedReportKey(reportKey);
+            setSaveStatus('Relatório salvo');
+            setSendStatus('E-mail enviado e relatório salvo');
+          } else {
+            setSendStatus('E-mail enviado, mas relatório não foi salvo');
+          }
+        } catch (saveError) {
+          setSaveStatus(saveError?.message || 'Não foi possível salvar');
+          setSendStatus('E-mail enviado, mas relatório não foi salvo');
+        }
+        return;
+      }
       setSendStatus(sent ? 'E-mail enviado' : 'Não foi possível enviar');
     } catch (error) {
       setSendStatus(error?.message || 'Não foi possível enviar');
     } finally {
+      setSavingReport(false);
       setSendingEmail(false);
     }
   }
@@ -6469,6 +6512,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
       && !EDIT_MODAL_HIDDEN_FIELDS.has(field.key)
       && !EDIT_MODAL_HIDDEN_GROUPS.has(field.group),
   );
+  const showEcdEcfGroup = isRegimeEcdEcfAplicavel(form.regime_tributario);
 
   function updateField(key, value) {
     setForm((current) => {
@@ -6550,6 +6594,8 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
           ) : null}
 
           {FIELD_GROUPS.map((group) => {
+            if (group === 'ECD / ECF' && !showEcdEcfGroup) return null;
+
             const visibleFields = modalFields.filter((field) => field.group === group);
 
             if (!visibleFields.length) return null;
