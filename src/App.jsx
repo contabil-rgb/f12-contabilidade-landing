@@ -5332,6 +5332,7 @@ function ReportsPage({
   const [reportFilters, setReportFilters] = useState({
     responsavel: '',
     regime: '',
+    atividade: '',
     empresa: '',
     socio: '',
     obrigacao: '',
@@ -5441,6 +5442,7 @@ function ReportsPage({
   const regimeOptions = selectedReportType === 'ecd_ecf'
     ? ['Lucro Real', 'Lucro Presumido']
     : uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
+  const atividadeOptions = uniqueValues(reportScope.map((client) => client.atividades).filter(Boolean));
   const empresaOptions = uniqueValues(
     (selectedReportType === 'lucros' ? reinfRelatoriosEnriquecidos : reportScope)
       .map((item) => item.nome_identificacao || item.razao_social)
@@ -5456,7 +5458,8 @@ function ReportsPage({
   const baseClientesReportRows = reportScope.filter((client) => {
     const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
-    return responsavelOk && regimeOk;
+    const atividadeOk = !reportFilters.atividade || normalizeText(client.atividades) === normalizeText(reportFilters.atividade);
+    return responsavelOk && regimeOk && atividadeOk;
   });
   const observacoesReportRows = reportScope.filter((client) => {
     if (!hasPendenciasObservacoes(client)) return false;
@@ -5893,6 +5896,9 @@ function ReportsPage({
       <>
         <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
         <DropdownFilterSelect label="Regime tributario" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+        {selectedReportType === 'clientes' ? (
+          <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} />
+        ) : null}
       </>
     );
   }
