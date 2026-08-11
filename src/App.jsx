@@ -1754,7 +1754,7 @@ function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onEr
   const anexo = fieldValueToAnexo(client[fieldKey], tipoAnexo, client);
 
   return (
-    <div className="flex min-w-64 flex-col gap-2" onClick={(event) => event.stopPropagation()}>
+    <div className="base-client-attachment-cell" onClick={(event) => event.stopPropagation()}>
       <AttachmentBadge value={client[fieldKey]} />
       <UploadAnexoButton
         cliente={client}
@@ -3429,7 +3429,7 @@ function ClientsTable({
         </div>
       </div>
       <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-2">
-        <table className="table-base base-clients-table min-w-[920px] xl:min-w-[1040px] 2xl:min-w-[1180px]">
+        <table className="table-base base-clients-table min-w-[1560px] 2xl:min-w-[1640px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
               <th className="table-head-cell table-sticky-left w-72 px-4">
@@ -5426,7 +5426,7 @@ function buildEcdEcfReportRows(clients, filters = {}) {
         const info = getEcdEcfReportInfo(client, tipo);
         return {
           id: `${client?.id ?? client?.cnpj ?? 'cliente'}-${tipo}`,
-          cliente: client?.nome_identificacao || client?.razao_social || 'Nao informado',
+          cliente: client?.nome_identificacao || client?.razao_social || 'Não informado',
           razao_social: client?.razao_social || '',
           cnpj: client?.cnpj || '',
           responsavel,
@@ -5577,10 +5577,10 @@ function ReportsPage({
     setSelectedReinfReportIds((current) => current.filter((id) => validIds.has(id)));
   }, [reinfRelatorioIdsKey]);
   const reportTypes = [
-    { value: 'clientes', label: 'Base de Clientes', eyebrow: 'Carteira', description: 'Clientes, CNPJ, responsavel e regime tributario.' },
-    { value: 'lucros', label: 'Distribuicao de Lucro', eyebrow: 'Valores', description: 'Socios, CPF, empresa e valores por mes.' },
-    { value: 'ecd_ecf', label: 'ECD / ECF', eyebrow: 'Obrigacoes', description: 'Entrega, anexos, pendencias e conclusoes.' },
-    { value: 'observacoes', label: 'Pendencias/Observacoes', eyebrow: 'Registros', description: 'Observacoes registradas nos clientes.' },
+    { value: 'clientes', label: 'Base de Clientes', eyebrow: 'Carteira', description: 'Clientes, CNPJ, responsável e regime tributário.' },
+    { value: 'lucros', label: 'Distribuição de Lucro', eyebrow: 'Valores', description: 'Sócios, CPF, empresa e valores por mês.' },
+    { value: 'ecd_ecf', label: 'ECD / ECF', eyebrow: 'Obrigações', description: 'Entrega, anexos, pendências e conclusões.' },
+    { value: 'observacoes', label: 'Pendências/Observações', eyebrow: 'Registros', description: 'Observações registradas nos clientes.' },
   ];
   const selectedReport = reportTypes.find((item) => item.value === selectedReportType) ?? reportTypes[0];
   const responsavelOptions = uniqueValues(
@@ -5624,7 +5624,7 @@ function ReportsPage({
       : relatorioMeses;
     const socios = Array.isArray(relatorio.socios) && relatorio.socios.length
       ? relatorio.socios
-      : [{ nome: 'Sem socio', cpf: '', valores_por_mes: {}, total: '' }];
+      : [{ nome: 'Sem sócio', cpf: '', valores_por_mes: {}, total: '' }];
     const empresaNome = relatorio.nome_identificacao || relatorio.razao_social || '';
     const responsavelOk = !reportFilters.responsavel || normalizeText(relatorio.responsavel) === normalizeText(reportFilters.responsavel);
     const empresaOk = !reportFilters.empresa || normalizeText(empresaNome) === normalizeText(reportFilters.empresa);
@@ -5654,7 +5654,7 @@ function ReportsPage({
           criado_em: relatorio.criado_em,
           modelo_tabela: relatorio.modelo_tabela || REINF_TABLE_MODEL_MONTHLY,
           modelo_tabela_label: relatorio.modelo_tabela_label || getReinfTableModelLabel(relatorio.modelo_tabela),
-          cliente: empresaNome || 'Nao informado',
+          cliente: empresaNome || 'Não informado',
           razao_social: relatorio.razao_social || '',
           cnpj: relatorio.cnpj || '',
           responsavel: relatorio.responsavel || '',
@@ -5662,7 +5662,7 @@ function ReportsPage({
           periodicidade: relatorio.periodicidade || '',
           ano_referencia: relatorio.ano_referencia || '',
           meses: mesesSelecionados,
-          socio: socio.nome || 'Sem socio',
+          socio: socio.nome || 'Sem sócio',
           cpf: socio.cpf || '',
           valores_por_mes: valoresSelecionados,
           valores_totais: valoresTotais,
@@ -5680,16 +5680,16 @@ function ReportsPage({
     const exportRow = {
       'Gerado em': formatDateTime(row.criado_em),
       Empresa: row.cliente,
-      'Razao social': row.razao_social,
+      'Razão social': row.razao_social,
       CNPJ: formatCnpj(row.cnpj),
-      Responsavel: row.responsavel,
+      Responsável: row.responsavel,
       Revisor: row.revisor,
       'Modelo da tabela': row.modelo_tabela_label || getReinfTableModelLabel(row.modelo_tabela),
       Periodicidade: row.periodicidade,
       Ano: row.ano_referencia,
       Meses: row.meses.map(getReinfMonthLabel).join(', '),
-      Periodo: row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Nao informado',
-      Socio: row.socio,
+      Período: row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Não informado',
+      Sócio: row.socio,
       CPF: row.cpf,
     };
 
@@ -5714,16 +5714,16 @@ function ReportsPage({
   const ecdEcfReportRows = buildEcdEcfReportRows(reportScope, reportFilters);
   const ecdEcfExportRows = ecdEcfReportRows.map((row) => ({
     Cliente: row.cliente,
-    'Razao social': row.razao_social,
+    'Razão social': row.razao_social,
     CNPJ: formatCnpj(row.cnpj),
-    Responsavel: row.responsavel,
+    Responsável: row.responsavel,
     Regime: row.regime,
-    Obrigacao: row.obrigacao,
-    'Ultima entregue': row.ultima_entregue,
+    Obrigação: row.obrigacao,
+    'Última entregue': row.ultima_entregue,
     'Data de entrega': row.data_entrega,
     'Data enviada': row.data_enviada,
     Recibo: row.recibo,
-    Situacao: row.situacao,
+    Situação: row.situacao,
   }));
   const observacoesExportRows = buildPendenciasObservacoesRows(observacoesReportRows);
   const currentReportRows = selectedReportType === 'clientes'
@@ -5814,10 +5814,10 @@ function ReportsPage({
   async function deleteSelectedReinfReports() {
     if (!canDeleteReinfReports || !selectedReinfReportCards.length) return;
     const count = selectedReinfReportCards.length;
-    const confirmed = window.confirm(`Excluir ${count} relatorio(s) de distribuicao de lucro selecionado(s)? Esta acao nao pode ser desfeita.`);
+    const confirmed = window.confirm(`Excluir ${count} relatório(s) de distribuição de lucro selecionado(s)? Esta ação não pode ser desfeita.`);
     if (!confirmed) return;
 
-    setReinfReportDeleteStatus('Excluindo relatorios selecionados...');
+    setReinfReportDeleteStatus('Excluindo relatórios selecionados...');
     let deletedCount = 0;
     let failedCount = 0;
 
@@ -5835,8 +5835,8 @@ function ReportsPage({
     );
     setReinfReportDeleteStatus(
       failedCount
-        ? `${deletedCount} relatorio(s) excluido(s), ${failedCount} com falha.`
-        : `${deletedCount} relatorio(s) excluido(s).`
+        ? `${deletedCount} relatório(s) excluído(s), ${failedCount} com falha.`
+        : `${deletedCount} relatório(s) excluído(s).`
     );
   }
 
@@ -5858,12 +5858,12 @@ function ReportsPage({
           ? 'relatorio-pendencias-observacoes'
           : 'relatorio-base-clientes';
     const pdfTitle = selectedReportType === 'lucros'
-      ? 'Relatorio - Distribuicao de Lucro'
+      ? 'Relatório - Distribuição de Lucro'
       : selectedReportType === 'ecd_ecf'
-        ? 'Relatorio - ECD ECF'
+        ? 'Relatório - ECD ECF'
         : selectedReportType === 'observacoes'
-          ? 'Relatorio - Pendencias e Observacoes'
-          : 'Relatorio - Base de Clientes';
+          ? 'Relatório - Pendências e Observações'
+          : 'Relatório - Base de Clientes';
     if (format === 'xlsx') {
       onExportXlsx(currentReportExportRows, `${filenameBase}.xlsx`);
       return;
@@ -5879,7 +5879,7 @@ function ReportsPage({
     if (!hasGeneratedPreview) {
       return (
         <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-500 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-400">
-          Selecione os filtros desejados e clique em Gerar previa para visualizar os dados do relatorio nesta area.
+          Selecione os filtros desejados e clique em Gerar prévia para visualizar os dados do relatório nesta área.
         </div>
       );
     }
@@ -5909,11 +5909,11 @@ function ReportsPage({
                 <tr>
                   <th className="px-3 py-2">Empresa</th>
                   <th className="px-3 py-2">CNPJ</th>
-                  <th className="px-3 py-2">Responsavel</th>
+                  <th className="px-3 py-2">Responsável</th>
                   <th className="px-3 py-2">Modelo</th>
-                  <th className="px-3 py-2">Socio</th>
+                  <th className="px-3 py-2">Sócio</th>
                   <th className="px-3 py-2">CPF</th>
-                  <th className="px-3 py-2">Periodo</th>
+                  <th className="px-3 py-2">Período</th>
                   {lucrosSelectedMonths.map((month) => (
                     <th key={month} className="px-3 py-2 text-right">{getReinfMonthShortLabel(month)}</th>
                   ))}
@@ -5927,14 +5927,14 @@ function ReportsPage({
                 {previewRows.length ? (
                   previewRows.map((row) => (
                     <tr key={row.id} className="text-slate-700 dark:text-gray-200">
-                      <td className="break-words px-3 py-2 font-black leading-snug">{row.cliente || 'Nao informado'}</td>
+                      <td className="break-words px-3 py-2 font-black leading-snug">{row.cliente || 'Não informado'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{formatCnpj(row.cnpj)}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.responsavel || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.modelo_tabela_label || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.socio || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.cpf || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">
-                        {row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Nao informado'}
+                        {row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Não informado'}
                       </td>
                       {lucrosSelectedMonths.map((month) => (
                         <td key={month} className="px-3 py-2 text-right font-semibold tabular-nums">{row.valores_por_mes[month] || '-'}</td>
@@ -5968,21 +5968,21 @@ function ReportsPage({
                 <tr>
                   <th className="px-4 py-3">Cliente</th>
                   <th className="px-4 py-3">CNPJ</th>
-                  <th className="px-4 py-3">Responsavel</th>
+                  <th className="px-4 py-3">Responsável</th>
                   <th className="px-4 py-3">Regime</th>
-                  <th className="px-4 py-3">Obrigacao</th>
-                  <th className="px-4 py-3">Ultima entregue</th>
+                  <th className="px-4 py-3">Obrigação</th>
+                  <th className="px-4 py-3">Última entregue</th>
                   <th className="px-4 py-3">Data de entrega</th>
                   <th className="px-4 py-3">Data enviada</th>
                   <th className="px-4 py-3">Recibo</th>
-                  <th className="px-4 py-3">Situacao</th>
+                  <th className="px-4 py-3">Situação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
                 {previewRows.length ? (
                   previewRows.map((row) => (
                     <tr key={row.id} className="text-slate-700 dark:text-gray-200">
-                      <td className="px-4 py-3 font-black">{row.cliente || 'Nao informado'}</td>
+                      <td className="px-4 py-3 font-black">{row.cliente || 'Não informado'}</td>
                       <td className="px-4 py-3 font-semibold">{formatCnpj(row.cnpj)}</td>
                       <td className="px-4 py-3 font-semibold">{row.responsavel || '-'}</td>
                       <td className="px-4 py-3 font-semibold">{row.regime || '-'}</td>
@@ -6017,16 +6017,16 @@ function ReportsPage({
                 <tr>
                   <th className="px-4 py-3">Cliente</th>
                   <th className="px-4 py-3">CNPJ</th>
-                  <th className="px-4 py-3">Responsavel</th>
+                  <th className="px-4 py-3">Responsável</th>
                   <th className="px-4 py-3">Regime</th>
-                  <th className="px-4 py-3">Pendencias/Observacoes</th>
+                  <th className="px-4 py-3">Pendências/Observações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
                 {previewRows.length ? (
                   previewRows.map((client) => (
                     <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
-                      <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
+                      <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Não informado'}</td>
                       <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
                       <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
                       <td className="px-4 py-3 font-semibold">{client.regime_tributario || '-'}</td>
@@ -6056,9 +6056,9 @@ function ReportsPage({
             <thead className="bg-slate-100 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:bg-gray-950 dark:text-gray-400">
               <tr>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Razao social</th>
+                <th className="px-4 py-3">Razão social</th>
                 <th className="px-4 py-3">CNPJ</th>
-                <th className="px-4 py-3">Responsavel</th>
+                <th className="px-4 py-3">Responsável</th>
                 <th className="px-4 py-3">Revisor</th>
                 <th className="px-4 py-3">Regime</th>
                 <th className="px-4 py-3">Tipo</th>
@@ -6069,7 +6069,7 @@ function ReportsPage({
               {previewRows.length ? (
                 previewRows.map((client) => (
                   <tr key={client.id ?? client.cnpj} className="text-slate-700 dark:text-gray-200">
-                    <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Nao informado'}</td>
+                    <td className="px-4 py-3 font-black">{client.nome_identificacao || client.razao_social || 'Não informado'}</td>
                     <td className="px-4 py-3 font-semibold">{client.razao_social || '-'}</td>
                     <td className="px-4 py-3 font-semibold">{formatCnpj(client.cnpj)}</td>
                     <td className="px-4 py-3 font-semibold">{client.responsavel || '-'}</td>
@@ -6097,12 +6097,12 @@ function ReportsPage({
     if (selectedReportType === 'lucros') {
       return (
         <>
-          <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
           <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} />
-          <DropdownFilterSelect label="Socio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} />
+          <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} />
           <div className="sm:col-span-2 xl:col-span-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Periodo</span>
+              <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
               <button
                 type="button"
                 onClick={() => updateReportFilter('meses', [])}
@@ -6138,18 +6138,18 @@ function ReportsPage({
     if (selectedReportType === 'ecd_ecf') {
       return (
         <>
-          <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
-          <DropdownFilterSelect label="Regime tributario" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
-          <DropdownFilterSelect label="Obrigacao" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} />
-          <DropdownFilterSelect label="Situacao" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} />
+          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+          <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+          <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} />
+          <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} />
         </>
       );
     }
 
     return (
       <>
-        <DropdownFilterSelect label="Responsavel" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
-        <DropdownFilterSelect label="Regime tributario" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+        <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
+        <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
         {selectedReportType === 'clientes' ? (
           <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} />
         ) : null}
@@ -6234,17 +6234,17 @@ function ReportsPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Previa
+              Prévia
             </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Pre-visualizacao do relatorio</h2>
+            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Pré-visualização do relatório</h2>
             <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">
               {canGenerateReportPreview
-                ? `${formatNumber(currentReportRows.length)} ${selectedReportType === 'ecd_ecf' ? 'linha(s)' : 'cliente(s)'} neste relatorio.`
-                : 'Este relatorio sera conectado em uma proxima etapa.'}
+                ? `${formatNumber(currentReportRows.length)} ${selectedReportType === 'ecd_ecf' ? 'linha(s)' : 'cliente(s)'} neste relatório.`
+                : 'Este relatório será conectado em uma próxima etapa.'}
             </p>
             {previewGeneratedAt && canGenerateReportPreview ? (
               <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-300">
-                Previa gerada em {previewGeneratedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
+                Prévia gerada em {previewGeneratedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
               </p>
             ) : null}
           </div>
@@ -6256,7 +6256,7 @@ function ReportsPage({
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300 dark:disabled:border-gray-800 dark:disabled:bg-gray-900 dark:disabled:text-gray-500"
             >
               <Eye size={15} aria-hidden="true" />
-              Gerar previa
+              Gerar prévia
             </button>
             <button
               type="button"
@@ -6296,11 +6296,11 @@ function ReportsPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-                Historico salvo
+                Histórico salvo
               </p>
-              <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatorios de Distribuicao de Lucro</h2>
+              <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Relatórios de Distribuição de Lucro</h2>
               <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">
-                {formatNumber(reinfRelatorioCards.length)} relatorio(s) salvo(s).
+                {formatNumber(reinfRelatorioCards.length)} relatório(s) salvo(s).
               </p>
               {reinfReportDeleteStatus ? (
                 <p className="mt-1 text-xs font-black text-emerald-600 dark:text-emerald-300">{reinfReportDeleteStatus}</p>
@@ -6314,7 +6314,7 @@ function ReportsPage({
                   disabled={!visibleReinfReportIds.length}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                 >
-                  {allVisibleReinfReportsSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+                  {allVisibleReinfReportsSelected ? 'Desmarcar visíveis' : 'Selecionar visíveis'}
                 </button>
                 <button
                   type="button"
@@ -6330,7 +6330,7 @@ function ReportsPage({
                   disabled={!selectedReinfReportIds.length}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
                 >
-                  Limpar selecao
+                  Limpar seleção
                 </button>
                 <button
                   type="button"
@@ -6368,19 +6368,19 @@ function ReportsPage({
                             type="checkbox"
                             checked={allVisibleReinfReportsSelected}
                             onChange={toggleVisibleReinfReportsSelection}
-                            aria-label="Selecionar relatorios visiveis"
+                            aria-label="Selecionar relatórios visíveis"
                             className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue dark:border-gray-700 dark:bg-gray-900"
                           />
                         </th>
                       ) : null}
                       <th className="px-3 py-3">Cliente</th>
                       <th className="px-3 py-3">CNPJ</th>
-                      <th className="px-3 py-3">Responsavel</th>
+                      <th className="px-3 py-3">Responsável</th>
                       <th className="px-3 py-3">Revisor</th>
-                      <th className="px-3 py-3">Periodo</th>
-                      <th className="px-3 py-3 text-center">Socios</th>
+                      <th className="px-3 py-3">Período</th>
+                      <th className="px-3 py-3 text-center">Sócios</th>
                       <th className="px-3 py-3">Gerado em</th>
-                      <th className="px-3 py-3 text-center">Acoes</th>
+                      <th className="px-3 py-3 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
@@ -6394,13 +6394,13 @@ function ReportsPage({
                                 type="checkbox"
                                 checked={selected}
                                 onChange={() => toggleReinfReportSelection(relatorio.id)}
-                                aria-label={`Selecionar relatorio de ${relatorio.razao_social || relatorio.nome_identificacao || 'cliente'}`}
+                                aria-label={`Selecionar relatório de ${relatorio.razao_social || relatorio.nome_identificacao || 'cliente'}`}
                                 className="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue dark:border-gray-700 dark:bg-gray-900"
                               />
                             </td>
                           ) : null}
                           <td className="break-words px-3 py-3">
-                            <p className="font-black leading-snug">{relatorio.razao_social || relatorio.nome_identificacao || 'Nao informado'}</p>
+                            <p className="font-black leading-snug">{relatorio.razao_social || relatorio.nome_identificacao || 'Não informado'}</p>
                             <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                               {relatorio.nome_identificacao || '-'}
                             </p>
@@ -6438,7 +6438,7 @@ function ReportsPage({
               </TableScrollArea>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-500 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-400">
-                Nenhum relatorio de distribuicao de lucro foi salvo ainda.
+                Nenhum relatório de distribuição de lucro foi salvo ainda.
               </div>
             )}
           </div>
@@ -6722,20 +6722,20 @@ function UserModal({ user, users, onClose, onSave }) {
     const nextErrors = [];
     const email = form.email.trim().toLowerCase();
     const duplicate = users.some((item) => item.id !== user?.id && normalizeText(item.email) === normalizeText(email));
-    if (isBlank(form.nome)) nextErrors.push('Nome completo e obrigatorio.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.push('Informe um e-mail profissional valido.');
+    if (isBlank(form.nome)) nextErrors.push('Nome completo é obrigatório.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextErrors.push('Informe um e-mail profissional válido.');
     if (duplicate) nextErrors.push('Já existe um usuário cadastrado com este e-mail.');
     if (!form.perfil_acesso) nextErrors.push('Selecione o perfil de acesso.');
 
     const sociosValidos = normalizeSociosClienteInput(form._socios ?? []);
     if (sociosValidos.some((socio) => !socio.nome && socio.cpf)) {
-      nextErrors.push('Informe o nome do socio.');
+      nextErrors.push('Informe o nome do sócio.');
     }
     if (sociosValidos.some((socio) => socio.nome && !socio.cpf)) {
-      nextErrors.push('Informe o CPF do socio.');
+      nextErrors.push('Informe o CPF do sócio.');
     }
     if (sociosValidos.some((socio) => socio.cpf && socio.cpf.length !== 11)) {
-      nextErrors.push('CPF do socio deve ter 11 digitos.');
+      nextErrors.push('CPF do sócio deve ter 11 dígitos.');
     }
 
     if (nextErrors.length) {
@@ -6773,7 +6773,7 @@ function UserModal({ user, users, onClose, onSave }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <AuthTextField label="Nome completo" value={form.nome} onChange={(value) => setForm((current) => ({ ...current, nome: value }))} />
             <AuthTextField label="E-mail profissional" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} disabled />
-            <AuthTextField label="Cargo / funcao" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} />
+            <AuthTextField label="Cargo / função" value={form.cargo} onChange={(value) => setForm((current) => ({ ...current, cargo: value }))} />
             <AuthTextField label="Setor" value={form.setor} onChange={(value) => setForm((current) => ({ ...current, setor: value }))} />
             <DropdownFilterSelect
               label="Perfil de acesso"
@@ -7011,15 +7011,15 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
     const nome = String(draft.nome ?? '').trim();
     const cpf = normalizeCpfDigits(draft.cpf);
     if (!nome || !cpf) {
-      setError('Informe nome e CPF para adicionar o socio.');
+      setError('Informe nome e CPF para adicionar o sócio.');
       return;
     }
     if (cpf.length !== 11) {
-      setError('CPF deve ter 11 digitos.');
+      setError('CPF deve ter 11 dígitos.');
       return;
     }
     if (normalizedSocios.some((socio) => socio.cpf === cpf)) {
-      setError('Este CPF ja foi cadastrado para o cliente.');
+      setError('Este CPF já foi cadastrado para o cliente.');
       return;
     }
     onChange([...normalizedSocios, { nome, cpf }]);
@@ -7116,7 +7116,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
                   value={formatCpfInput(socio.cpf)}
                   onChange={(event) => updateSocio(index, 'cpf', event.target.value)}
                   disabled={disabled}
-                  aria-label="CPF do socio"
+                  aria-label="CPF do sócio"
                   className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
                 />
                 <button
@@ -7124,7 +7124,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
                   onClick={() => removeSocio(index)}
                   disabled={disabled}
                   className="inline-flex h-11 items-center justify-center rounded-lg border border-red-200 px-3 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Remover socio"
+                  aria-label="Remover sócio"
                 >
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
@@ -7133,7 +7133,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
           </div>
         ) : null}
         {listOpen && !normalizedSocios.length ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-400">Nenhum socio cadastrado.</p>
+          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-400">Nenhum sócio cadastrado.</p>
         ) : null}
       </div>
     </section>
@@ -8609,7 +8609,7 @@ export default function App() {
       }
       setToast({
         title: 'Relatório de distribuição de lucro salvo',
-        message: saved?.razao_social || saved?.nome_identificacao || 'Historico atualizado.',
+        message: saved?.razao_social || saved?.nome_identificacao || 'Histórico atualizado.',
       });
       return saved || true;
     } catch (error) {
@@ -8623,12 +8623,12 @@ export default function App() {
 
   async function excluirRelatorioReinf(relatorio, options = {}) {
     const { skipConfirm = false, silent = false } = options;
-    if (!ensureSupabaseWriteReady('excluir o relatorio de distribuicao de lucro')) return false;
+    if (!ensureSupabaseWriteReady('excluir o relatório de distribuição de lucro')) return false;
     if (!relatorio?.id) {
       if (!silent) {
         setToast({
-          title: 'Relatorio de distribuicao de lucro invalido',
-          message: 'Nao foi possivel identificar o relatorio para exclusao.',
+          title: 'Relatório de distribuição de lucro inválido',
+          message: 'Não foi possível identificar o relatório para exclusão.',
         });
       }
       return false;
@@ -8636,7 +8636,7 @@ export default function App() {
 
     const clienteNome = relatorio.razao_social || relatorio.nome_identificacao || 'este cliente';
     if (!skipConfirm) {
-      const confirmed = window.confirm(`Excluir o relatorio de distribuicao de lucro de ${clienteNome}? Esta acao nao pode ser desfeita.`);
+      const confirmed = window.confirm(`Excluir o relatório de distribuição de lucro de ${clienteNome}? Esta ação não pode ser desfeita.`);
       if (!confirmed) return false;
     }
 
@@ -8645,16 +8645,16 @@ export default function App() {
       setReinfRelatorios((current) => current.filter((item) => item.id !== relatorio.id));
       if (!silent) {
         setToast({
-          title: 'Relatorio de distribuicao de lucro excluido',
-          message: deleted?.razao_social || deleted?.nome_identificacao || 'Historico atualizado.',
+          title: 'Relatório de distribuição de lucro excluído',
+          message: deleted?.razao_social || deleted?.nome_identificacao || 'Histórico atualizado.',
         });
       }
       return true;
     } catch (error) {
       if (!silent) {
         setToast({
-          title: 'Falha ao excluir relatorio de distribuicao de lucro',
-          message: error.message || 'Nao foi possivel excluir o relatorio agora.',
+          title: 'Falha ao excluir relatório de distribuição de lucro',
+          message: error.message || 'Não foi possível excluir o relatório agora.',
         });
       }
       return false;

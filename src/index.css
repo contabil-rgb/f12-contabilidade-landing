@@ -717,31 +717,31 @@
 
   .base-clients-table .table-head-cell:nth-child(1),
   .base-clients-table .table-cell:nth-child(1) {
-    width: 15rem;
+    width: 18rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(2),
   .base-clients-table .table-cell:nth-child(2),
-  .base-clients-table .table-head-cell:nth-child(4),
-  .base-clients-table .table-cell:nth-child(4) {
-    width: 6.75rem;
-  }
-
   .base-clients-table .table-head-cell:nth-child(3),
   .base-clients-table .table-cell:nth-child(3) {
-    width: 6.75rem;
+    width: 13rem;
+  }
+
+  .base-clients-table .table-head-cell:nth-child(4),
+  .base-clients-table .table-cell:nth-child(4) {
+    width: 8rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(5),
   .base-clients-table .table-cell:nth-child(5),
   .base-clients-table .table-head-cell:nth-child(6),
   .base-clients-table .table-cell:nth-child(6) {
-    width: 8rem;
+    width: 9rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(7),
   .base-clients-table .table-cell:nth-child(7) {
-    width: 7rem;
+    width: 8rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(8),
@@ -756,7 +756,37 @@
 
   .base-clients-table .table-head-cell:nth-child(10),
   .base-clients-table .table-cell:nth-child(10) {
-    width: 7rem;
+    width: 6.75rem;
+  }
+
+  .base-client-attachment-cell {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .base-client-attachment-cell > span {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .base-client-attachment-cell > div {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .base-client-attachment-cell button {
+    min-height: 2rem;
+    border-radius: 0.5rem;
+    padding: 0.42rem 0.55rem;
+    font-size: 0.72rem;
   }
 
   .base-clients-table .table-actions {
