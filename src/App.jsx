@@ -1877,8 +1877,6 @@ const REINF_TABLE_MODEL_OPTIONS = [
   { value: REINF_TABLE_MODEL_TOTALS, label: 'Tabela de totais' },
 ];
 const REINF_TOTAL_FIELD_OPTIONS = [
-  { key: 'totalLiquido', label: 'Total liquido' },
-  { key: 'despesaDescontadaSocios', label: 'Desp. desc. socios' },
   { key: 'totalDistribuidoIsentoAta', label: 'Total distribuido isento (ATA)' },
   { key: 'totalDistribuidoTributavel', label: 'Total distribuido tributavel' },
 ];
