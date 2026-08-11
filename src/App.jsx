@@ -3429,7 +3429,7 @@ function ClientsTable({
         </div>
       </div>
       <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-2">
-        <table className="table-base min-w-[980px] xl:min-w-[1180px] 2xl:min-w-[1360px]">
+        <table className="table-base base-clients-table min-w-[920px] xl:min-w-[1040px] 2xl:min-w-[1180px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
               <th className="table-head-cell table-sticky-left w-72 px-4">
@@ -3458,7 +3458,7 @@ function ClientsTable({
                   </button>
                 </th>
               ))}
-              <th className="table-head-cell table-sticky-right w-36">
+              <th className="table-head-cell table-sticky-right w-28">
                 Ações
               </th>
             </tr>
@@ -3468,10 +3468,10 @@ function ClientsTable({
                 <tr
                   key={client.id}
                   onClick={() => onView(client.id)}
-                  className="table-row cursor-pointer"
+                  className={`table-row cursor-pointer ${selectedIdsSet.has(client.id) ? 'table-row-selected' : ''}`}
                 >
                   <td className="table-cell table-sticky-left px-4">
-                    <div className="flex max-w-72 items-start gap-3">
+                    <div className="flex max-w-72 items-center gap-3">
                       <input
                         type="checkbox"
                         checked={selectedIdsSet.has(client.id)}
@@ -3479,9 +3479,9 @@ function ClientsTable({
                         aria-label={`Selecionar ${client.nome_identificacao || client.razao_social || 'cliente'}`}
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) => onToggleSelect?.(client.id, event.target.checked)}
-                        className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                         {getDashboardInitials(client.nome_identificacao || client.razao_social || 'CL')}
                       </div>
                       <div className="min-w-0">
@@ -3631,13 +3631,13 @@ function BaseClientesPage(props) {
         canSelectRow={canSelectClientForBatch}
       />
       {batchResponsavelOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-panel dark:border-gray-800 dark:bg-gray-900">
+        <div className="modal-backdrop z-[70] flex items-center justify-center">
+          <section className="modal-panel modal-panel-sm p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Alteração em lote</p>
-                <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Alterar responsável</h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
+                <p className="modal-eyebrow">Alteração em lote</p>
+                <h2 className="modal-title">Alterar responsável</h2>
+                <p className="modal-subtitle">
                   {formatNumber(selectedClients.length)} cliente(s) selecionado(s). Escolha um responsável ativo para receber essa carteira.
                 </p>
               </div>
@@ -3645,7 +3645,7 @@ function BaseClientesPage(props) {
                 type="button"
                 onClick={() => setBatchResponsavelOpen(false)}
                 disabled={batchResponsavelBusy}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+                className="modal-close-button disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <X size={18} aria-hidden="true" />
               </button>
@@ -3663,7 +3663,7 @@ function BaseClientesPage(props) {
               buttonClassName="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold normal-case text-slate-800 outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
 
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+            <div className="modal-warning mt-5">
               A alteração atualiza somente o campo responsável dos clientes selecionados e registra histórico para auditoria.
             </div>
 
@@ -4402,26 +4402,26 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   if (!client) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
-      <div className="mx-auto my-6 max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-panel dark:border-gray-700 dark:bg-gray-900">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+    <div className="modal-backdrop z-[70] overflow-y-auto">
+      <div className="modal-panel modal-panel-xl mx-auto my-6">
+        <div className="modal-header sticky top-0 z-10 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Preparação da Distribuição de Lucro</p>
-            <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-gray-100">{getClientDisplayName(client)}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-gray-300">{formatCnpj(client.cnpj)}</p>
+            <p className="modal-eyebrow">Preparação da Distribuição de Lucro</p>
+            <h2 className="modal-title">{getClientDisplayName(client)}</h2>
+            <p className="modal-subtitle">{formatCnpj(client.cnpj)}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-500/40 dark:hover:text-red-300"
+            className="modal-close-button"
             aria-label="Fechar modal de distribuição de lucro"
           >
             <X size={18} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="space-y-4 p-5">
-          <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
+        <div className="modal-body space-y-4">
+          <section className="modal-section">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Sócios no relatório</h3>
@@ -4458,7 +4458,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 p-4 dark:border-gray-700">
+          <section className="modal-section">
             <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e período</h3>
             <div className="mt-4 grid gap-3 lg:grid-cols-[220px_180px_minmax(180px,220px)_minmax(0,1fr)]">
               <DropdownFilterSelect
@@ -6757,19 +6757,19 @@ function UserModal({ user, users, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
-      <form onSubmit={submit} className="mx-auto max-w-3xl rounded-lg bg-white shadow-panel dark:bg-gray-900">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-gray-800">
+    <div className="modal-backdrop z-50 overflow-y-auto">
+      <form onSubmit={submit} className="modal-panel modal-panel-md mx-auto my-6">
+        <div className="modal-header flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-slate-950 dark:text-gray-100">Editar usuário institucional</h2>
-            <p className="text-sm font-semibold text-slate-500 dark:text-gray-300">Edicao de status e dados complementares do perfil.</p>
+            <h2 className="modal-title">Editar usuário institucional</h2>
+            <p className="modal-subtitle">Edição de status e dados complementares do perfil.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600 dark:border-gray-700 dark:text-gray-300">
+          <button type="button" onClick={onClose} className="modal-close-button">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="modal-body space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <AuthTextField label="Nome completo" value={form.nome} onChange={(value) => setForm((current) => ({ ...current, nome: value }))} />
             <AuthTextField label="E-mail profissional" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} disabled />
@@ -6802,7 +6802,7 @@ function UserModal({ user, users, onClose, onSave }) {
           <ErrorList errors={errors} />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-gray-800">
+        <div className="modal-footer flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 dark:border-gray-700 dark:text-gray-100">
             Cancelar
           </button>
@@ -6916,19 +6916,19 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm">
-      <form onSubmit={submit} className="mx-auto max-w-6xl rounded-lg bg-white shadow-panel">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+    <div className="modal-backdrop z-50 overflow-y-auto">
+      <form onSubmit={submit} className="modal-panel modal-panel-xl mx-auto my-6">
+        <div className="modal-header sticky top-0 z-10 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-slate-950">{client?.id ? 'Editar cliente' : 'Novo cliente'}</h2>
-            <p className="text-sm font-semibold text-slate-500">{form.nome_identificacao || form.razao_social || 'Cadastro contábil'}</p>
+            <h2 className="modal-title">{client?.id ? 'Editar cliente' : 'Novo cliente'}</h2>
+            <p className="modal-subtitle">{form.nome_identificacao || form.razao_social || 'Cadastro contábil'}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-red-600">
+          <button type="button" onClick={onClose} className="modal-close-button">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="space-y-5 p-5">
+        <div className="modal-body space-y-5">
           {errors.length ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
               {errors.map((error) => (
@@ -6946,8 +6946,8 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
 
             return (
               <Fragment key={group}>
-                <section className="rounded-lg border border-slate-200 p-4">
-                  <h3 className="text-base font-black text-slate-950">{group}</h3>
+                <section className="modal-section">
+                  <h3 className="text-base font-black text-slate-950 dark:text-gray-100">{group}</h3>
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {visibleFields.map((field) => (
                       <FormField
@@ -6981,7 +6981,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
           })}
         </div>
 
-        <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+        <div className="modal-footer sticky bottom-0 flex flex-wrap items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700">
             Cancelar
           </button>
@@ -7043,18 +7043,18 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 p-4">
+    <section className="modal-section">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-base font-black text-slate-950">Sócios da Empresa</h3>
+          <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Sócios da Empresa</h3>
         </div>
-        <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500">
+        <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-black text-slate-500 dark:border-gray-700 dark:text-gray-300">
           {normalizedSocios.length} sócio(s)
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
-        <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+        <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
           Nome do sócio
           <input
             value={draft.nome}
@@ -7067,7 +7067,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
             className="form-control-shell mt-1 disabled:bg-slate-100 disabled:text-slate-400"
           />
         </label>
-        <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+        <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
           CPF
           <input
             value={formatCpfInput(draft.cpf)}
@@ -7133,7 +7133,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
           </div>
         ) : null}
         {listOpen && !normalizedSocios.length ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500">Nenhum socio cadastrado.</p>
+          <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-gray-400">Nenhum socio cadastrado.</p>
         ) : null}
       </div>
     </section>
@@ -7173,9 +7173,9 @@ function FormField({
     const canUpload = Boolean(tipoAnexo && isUuid(cliente?.id));
 
     return (
-      <div className="text-xs font-black uppercase tracking-normal text-slate-500">
+      <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
         <span>{label}</span>
-        <div className={`mt-1 rounded-lg border border-slate-200 bg-white p-3 ${disabled ? 'bg-slate-100 text-slate-400' : ''}`}>
+        <div className={`mt-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 ${disabled ? 'bg-slate-100 text-slate-400 dark:bg-gray-800/60 dark:text-gray-500' : ''}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <AttachmentBadge value={value} />
             <div className="flex flex-wrap gap-2">
@@ -7223,7 +7223,7 @@ function FormField({
 
   if (field.type === 'textarea') {
     return (
-      <label className="text-xs font-black uppercase tracking-normal text-slate-500 md:col-span-2 xl:col-span-3">
+      <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400 md:col-span-2 xl:col-span-3">
         {label}
         <textarea
           value={value}
@@ -7240,7 +7240,7 @@ function FormField({
   if (field.type === 'select' || field.type === 'yesno') {
     const options = uniqueValues([...(getOptions(listagens, field) ?? []), value]);
     return (
-      <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+      <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
         {label}
         <DropdownFilterSelect
           label=""
@@ -7262,7 +7262,7 @@ function FormField({
   }
 
   return (
-    <label className="text-xs font-black uppercase tracking-normal text-slate-500">
+    <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
       {label}
       <input
         value={value}
