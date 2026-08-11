@@ -83,11 +83,6 @@ export default function UsersPage({
 
   return (
     <div className="min-w-0 space-y-5">
-      <SurfacePanel
-        title="Usuários institucionais"
-        right={<span className="pill-shell">{users.length} usuário(s) sincronizado(s)</span>}
-      />
-
       <SurfacePanel>
         <DataTableShell
           headers={['Nome', 'E-mail', 'Cargo', 'Setor', 'Perfil', 'Status', 'Último acesso', 'Ações']}

@@ -26,7 +26,7 @@ export default function ActionButton({
   return (
     <Component
       className={classNames(
-        'inline-flex min-w-0 items-center justify-center gap-2 rounded-lg font-black outline-none transition duration-150 ease-out active:translate-y-px focus-visible:ring-4 focus-visible:ring-brand-blue/10 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex min-w-0 items-center justify-center gap-2 rounded-lg font-semibold outline-none transition duration-150 ease-out active:translate-y-px focus-visible:ring-4 focus-visible:ring-brand-blue/10 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60',
         VARIANT_CLASSNAMES[variant] ?? VARIANT_CLASSNAMES.secondary,
         SIZE_CLASSNAMES[size] ?? SIZE_CLASSNAMES.md,
         className,

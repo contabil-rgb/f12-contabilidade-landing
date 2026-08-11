@@ -40,9 +40,9 @@ export default function MetricTile({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-gray-300">{title}</p>
-          <p className="mt-3 text-3xl font-black leading-none text-slate-950 dark:text-gray-100 sm:text-[2.1rem]">{value}</p>
-          {detail ? <p className="mt-3 max-w-[30ch] text-sm font-semibold leading-6 text-slate-500 dark:text-gray-200/90">{detail}</p> : null}
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-gray-300">{title}</p>
+          <p className="mt-3 text-3xl font-bold leading-none text-slate-950 dark:text-gray-100 sm:text-[2.1rem]">{value}</p>
+          {detail ? <p className="mt-3 max-w-[30ch] text-sm font-medium leading-6 text-slate-500 dark:text-gray-200/90">{detail}</p> : null}
         </div>
         {Icon ? (
           <span className={classNames('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-slate-50/95 shadow-sm dark:border-gray-600 dark:bg-gray-800/90', toneClass)}>

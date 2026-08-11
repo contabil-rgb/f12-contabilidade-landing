@@ -2563,15 +2563,11 @@ function AppShell({
   supabaseStatusLabel = '',
   supabaseStatusTone = 'neutral',
   writeBlockedMessage = '',
-  searchClients = [],
-  searchHistory = [],
-  onOpenClient,
-  onOpenHistoryPage,
 }) {
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.permission || can(currentUser, item.permission));
-  const canSearchHistorico = visibleNavItems.some((item) => item.key === 'historico');
   const profile = getProfile(currentUser);
   const currentTitle = NAV_ITEMS.find((item) => item.key === page)?.label ?? 'Cliente';
+  const showDashboardHeaderControls = page === 'dashboard';
   const pageDescription = PAGE_DESCRIPTIONS[page] ?? 'Painel interno do escritório contábil';
   const statusToneTextClass = {
     success: 'text-emerald-300',
@@ -2581,134 +2577,12 @@ function AppShell({
     muted: 'text-slate-400',
     neutral: 'text-slate-300',
   }[supabaseStatusTone] ?? 'text-slate-300';
-  const searchRef = useRef(null);
-  const [globalQuery, setGlobalQuery] = useState('');
-  const [globalOpen, setGlobalOpen] = useState(false);
   const groupedNav = NAV_GROUPS
     .map((group) => ({
       ...group,
       items: group.keys.map((key) => visibleNavItems.find((item) => item.key === key)).filter(Boolean),
     }))
     .filter((group) => group.items.length > 0);
-
-  const clientsById = useMemo(() => {
-    const map = new Map();
-    searchClients.forEach((client) => {
-      if (client?.id) map.set(String(client.id), client);
-    });
-    return map;
-  }, [searchClients]);
-
-  const globalResults = useMemo(() => {
-    const query = String(globalQuery ?? '').trim();
-    if (!query) return [];
-
-    const queryNorm = normalizeText(query);
-    const queryDigits = normalizeCnpj(query);
-    const seen = new Set();
-    const results = [];
-
-    for (const client of searchClients) {
-      if (!client?.id) continue;
-      const id = String(client.id);
-      const seenKey = `cliente:${id}`;
-      if (seen.has(seenKey)) continue;
-
-      const nome = String(client.nome_identificacao ?? '');
-      const razao = String(client.razao_social ?? '');
-      const cnpj = String(client.cnpj ?? '');
-      const stack = normalizeText(`${nome} ${razao} ${cnpj}`);
-      const cnpjDigits = normalizeCnpj(cnpj);
-
-      const byText = queryNorm && stack.includes(queryNorm);
-      const byCnpj = queryDigits && cnpjDigits.includes(queryDigits);
-      if (!byText && !byCnpj) continue;
-
-      seen.add(seenKey);
-      results.push({
-        kind: 'cliente',
-        id,
-        nome: nome || razao || 'Cliente sem identificação',
-        razao: razao || 'Razão social não informada',
-        cnpj: cnpj || '-',
-        subtitle: 'Cliente',
-      });
-
-      if (results.length >= 8) break;
-    }
-
-    if (canSearchHistorico && results.length < 15) {
-      for (const item of searchHistory) {
-        const historyId = String(item?.id ?? '');
-        if (!historyId) continue;
-        const seenKey = `historico:${historyId}`;
-        if (seen.has(seenKey)) continue;
-
-        const clientId = String(item?.cliente_id ?? '');
-        const linkedClient = clientsById.get(clientId);
-        const nomeCliente = String(item?.cliente_nome ?? linkedClient?.nome_identificacao ?? linkedClient?.razao_social ?? '');
-        const stack = normalizeText(
-          `${nomeCliente} ${item?.campo_alterado ?? ''} ${item?.tipo_acao ?? ''} ${item?.origem ?? ''} ${item?.usuario_email ?? ''} ${item?.usuario_nome ?? ''} ${item?.valor_novo ?? ''} ${item?.valor_anterior ?? ''}`,
-        );
-        if (!stack.includes(queryNorm)) continue;
-
-        seen.add(seenKey);
-        results.push({
-          kind: 'historico',
-          id: clientId || historyId,
-          nome: nomeCliente || 'Registro de historico',
-          razao: String(item?.campo_alterado ?? 'Campo não informado'),
-          cnpj: String(item?.tipo_acao ?? '-'),
-          subtitle: 'Histórico',
-        });
-
-        if (results.length >= 15) break;
-      }
-    }
-
-    return results;
-  }, [canSearchHistorico, clientsById, globalQuery, searchClients, searchHistory]);
-
-  useEffect(() => {
-    function onOutsideClick(event) {
-      if (!searchRef.current) return;
-      if (!searchRef.current.contains(event.target)) {
-        setGlobalOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', onOutsideClick);
-    return () => document.removeEventListener('mousedown', onOutsideClick);
-  }, []);
-
-  function handleGlobalResultClick(result) {
-    if (!result?.id) return;
-    if (result.kind === 'historico') {
-      onOpenHistoryPage?.();
-    } else {
-      onOpenClient?.(result.id);
-    }
-    setGlobalOpen(false);
-    setGlobalQuery('');
-  }
-
-  function renderHighlighted(text) {
-    const value = String(text ?? '');
-    const query = String(globalQuery ?? '').trim();
-    if (!query) return value;
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escaped})`, 'ig');
-    const parts = value.split(regex);
-    if (parts.length <= 1) return value;
-    return parts.map((part, index) => (
-      part.toLowerCase() === query.toLowerCase()
-        ? (
-          <mark key={`${part}-${index}`} className="rounded bg-amber-100 px-0.5 text-slate-900">
-            {part}
-          </mark>
-        )
-        : <span key={`${part}-${index}`}>{part}</span>
-    ));
-  }
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-gray-100">
@@ -2792,58 +2666,8 @@ function AppShell({
               <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
             </div>
 
-            <div className="flex min-w-0 flex-wrap items-center gap-2.5 2xl:justify-end">
-              <div className="hidden xl:block">
-                <div ref={searchRef} className="relative">
-                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
-                  <input
-                    className="input-shell w-72 pl-9 2xl:w-80"
-                    value={globalQuery}
-                    onFocus={() => setGlobalOpen(true)}
-                    onChange={(event) => {
-                      setGlobalQuery(event.target.value);
-                      setGlobalOpen(true);
-                    }}
-                    placeholder="Busca por CNPJ, razão social ou nome"
-                  />
-                  {globalOpen ? (
-                    <div className="absolute right-0 z-50 mt-2 max-h-80 w-[min(34rem,calc(100vw-20rem))] overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-soft dark:border-gray-700 dark:bg-gray-800">
-                      {!globalQuery.trim() ? (
-                        <p className="px-2 py-2 text-sm font-semibold text-slate-500">
-                          Digite para buscar clientes e histórico.
-                        </p>
-                      ) : globalResults.length ? (
-                        <div className="space-y-1">
-                          {globalResults.map((result) => (
-                            <button
-                              key={`${result.kind}-${result.id}-${result.subtitle}`}
-                              type="button"
-                              onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => handleGlobalResultClick(result)}
-                              className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <p className="text-sm font-black text-slate-900">{renderHighlighted(result.nome)}</p>
-                                  <p className="text-xs font-semibold text-slate-500">{renderHighlighted(result.razao)}</p>
-                                  <p className="text-xs font-semibold text-slate-500">{renderHighlighted(result.cnpj)}</p>
-                                </div>
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black text-slate-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
-                                  {result.subtitle}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="px-2 py-2 text-sm font-semibold text-slate-500">
-                          Nenhum cliente encontrado para "{globalQuery}".
-                        </p>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+            {showDashboardHeaderControls ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5 2xl:justify-end">
               <div className="pill-shell">{currentUser?.nome ?? 'Usuário'}</div>
               <ThemeToggle />
               {canImport ? (
@@ -2863,7 +2687,8 @@ function AppShell({
               </ActionButton>
               <div className="pill-shell">Atualizado: {metadata.importedAt || metadata.generatedAt || 'não informado'}</div>
               <StatusBadge toneClass={chipClass(supabaseStatusTone)} size="md">{supabaseStatusLabel}</StatusBadge>
-            </div>
+              </div>
+            ) : null}
           </div>
 
           {writeBlockedMessage ? (
@@ -3735,15 +3560,6 @@ function BaseClientesPage(props) {
   const [batchResponsavelValue, setBatchResponsavelValue] = useState('');
   const [batchResponsavelBusy, setBatchResponsavelBusy] = useState(false);
 
-  const activeFilterCount = useMemo(
-    () => Object.entries(props.filters || {}).reduce((count, [key, value]) => {
-      if (!value) return count;
-      if (Array.isArray(value)) return value.length ? count + 1 : count;
-      return count + 1;
-    }, 0),
-    [props.filters],
-  );
-
   const canSelectClientForBatch = (client) => Boolean(props.canBatchUpdateResponsavel?.(client));
   const selectedClientIdSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
   const selectedClients = useMemo(
@@ -3793,18 +3609,6 @@ function BaseClientesPage(props) {
 
   return (
     <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="Base de Clientes"
-        description="Carteira central com filtros rápidos e atalhos para edição."
-        right={(
-          <>
-            <span className="pill-shell">{formatNumber(props.clients.length)} cliente(s) visível(is)</span>
-            <span className={`rounded-full border px-3 py-1.5 text-xs font-black ${chipClass(activeFilterCount ? 'info' : 'neutral')}`}>
-              {activeFilterCount ? `${formatNumber(activeFilterCount)} filtro(s) ativo(s)` : 'Visão ampla'}
-            </span>
-          </>
-        )}
-      />
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           title="Carteira exibida"
@@ -5102,29 +4906,6 @@ function ReinfPage({
 
   return (
     <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="Distribuição de Lucro"
-        description="Preparação e envio da distribuição de lucro ao setor fiscal."
-        right={(
-          <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
-              {statusLabel}
-            </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              Fonte: {getMetadataSourceDisplay(metadata?.source)}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-            >
-              <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Atualizando...' : 'Atualizar dados'}
-            </button>
-          </>
-        )}
-      />
       {focusedClientId ? (
         <section className="rounded-lg border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5323,29 +5104,6 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
 
   return (
     <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="ECD / ECF"
-        description="Controle das obrigações anuais, responsáveis e comprovantes da ECD/ECF."
-        right={(
-          <>
-            <span className={`rounded-lg border px-3 py-2 text-xs font-black ${chipClass(statusTone)}`}>
-              {statusLabel}
-            </span>
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              Fonte: {getMetadataSourceDisplay(metadata?.source)}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-            >
-              <RefreshCcw size={15} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Atualizando...' : 'Atualizar dados'}
-            </button>
-          </>
-        )}
-      />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="ECD obrigatoria" value={countWhere(scopedClients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
         <MetricCard title="Pendências ECD" value={countWhere(scopedClients, (client) => hasPendenciaObrigacaoEcd(client))} icon={AlertTriangle} tone="warning" />
@@ -6406,71 +6164,6 @@ function ReportsPage({
   return (
     <div className="min-w-0 space-y-5">
       <section className="surface-card p-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Exportação da base
-            </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">Base filtrada para saída</h2>
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">
-              {formatNumber(reportScope.length)} registros no recorte atual, {formatNumber(clients.length)} registros na base completa.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className={`rounded-full border px-3 py-1.5 text-xs font-black ${chipClass(statusTone)}`}>
-                {statusLabel}
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                Fonte: {getMetadataSourceDisplay(metadata?.source)}
-              </span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                Recorte atual: {formatNumber(reportScope.length)}
-              </span>
-            </div>
-          </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-3 dark:border-gray-800 dark:bg-gray-900/70">
-            <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">
-              Ações de saída
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-              >
-                <RefreshCcw size={16} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
-                {loading ? 'Atualizando...' : 'Atualizar dados'}
-              </button>
-              {canExport ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onExportXlsx(reportScope, 'clientes-contabeis-filtrados.xlsx')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-brand-blue px-4 py-2.5 text-sm font-black text-white transition hover:bg-[#0056d6]"
-                  >
-                    <Download size={16} aria-hidden="true" />
-                    Excel filtrado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onExportCsv(reportScope, 'clientes-contabeis-filtrados.csv')}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-                  >
-                    <FileDown size={16} aria-hidden="true" />
-                    CSV filtrado
-                  </button>
-                </>
-              ) : (
-                <span className="inline-flex items-center rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500 dark:bg-gray-800 dark:text-gray-400">
-                  Exportação bloqueada
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="surface-card p-6">
         <div className="grid gap-3 lg:grid-cols-4">
           {reportTypes.map((type) => {
             const selected = selectedReportType === type.value;
@@ -6506,14 +6199,36 @@ function ReportsPage({
             </p>
             <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-gray-100">{selectedReport.label}</h2>
           </div>
-          <button
-            type="button"
-            onClick={clearReportFilters}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
-          >
-            <RefreshCcw size={15} aria-hidden="true" />
-            Limpar filtros
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={clearReportFilters}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+            >
+              <RefreshCcw size={15} aria-hidden="true" />
+              Limpar filtros
+            </button>
+            {canExport ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onExportXlsx(reportScope, 'clientes-contabeis-filtrados.xlsx')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-blue px-4 py-2 text-sm font-black text-white transition hover:bg-[#0056d6]"
+                >
+                  <Download size={15} aria-hidden="true" />
+                  Excel filtrado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onExportCsv(reportScope, 'clientes-contabeis-filtrados.csv')}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300"
+                >
+                  <FileDown size={15} aria-hidden="true" />
+                  CSV filtrado
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {renderReportFilters()}
@@ -9708,10 +9423,6 @@ export default function App() {
         supabaseStatusLabel={supabaseStatusLabel}
         supabaseStatusTone={supabaseStatusTone}
         writeBlockedMessage={writeBlockedMessage}
-        searchClients={enrichedClients}
-        searchHistory={can(currentUserFull, PERMISSIONS.HISTORY_VIEW) ? security.historico_alteracoes : []}
-        onOpenClient={openClient}
-        onOpenHistoryPage={() => setPage('historico')}
       >
         <PageContentErrorBoundary
           resetKey={page}

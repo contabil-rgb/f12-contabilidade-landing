@@ -102,8 +102,8 @@ export default function DataTableShell({
       {!hasRows ? (
         <div className="empty-state">
           <Search className="text-slate-300 dark:text-gray-600" size={40} aria-hidden="true" />
-          <p className="text-base font-black text-slate-800 dark:text-gray-100">{emptyTitle}</p>
-          {emptyDescription ? <p className="max-w-md text-sm font-semibold leading-6 text-slate-500 dark:text-gray-300">{emptyDescription}</p> : null}
+          <p className="text-base font-bold text-slate-800 dark:text-gray-100">{emptyTitle}</p>
+          {emptyDescription ? <p className="max-w-md text-sm font-medium leading-6 text-slate-500 dark:text-gray-300">{emptyDescription}</p> : null}
         </div>
       ) : null}
     </>

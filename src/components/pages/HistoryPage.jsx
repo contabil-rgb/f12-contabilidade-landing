@@ -59,22 +59,20 @@ export default function HistoryPage({
   }
 
   return (
-    <SurfacePanel
-      title="Histórico de alterações"
-      description="Registros automáticos dos campos sensíveis e operacionais definidos."
-      headerClassName="border-b border-slate-200"
-      right={canDelete ? (
-        <button
-          type="button"
-          onClick={handleDeleteSelected}
-          disabled={!selectedCount || deleting}
-          className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-black text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/15"
-        >
-          <Trash2 size={16} aria-hidden="true" />
-          {deleting ? 'Excluindo...' : selectedCount ? `Excluir selecionados (${selectedCount})` : 'Excluir selecionados'}
-        </button>
+    <SurfacePanel>
+      {canDelete ? (
+        <div className="flex justify-end p-4 pb-0 sm:p-5 sm:pb-0">
+          <button
+            type="button"
+            onClick={handleDeleteSelected}
+            disabled={!selectedCount || deleting}
+            className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-black text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/15"
+          >
+            <Trash2 size={16} aria-hidden="true" />
+            {deleting ? 'Excluindo...' : selectedCount ? `Excluir selecionados (${selectedCount})` : 'Excluir selecionados'}
+          </button>
+        </div>
       ) : null}
-    >
       <DataTableShell
         headers={[
           ...(canDelete ? ['Selecionar'] : []),

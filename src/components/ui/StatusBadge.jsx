@@ -14,7 +14,7 @@ export default function StatusBadge({
   return (
     <span
       className={classNames(
-        'inline-flex items-center rounded-full border font-black',
+        'inline-flex items-center rounded-full border font-semibold',
         sizeClass,
         toneClass,
         className,
