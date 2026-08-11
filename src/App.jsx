@@ -2837,7 +2837,7 @@ function getDashboardInitials(label) {
 
 function buildDashboardChartGeometry(values, maxValue) {
   const width = 520;
-  const height = 248;
+  const height = 214;
   const paddingX = 14;
   const paddingY = 18;
   const safeValues = values.length ? values : [0];
@@ -2867,20 +2867,20 @@ function DashboardTotalCard({ total, onClick }) {
       as={onClick ? 'button' : 'section'}
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`relative overflow-hidden p-6 text-left xl:p-8 ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
+      className={`relative h-full w-full overflow-hidden p-5 text-left xl:p-6 ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
     >
-      <div className="relative z-10 flex min-h-[220px] flex-col justify-between xl:min-h-[260px] 2xl:min-h-[300px]">
+      <div className="relative z-10 flex min-h-[190px] flex-col justify-between xl:min-h-[220px]">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-300">Total de clientes</p>
-          <p className="mt-4 text-5xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.25rem] 2xl:text-[3.5rem]">{formatNumber(total)}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-300">Total de clientes</p>
+          <p className="mt-4 text-5xl font-bold tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.15rem]">{formatNumber(total)}</p>
         </div>
         <div className="flex items-end justify-center">
-          <span className="flex h-24 w-24 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_24px_60px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 2xl:h-28 2xl:w-28">
-            <Users className="h-11 w-11 2xl:h-[52px] 2xl:w-[52px]" aria-hidden="true" />
+          <span className="flex h-20 w-20 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_18px_42px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 xl:h-24 xl:w-24">
+            <Users className="h-9 w-9 xl:h-11 xl:w-11" aria-hidden="true" />
           </span>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-brand-blue/10 to-transparent dark:from-blue-500/10" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-brand-blue/10 to-transparent dark:from-blue-500/10" />
     </SurfacePanel>
   );
 }
@@ -2899,27 +2899,27 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     : '';
 
   return (
-    <SurfacePanel className={`p-6 2xl:p-7 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Carteira por regime tributário</h2>
+          <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Carteira por regime tributário</h2>
         </div>
       </div>
-      <div className="mt-7 grid gap-6">
+      <div className="mt-5 grid gap-5">
         <div className="flex justify-center">
           <div
-            className="relative flex h-36 w-36 items-center justify-center rounded-full 2xl:h-44 2xl:w-44"
+            className="relative flex h-32 w-32 items-center justify-center rounded-full xl:h-36 xl:w-36"
             style={{
               background: gradient || 'conic-gradient(#2563eb 0% 100%)',
             }}
           >
-            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95 2xl:h-28 2xl:w-28">
-              <span className="text-4xl font-black tracking-tight leading-none text-slate-950 dark:text-gray-100 2xl:text-[2.85rem]">{formatNumber(total)}</span>
+            <div className="flex h-22 w-22 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95 xl:h-24 xl:w-24">
+              <span className="text-4xl font-bold tracking-tight leading-none text-slate-950 dark:text-gray-100">{formatNumber(total)}</span>
               <span className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">clientes</span>
             </div>
           </div>
         </div>
-        <div className="space-y-3.5">
+        <div className="space-y-2">
           {displayRows.map((row, index) => {
             const percentage = total ? ((row.value / total) * 100).toFixed(1).replace('.', ',') : '0,0';
             return (
@@ -2927,7 +2927,7 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
                 key={row.label}
                 type="button"
                 onClick={() => onSelect?.({ regime_tributario: row.label }, `Regime: ${row.label}`)}
-                className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-1.5 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
               >
                 <span
                   className="h-3 w-3 rounded-full"
@@ -2940,7 +2940,7 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
               </button>
             );
           })}
-          <div className="border-t border-slate-100 pt-5 dark:border-gray-800">
+          <div className="border-t border-slate-100 pt-3 dark:border-gray-800">
             <ActionButton type="button" variant="subtle" className="mx-auto flex" onClick={() => onNavigate?.('clientes', { clearFilters: true })}>
               Ver detalhes
               <ChevronRight size={16} aria-hidden="true" />
@@ -2962,14 +2962,14 @@ function DashboardSituationCard({ values, total }) {
   const lastPoint = points[points.length - 1];
 
   return (
-    <SurfacePanel className={`overflow-hidden p-6 sm:p-7 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className={`h-full w-full overflow-hidden p-5 sm:p-6 ${getMetricPanelToneClass('info')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Situação da carteira</h2>
-        <span className="inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-3 text-lg font-black text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+        <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Situação da carteira</h2>
+        <span className="inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-base font-bold text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           {formatNumber(total)}
         </span>
       </div>
-      <div className="mt-7 flex gap-4 sm:gap-5">
+      <div className="mt-5 flex gap-4 sm:gap-5">
         <div className="hidden w-12 shrink-0 flex-col justify-between text-xs font-semibold text-slate-500 dark:text-gray-400 md:flex" style={{ height: `${height}px` }}>
           {ticks.map((tick) => (
             <span key={tick.position}>{formatNumber(tick.label)}</span>
@@ -3009,7 +3009,7 @@ function DashboardSituationCard({ values, total }) {
             </svg>
             {lastPoint ? (
               <div
-                className="absolute -translate-x-1/2 rounded-2xl border border-blue-200 bg-white px-3 py-1.5 text-base font-black text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
+                className="absolute -translate-x-1/2 rounded-xl border border-blue-200 bg-white px-3 py-1.5 text-sm font-bold text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
                 style={{
                   left: `${(lastPoint.x / width) * 100}%`,
                   top: `${Math.max(((lastPoint.y - 52) / height) * 100, 6)}%`,
@@ -3034,9 +3034,9 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
   const max = Math.max(...rows.map((row) => row.value), 1);
 
   return (
-    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
+    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">{title}</h2>
+        <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">{title}</h2>
         <button
           type="button"
           onClick={onViewAll}
@@ -3045,17 +3045,17 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
           Ver todos
         </button>
       </div>
-      <div className="mt-8 space-y-5">
-        {rows.slice(0, 6).map((row, index) => {
+      <div className="mt-5 space-y-3.5">
+        {rows.slice(0, 5).map((row, index) => {
           const percentage = total ? ((row.value / total) * 100).toFixed(1).replace('.', ',') : '0,0';
           return (
             <button
               key={`${field}-${row.label}`}
               type="button"
               onClick={() => onSelect?.({ [field]: row.label }, `${title}: ${row.label}`)}
-              className="flex w-full items-center gap-4 rounded-lg border border-transparent px-1 py-1 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+              className="flex w-full items-center gap-3 rounded-lg border border-transparent px-1 py-1 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
             >
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${DASHBOARD_AVATAR_GRADIENTS[index % DASHBOARD_AVATAR_GRADIENTS.length]} text-sm font-black text-white shadow-sm`}>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${DASHBOARD_AVATAR_GRADIENTS[index % DASHBOARD_AVATAR_GRADIENTS.length]} text-xs font-bold text-white shadow-sm`}>
                 {getDashboardInitials(row.label)}
               </span>
               <div className="min-w-0 flex-1">
@@ -3065,7 +3065,7 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
                     {formatNumber(row.value)} ({percentage}%)
                   </span>
                 </div>
-                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700">
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700">
                   <div
                     className="h-full rounded-full bg-brand-blue"
                     style={{ width: `${Math.max((row.value / max) * 100, 4)}%` }}
@@ -3089,11 +3089,11 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   ];
 
   return (
-    <SurfacePanel className={`p-8 ${getMetricPanelToneClass('muted')}`}>
+    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('muted')}`}>
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.35rem] font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 2xl:text-[1.65rem]">Ações rápidas</h2>
+        <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Ações rápidas</h2>
       </div>
-      <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-4">
+      <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
@@ -3101,10 +3101,10 @@ function DashboardQuickActionsPanel({ onNavigate }) {
               key={action.key}
               type="button"
               onClick={() => onNavigate?.(action.route, { clearFilters: action.route === 'clientes' })}
-              className="flex min-h-[116px] items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/70 px-5 py-5 text-left transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:bg-slate-50 hover:shadow-soft dark:border-gray-700 dark:bg-gray-800/75 dark:hover:border-blue-500/30 dark:hover:bg-gray-800"
+              className="flex min-h-[82px] items-center gap-3 rounded-xl border border-slate-200/80 bg-white/70 px-4 py-4 text-left transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:bg-slate-50 hover:shadow-soft dark:border-gray-700 dark:bg-gray-800/75 dark:hover:border-blue-500/30 dark:hover:bg-gray-800"
             >
-              <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${action.accentBg} ${action.accent}`}>
-                <Icon size={26} aria-hidden="true" />
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${action.accentBg} ${action.accent}`}>
+                <Icon size={22} aria-hidden="true" />
               </span>
               <span className="text-sm font-semibold leading-6 text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{action.label}</span>
             </button>
@@ -3155,18 +3155,24 @@ function DashboardPage({ clients, onPreset, onNavigate }) {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-5 2xl:gap-6">
-        <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
-        <DashboardRegimeCard
-          rows={regimeRows}
-          total={total}
-          onSelect={onPreset}
-          onNavigate={onNavigate}
-        />
-        <DashboardSituationCard values={situationValues} total={total} />
+      <section className="min-w-0 grid items-start gap-5 xl:grid-cols-[minmax(16rem,0.8fr)_minmax(21rem,1.05fr)_minmax(24rem,1.3fr)] 2xl:gap-6">
+        <div className="min-w-0">
+          <DashboardTotalCard total={total} onClick={() => onNavigate?.('clientes', { clearFilters: true })} />
+        </div>
+        <div className="min-w-0">
+          <DashboardRegimeCard
+            rows={regimeRows}
+            total={total}
+            onSelect={onPreset}
+            onNavigate={onNavigate}
+          />
+        </div>
+        <div className="min-w-0">
+          <DashboardSituationCard values={situationValues} total={total} />
+        </div>
       </section>
 
-      <section className="min-w-0 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-5 2xl:gap-6">
+      <section className="min-w-0 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(20rem,0.9fr)] 2xl:gap-6">
         <DashboardRankingPanel
           title="Clientes por responsável"
           rows={responsavelRows}
