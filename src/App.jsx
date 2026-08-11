@@ -3248,39 +3248,29 @@ function SearchAndFilters({
   ].filter(Boolean);
 
   return (
-    <SurfacePanel className="min-w-0 p-5 sm:p-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.78fr)]">
-        <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/80 p-5 shadow-sm dark:border-gray-800 dark:from-gray-950/70 dark:via-gray-950/50 dark:to-gray-900/60">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
-            </div>
-            <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-black text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
-            </span>
+    <SurfacePanel className="min-w-0 p-4 sm:p-5">
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 shadow-sm dark:border-gray-800 dark:from-gray-950/70 dark:via-gray-950/50 dark:to-gray-900/60">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
           </div>
+          <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-black text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
+          </span>
+        </div>
 
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" size={18} />
             <input
               value={filters.search}
               onChange={(event) => updateFilter({ search: event.target.value })}
-              className="input-shell h-12 pl-11 text-sm shadow-sm"
+              className="input-shell h-10 min-h-10 pl-11 text-sm shadow-sm"
               placeholder="Pesquisar cliente, CNPJ ou razão social"
             />
           </div>
-        </div>
 
-        <div className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Visão atual</p>
-            <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
-              {activeFilterItems.length
-                ? `${formatNumber(activeFilterItems.length)} filtro(s) ativo(s) nesta carteira`
-                : 'Nenhum filtro manual ativo no momento.'}
-            </p>
-          </div>
-          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <div className="grid gap-2.5 min-[480px]:grid-cols-2 lg:flex lg:items-center">
             <ActionButton type="button" variant="secondary" size="sm" onClick={onClear}>
               <RefreshCcw size={16} aria-hidden="true" />
               Limpar filtros
@@ -3288,6 +3278,7 @@ function SearchAndFilters({
             {canCreateClient ? (
               <ActionButton
                 type="button"
+                size="sm"
                 onClick={onNewClient}
                 disabled={!canCreateClientEnabled}
                 title={!canCreateClientEnabled ? createDisabledReason : ''}
@@ -3300,11 +3291,12 @@ function SearchAndFilters({
         </div>
       </div>
 
+
       {quickFilterLabel || activeFilterItems.length ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-slate-50/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/65">
+        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/75 p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900/65">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {quickFilterLabel ? (
-              <div className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
                 <Filter size={16} aria-hidden="true" />
                 {quickFilterLabel}
                 <button type="button" onClick={onClear} className="rounded-md p-1 transition hover:bg-sky-100 dark:hover:bg-sky-500/10">
@@ -3339,8 +3331,8 @@ function SearchAndFilters({
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-3xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/55">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-gray-800">
+      <div className="mt-3 rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/55">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-gray-800">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
           </div>
@@ -3349,7 +3341,7 @@ function SearchAndFilters({
           </span>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+        <div className="mt-3 grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           <DropdownFilterSelect
             label="Alertas e acompanhamento"
             value={filters.alerta}
@@ -3411,7 +3403,7 @@ function ClientsTable({
 
   return (
     <section className="min-w-0 surface-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-4 dark:border-gray-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-4 py-3 dark:border-gray-800">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Carteira listada</p>
           <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
@@ -3434,16 +3426,13 @@ function ClientsTable({
               </button>
             </>
           ) : null}
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            Role a tabela no bloco, se precisar.
-          </span>
         </div>
       </div>
-      <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-3">
-        <table className="table-base min-w-[1040px] xl:min-w-[1260px] 2xl:min-w-[1480px]">
+      <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-2">
+        <table className="table-base min-w-[980px] xl:min-w-[1180px] 2xl:min-w-[1360px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
-              <th className="table-head-cell table-sticky-left w-80 px-5">
+              <th className="table-head-cell table-sticky-left w-72 px-4">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -3481,8 +3470,8 @@ function ClientsTable({
                   onClick={() => onView(client.id)}
                   className="table-row cursor-pointer"
                 >
-                  <td className="table-cell table-sticky-left px-5">
-                    <div className="flex max-w-80 items-start gap-3">
+                  <td className="table-cell table-sticky-left px-4">
+                    <div className="flex max-w-72 items-start gap-3">
                       <input
                         type="checkbox"
                         checked={selectedIdsSet.has(client.id)}
