@@ -1,4 +1,5 @@
 import { Component, Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -3248,19 +3249,19 @@ function SearchAndFilters({
   ].filter(Boolean);
 
   return (
-    <SurfacePanel className="min-w-0 p-4 sm:p-5">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 shadow-sm dark:border-gray-800 dark:from-gray-950/70 dark:via-gray-950/50 dark:to-gray-900/60">
+    <SurfacePanel className="min-w-0 overflow-hidden p-0">
+      <div className="border-b border-slate-200/80 bg-gradient-to-br from-white/90 via-white/70 to-slate-50/70 p-4 dark:border-gray-800 dark:from-gray-950/65 dark:via-gray-950/45 dark:to-gray-900/45 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Busca principal</p>
           </div>
-          <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-black text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-300">
             {formatNumber(visibleCount)} de {formatNumber(totalCount)} cliente(s)
           </span>
         </div>
 
         <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full max-w-2xl">
+          <div className="relative w-full max-w-xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" size={18} />
             <input
               value={filters.search}
@@ -3293,10 +3294,10 @@ function SearchAndFilters({
 
 
       {quickFilterLabel || activeFilterItems.length ? (
-        <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/75 p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900/65">
+        <div className="mx-4 mt-4 flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-slate-50/60 p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900/45 sm:mx-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {quickFilterLabel ? (
-              <div className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
                 <Filter size={16} aria-hidden="true" />
                 {quickFilterLabel}
                 <button type="button" onClick={onClear} className="rounded-md p-1 transition hover:bg-sky-100 dark:hover:bg-sky-500/10">
@@ -3305,7 +3306,7 @@ function SearchAndFilters({
               </div>
             ) : <span />}
 
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
               {activeFilterItems.length ? `${formatNumber(activeFilterItems.length)} ativo(s)` : 'Sem filtros'}
             </span>
           </div>
@@ -3315,14 +3316,14 @@ function SearchAndFilters({
               {activeFilterItems.slice(0, 5).map((item) => (
                 <span
                   key={item.key}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                 >
                   <span className="text-slate-400 dark:text-gray-500">{item.label}:</span>
                   <span className="max-w-[18ch] truncate">{String(item.value)}</span>
                 </span>
               ))}
               {activeFilterItems.length > 5 ? (
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                   +{activeFilterItems.length - 5} filtro(s)
                 </span>
               ) : null}
@@ -3331,12 +3332,12 @@ function SearchAndFilters({
         </div>
       ) : null}
 
-      <div className="mt-3 rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/55">
+      <div className="px-4 py-4 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-gray-800">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
           </div>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             {activeFilterItems.length ? `${formatNumber(activeFilterItems.length)} ativo(s)` : 'Sem filtros'}
           </span>
         </div>
@@ -3347,7 +3348,7 @@ function SearchAndFilters({
             value={filters.alerta}
             options={alertOptions}
             onChange={(value) => updateFilter({ alerta: value })}
-            labelClassName="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
+            labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
             buttonClassName="select-shell mt-2 normal-case"
           />
           {FILTER_FIELDS.map((fieldKey) => {
@@ -3360,7 +3361,7 @@ function SearchAndFilters({
                 value={filters[fieldKey]}
                 options={options}
                 onChange={(value) => updateFilter({ [fieldKey]: value })}
-                labelClassName="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
+                labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
                 buttonClassName="select-shell mt-2 normal-case"
               />
             );
@@ -3402,24 +3403,24 @@ function ClientsTable({
   const hasSelection = selectedClientIds.length > 0;
 
   return (
-    <section className="min-w-0 surface-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-4 py-3 dark:border-gray-800">
+    <section className="min-w-0 overflow-hidden surface-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-gradient-to-r from-white/85 via-white/70 to-slate-50/55 px-4 py-3 dark:border-gray-800 dark:from-gray-950/60 dark:via-gray-950/35 dark:to-gray-900/35 sm:px-5">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Carteira listada</p>
-          <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Carteira listada</p>
+          <p className="mt-1 text-sm font-medium text-slate-700 dark:text-gray-200">
             {formatNumber(clients.length)} cliente(s) visível(is) nesta consulta.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasSelection ? (
             <>
-              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
                 {formatNumber(selectedClientIds.length)} selecionado(s)
               </span>
               <button
                 type="button"
                 onClick={onOpenBatchResponsavel}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-3 py-2 text-xs font-black text-white transition hover:bg-[#0056d6]"
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-500/70 bg-brand-blue px-3 py-2 text-xs font-medium text-white shadow-[0_10px_26px_rgba(37,99,235,0.18)] transition hover:-translate-y-px hover:bg-[#0056d6]"
               >
                 <UserCog size={14} aria-hidden="true" />
                 Alterar responsável
@@ -3428,7 +3429,7 @@ function ClientsTable({
           ) : null}
         </div>
       </div>
-      <TableScrollArea className="border-x-0 border-b-0 rounded-none" topClassName="mx-3 mt-2">
+      <TableScrollArea className="border-x-0 border-b-0 rounded-none shadow-none" topClassName="mx-4 mt-3 sm:mx-5">
         <table className="table-base base-clients-table min-w-[1560px] 2xl:min-w-[1640px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
@@ -3481,12 +3482,12 @@ function ClientsTable({
                         onChange={(event) => onToggleSelect?.(client.id, event.target.checked)}
                         className="h-4 w-4 shrink-0 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 text-xs font-semibold text-slate-700 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-900 dark:text-gray-200">
                         {getDashboardInitials(client.nome_identificacao || client.razao_social || 'CL')}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-black text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">{client.cnpj}</p>
+                        <p className="font-semibold leading-snug text-slate-950 dark:text-gray-100">{client.nome_identificacao || client.razao_social}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-300">{client.cnpj}</p>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-gray-400">{client.razao_social}</p>
                       </div>
                     </div>
@@ -3494,7 +3495,7 @@ function ClientsTable({
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                   <td key={field.key} className="table-cell">
                     {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
                         {valueOrDash(getResolvedFieldValue(client, field.key))}
                       </span>
                     ) : (
@@ -3774,6 +3775,60 @@ function DetailPage({
   );
 }
 
+function useFloatingDropdown(open, containerRef) {
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    function updatePosition() {
+      if (typeof window === 'undefined') return;
+      const trigger = containerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportPadding = 12;
+      const gap = 6;
+      const menuWidth = Math.max(rect.width, 220);
+      const left = Math.min(
+        Math.max(rect.left, viewportPadding),
+        Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
+      );
+      const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+      const spaceAbove = rect.top - viewportPadding;
+      const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      const availableSpace = openUp ? spaceAbove : spaceBelow;
+      const maxHeight = Math.min(256, Math.max(144, availableSpace - gap));
+      const top = openUp
+        ? Math.max(viewportPadding, rect.top - maxHeight - gap)
+        : Math.min(rect.bottom + gap, window.innerHeight - viewportPadding - maxHeight);
+
+      setMenuStyle({
+        position: 'fixed',
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${menuWidth}px`,
+        maxHeight: `${maxHeight}px`,
+        zIndex: 9999,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, containerRef]);
+
+  return { menuRef, menuStyle };
+}
+
 function DropdownFilterSelect({
   label,
   value,
@@ -3788,6 +3843,7 @@ function DropdownFilterSelect({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const { menuRef, menuStyle } = useFloatingDropdown(open, containerRef);
   const blankLabel = emptyLabel ?? (includeBlank ? 'Todos' : 'Não informado');
   const normalizedOptions = [
     ...(includeBlank ? [{ value: '', label: blankLabel }] : []),
@@ -3800,7 +3856,7 @@ function DropdownFilterSelect({
     if (!open) return undefined;
 
     function handlePointerDown(event) {
-      if (!containerRef.current?.contains(event.target)) {
+      if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
         setOpen(false);
       }
     }
@@ -3825,6 +3881,38 @@ function DropdownFilterSelect({
     setOpen(false);
   }
 
+  const dropdownMenu = open && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        role="listbox"
+        style={menuStyle ?? { visibility: 'hidden' }}
+        className="overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel ring-1 ring-slate-900/5 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:ring-white/5"
+      >
+        {normalizedOptions.map((option) => {
+          const selected = option.value === value;
+          return (
+            <button
+              key={`${option.value}-${option.label}`}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSelect(option.value);
+              }}
+              className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
+            >
+              <span className="truncate">{option.label}</span>
+              {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
+      </div>,
+      document.body,
+    )
+    : null;
+
   return (
     <div ref={containerRef} className={`relative ${labelClassName}`}>
       <span>{label}</span>
@@ -3843,32 +3931,7 @@ function DropdownFilterSelect({
         <span className="truncate">{selectedLabel}</span>
         <ChevronDown size={16} className={`shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      {open ? (
-        <div
-          role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel ring-1 ring-slate-900/5 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:ring-white/5"
-        >
-          {normalizedOptions.map((option) => {
-            const selected = option.value === value;
-            return (
-              <button
-                key={`${option.value}-${option.label}`}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleSelect(option.value);
-                }}
-                className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
-              >
-                <span className="truncate">{option.label}</span>
-                {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      {dropdownMenu}
     </div>
   );
 }
@@ -3886,6 +3949,7 @@ function DropdownMultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const { menuRef, menuStyle } = useFloatingDropdown(open, containerRef);
   const normalizedOptions = options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
   const selectedValues = Array.isArray(values) ? values : [];
   const selectedLabels = normalizedOptions
@@ -3899,7 +3963,7 @@ function DropdownMultiSelect({
     if (!open) return undefined;
 
     function handlePointerDown(event) {
-      if (!containerRef.current?.contains(event.target)) {
+      if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
         setOpen(false);
       }
     }
@@ -3930,6 +3994,39 @@ function DropdownMultiSelect({
     onChange(orderedValues);
   }
 
+  const dropdownMenu = open && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        role="listbox"
+        aria-multiselectable="true"
+        style={menuStyle ?? { visibility: 'hidden' }}
+        className="overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel ring-1 ring-slate-900/5 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:ring-white/5"
+      >
+        {normalizedOptions.map((option) => {
+          const selected = selectedValues.includes(option.value);
+          return (
+            <button
+              key={`${option.value}-${option.label}`}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleValue(option.value);
+              }}
+              className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
+            >
+              <span className="truncate">{option.label}</span>
+              {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
+      </div>,
+      document.body,
+    )
+    : null;
+
   return (
     <div ref={containerRef} className={`relative ${labelClassName}`}>
       <span>{label}</span>
@@ -3948,33 +4045,7 @@ function DropdownMultiSelect({
         <span className="truncate">{selectedLabel}</span>
         <ChevronDown size={16} className={`shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      {open ? (
-        <div
-          role="listbox"
-          aria-multiselectable="true"
-          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto overflow-soft rounded-lg border border-slate-200 bg-white p-1 text-sm font-semibold normal-case text-slate-700 shadow-panel ring-1 ring-slate-900/5 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:ring-white/5"
-        >
-          {normalizedOptions.map((option) => {
-            const selected = selectedValues.includes(option.value);
-            return (
-              <button
-                key={`${option.value}-${option.label}`}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleValue(option.value);
-                }}
-                className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition ${selected ? 'bg-brand-blue text-white' : 'hover:bg-slate-100 dark:hover:bg-gray-800'}`}
-              >
-                <span className="truncate">{option.label}</span>
-                {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      {dropdownMenu}
     </div>
   );
 }

@@ -716,15 +716,15 @@
   }
 
   .base-clients-table .table-head-cell {
-    padding-top: 0.68rem;
-    padding-bottom: 0.68rem;
+    padding-top: 0.72rem;
+    padding-bottom: 0.72rem;
     font-size: 0.68rem;
     letter-spacing: 0.08em;
   }
 
   .base-clients-table .table-cell {
-    padding-top: 0.64rem;
-    padding-bottom: 0.64rem;
+    padding-top: 0.72rem;
+    padding-bottom: 0.72rem;
     vertical-align: middle;
   }
 
@@ -803,14 +803,24 @@
   }
 
   .base-clients-table .table-actions {
-    gap: 0.35rem;
-    border-radius: 8px;
+    gap: 0.3rem;
+    border-radius: 12px;
     padding: 0.25rem;
   }
 
   .base-clients-table .table-icon-action {
     height: 2rem;
     width: 2rem;
+  }
+
+  .base-clients-table .table-row:hover .table-cell-strong,
+  .base-clients-table .table-row:hover .table-sticky-left p:first-of-type {
+    color: #0b66ff;
+  }
+
+  .dark .base-clients-table .table-row:hover .table-cell-strong,
+  .dark .base-clients-table .table-row:hover .table-sticky-left p:first-of-type {
+    color: #93c5fd;
   }
 
   .reinf-socio-select {
