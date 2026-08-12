@@ -3259,8 +3259,8 @@ function SearchAndFilters({
           </span>
         </div>
 
-        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="relative">
+        <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="relative w-full max-w-2xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" size={18} />
             <input
               value={filters.search}
