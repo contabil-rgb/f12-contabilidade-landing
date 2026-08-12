@@ -2868,20 +2868,23 @@ function DashboardTotalCard({ total, onClick }) {
       as={onClick ? 'button' : 'section'}
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`relative h-full w-full overflow-hidden p-5 text-left xl:p-6 ${getMetricPanelToneClass('success')} ${onClick ? 'transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : ''}`}
+      className={`dashboard-card dashboard-total-card relative h-full w-full overflow-hidden p-5 text-left xl:p-6 ${onClick ? 'transition duration-150 hover:-translate-y-0.5' : ''}`}
     >
       <div className="relative z-10 flex min-h-[190px] flex-col justify-between xl:min-h-[220px]">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-300">Total de clientes</p>
-          <p className="mt-4 text-5xl font-bold tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.15rem]">{formatNumber(total)}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-900/70 dark:text-emerald-100/80">Total de clientes</p>
+            <span className="dashboard-pill dashboard-pill-success">Carteira ativa</span>
+          </div>
+          <p className="mt-5 text-5xl font-semibold tracking-tight leading-none text-slate-950 dark:text-gray-100 sm:text-[3.35rem]">{formatNumber(total)}</p>
+          <p className="mt-3 max-w-[16rem] text-sm font-medium leading-6 text-emerald-950/70 dark:text-emerald-100/70">Base consolidada para acompanhamento contábil.</p>
         </div>
-        <div className="flex items-end justify-center">
-          <span className="flex h-20 w-20 items-center justify-center rounded-full border border-brand-blue/20 bg-brand-blue/10 text-brand-blue shadow-[0_18px_42px_rgba(11,102,255,0.12)] dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 xl:h-24 xl:w-24">
-            <Users className="h-9 w-9 xl:h-11 xl:w-11" aria-hidden="true" />
+        <div className="flex items-end justify-end">
+          <span className="dashboard-orb dashboard-orb-success">
+            <Users className="h-8 w-8 xl:h-10 xl:w-10" aria-hidden="true" />
           </span>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-brand-blue/10 to-transparent dark:from-blue-500/10" />
     </SurfacePanel>
   );
 }
@@ -2900,23 +2903,25 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
     : '';
 
   return (
-    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className="dashboard-card dashboard-regime-card h-full w-full p-5 xl:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200/80">Distribuição</p>
           <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Carteira por regime tributário</h2>
         </div>
+        <span className="dashboard-pill">{formatNumber(displayRows.length)} grupo(s)</span>
       </div>
       <div className="mt-5 grid gap-5">
         <div className="flex justify-center">
           <div
-            className="relative flex h-32 w-32 items-center justify-center rounded-full xl:h-36 xl:w-36"
+            className="dashboard-donut relative flex h-32 w-32 items-center justify-center rounded-full xl:h-36 xl:w-36"
             style={{
               background: gradient || 'conic-gradient(#2563eb 0% 100%)',
             }}
           >
-            <div className="flex h-22 w-22 flex-col items-center justify-center rounded-full border border-slate-200/90 bg-white/95 dark:border-gray-700 dark:bg-gray-900/95 xl:h-24 xl:w-24">
-              <span className="text-4xl font-bold tracking-tight leading-none text-slate-950 dark:text-gray-100">{formatNumber(total)}</span>
-              <span className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-300">clientes</span>
+            <div className="dashboard-donut-core flex h-[5.5rem] w-[5.5rem] flex-col items-center justify-center rounded-full xl:h-24 xl:w-24">
+              <span className="text-4xl font-semibold tracking-tight leading-none text-slate-950 dark:text-gray-100">{formatNumber(total)}</span>
+              <span className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-300">clientes</span>
             </div>
           </div>
         </div>
@@ -2928,14 +2933,14 @@ function DashboardRegimeCard({ rows, total, onSelect, onNavigate }) {
                 key={row.label}
                 type="button"
                 onClick={() => onSelect?.({ regime_tributario: row.label }, `Regime: ${row.label}`)}
-                className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-1.5 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+                className="dashboard-list-row flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition duration-150"
               >
                 <span
-                  className="h-3 w-3 rounded-full"
+                  className="h-2.5 w-2.5 rounded-full shadow-sm"
                   style={{ backgroundColor: DASHBOARD_DONUT_COLORS[index % DASHBOARD_DONUT_COLORS.length] }}
                 />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
-                <span className="shrink-0 text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
+                <span className="shrink-0 text-sm font-semibold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
                   {formatNumber(row.value)} ({percentage}%)
                 </span>
               </button>
@@ -2963,10 +2968,10 @@ function DashboardSituationCard({ values, total }) {
   const lastPoint = points[points.length - 1];
 
   return (
-    <SurfacePanel className={`h-full w-full overflow-hidden p-5 sm:p-6 ${getMetricPanelToneClass('info')}`}>
+    <SurfacePanel className="dashboard-card dashboard-chart-panel h-full w-full overflow-hidden p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Situação da carteira</h2>
-        <span className="inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-base font-bold text-brand-blue shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+        <span className="dashboard-pill dashboard-pill-info text-sm">
           {formatNumber(total)}
         </span>
       </div>
@@ -2977,12 +2982,12 @@ function DashboardSituationCard({ values, total }) {
           ))}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="relative overflow-hidden rounded-2xl bg-slate-50/70 dark:bg-gray-900/50" style={{ height: `${height}px` }}>
+          <div className="dashboard-chart-frame relative overflow-hidden rounded-2xl" style={{ height: `${height}px` }}>
             <div className="absolute inset-0">
               {ticks.map((tick) => (
                 <span
                   key={tick.position}
-                  className="absolute inset-x-0 border-t border-slate-200/80 dark:border-gray-800"
+                  className="absolute inset-x-0 border-t border-slate-200/70 dark:border-white/10"
                   style={{ top: `${paddingY + ((100 - tick.position) / 100) * (height - paddingY * 2)}px` }}
                 />
               ))}
@@ -3001,16 +3006,16 @@ function DashboardSituationCard({ values, total }) {
                   key={`${point.x}-${point.y}-${index}`}
                   cx={point.x}
                   cy={point.y}
-                  r={index === points.length - 1 ? 6 : 4}
-                  fill="#93c5fd"
+                  r={index === points.length - 1 ? 5.5 : 4}
+                  fill="#dbeafe"
                   stroke="#2563eb"
-                  strokeWidth="3"
+                  strokeWidth="2.5"
                 />
               ))}
             </svg>
             {lastPoint ? (
               <div
-                className="absolute -translate-x-1/2 rounded-xl border border-blue-200 bg-white px-3 py-1.5 text-sm font-bold text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
+                className="absolute -translate-x-1/2 rounded-xl border border-blue-200 bg-white px-3 py-1.5 text-sm font-semibold text-brand-blue shadow-lg dark:border-blue-500/30 dark:bg-gray-800 dark:text-blue-200"
                 style={{
                   left: `${(lastPoint.x / width) * 100}%`,
                   top: `${Math.max(((lastPoint.y - 52) / height) * 100, 6)}%`,
@@ -3035,13 +3040,13 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
   const max = Math.max(...rows.map((row) => row.value), 1);
 
   return (
-    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('muted')}`}>
+    <SurfacePanel className="dashboard-card dashboard-ranking-card h-full w-full p-5 xl:p-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">{title}</h2>
+        <h2 className="text-[1.16rem] font-semibold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.28rem]">{title}</h2>
         <button
           type="button"
           onClick={onViewAll}
-          className="text-sm font-bold text-sky-600 transition duration-150 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
+          className="rounded-full px-3 py-1 text-sm font-semibold text-sky-600 transition duration-150 hover:bg-sky-50 hover:text-sky-500 dark:text-sky-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-200"
         >
           Ver todos
         </button>
@@ -3054,15 +3059,15 @@ function DashboardRankingPanel({ title, rows, total, field, onSelect, onViewAll 
               key={`${field}-${row.label}`}
               type="button"
               onClick={() => onSelect?.({ [field]: row.label }, `${title}: ${row.label}`)}
-              className="flex w-full items-center gap-3 rounded-lg border border-transparent px-1 py-1 text-left transition duration-150 hover:border-slate-200 hover:bg-slate-50 dark:hover:border-gray-700 dark:hover:bg-gray-800"
+              className="dashboard-list-row flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition duration-150"
             >
-              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${DASHBOARD_AVATAR_GRADIENTS[index % DASHBOARD_AVATAR_GRADIENTS.length]} text-xs font-bold text-white shadow-sm`}>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${DASHBOARD_AVATAR_GRADIENTS[index % DASHBOARD_AVATAR_GRADIENTS.length]} text-xs font-semibold text-white shadow-sm`}>
                 {getDashboardInitials(row.label)}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-sm font-semibold text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
-                  <span className="shrink-0 text-sm font-bold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
+                  <span className="truncate text-sm font-medium text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{row.label}</span>
+                  <span className="shrink-0 text-sm font-semibold text-slate-500 dark:text-gray-300 xl:text-[0.95rem]">
                     {formatNumber(row.value)} ({percentage}%)
                   </span>
                 </div>
@@ -3090,9 +3095,9 @@ function DashboardQuickActionsPanel({ onNavigate }) {
   ];
 
   return (
-    <SurfacePanel className={`h-full w-full p-5 xl:p-6 ${getMetricPanelToneClass('muted')}`}>
+    <SurfacePanel className="dashboard-actions-card h-full w-full p-5 xl:p-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-[1.18rem] font-bold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.3rem]">Ações rápidas</h2>
+        <h2 className="text-[1.18rem] font-semibold tracking-tight leading-tight text-slate-950 dark:text-gray-100 xl:text-[1.28rem]">Ações rápidas</h2>
       </div>
       <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3">
         {actions.map((action) => {
@@ -3102,12 +3107,12 @@ function DashboardQuickActionsPanel({ onNavigate }) {
               key={action.key}
               type="button"
               onClick={() => onNavigate?.(action.route, { clearFilters: action.route === 'clientes' })}
-              className="flex min-h-[82px] items-center gap-3 rounded-xl border border-slate-200/80 bg-white/70 px-4 py-4 text-left transition duration-150 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:bg-slate-50 hover:shadow-soft dark:border-gray-700 dark:bg-gray-800/75 dark:hover:border-blue-500/30 dark:hover:bg-gray-800"
+              className="dashboard-action-tile flex min-h-[82px] items-center gap-3 rounded-xl px-4 py-4 text-left transition duration-150 hover:-translate-y-0.5"
             >
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${action.accentBg} ${action.accent}`}>
                 <Icon size={22} aria-hidden="true" />
               </span>
-              <span className="text-sm font-semibold leading-6 text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{action.label}</span>
+              <span className="text-sm font-medium leading-6 text-slate-700 dark:text-gray-200 xl:text-[0.95rem]">{action.label}</span>
             </button>
           );
         })}
