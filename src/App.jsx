@@ -2782,7 +2782,7 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
     <SurfacePanel className="p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-black text-slate-950 dark:text-gray-100">{title}</h2>
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-brand-blue">
+        <span className="dashboard-orb dashboard-orb-success flex h-10 w-10 items-center justify-center">
           <BarChart3 size={18} aria-hidden="true" />
         </span>
       </div>
@@ -2792,7 +2792,7 @@ function BreakdownPanel({ title, rows, total, onSelect, field }) {
             key={row.label}
             type="button"
             onClick={() => onSelect({ [field]: row.label }, `${title}: ${row.label}`)}
-            className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-slate-200 hover:bg-slate-50"
+            className="dashboard-list-row w-full rounded-xl px-3 py-3 text-left transition duration-150"
           >
             <div className="mb-2 flex items-center justify-between gap-3 text-sm">
               <span className="font-bold text-slate-700 dark:text-gray-200">{row.label}</span>

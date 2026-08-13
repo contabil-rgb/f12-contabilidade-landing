@@ -66,13 +66,14 @@
 
 @layer components {
   .surface-card {
+    position: relative;
     border: 1px solid rgba(148, 163, 184, 0.28);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 253, 0.94));
+      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(242, 247, 252, 0.9));
     border-radius: 14px;
     box-shadow:
-      0 16px 44px rgba(15, 23, 42, 0.07),
-      0 1px 0 rgba(255, 255, 255, 0.82) inset;
+      0 22px 60px rgba(15, 23, 42, 0.08),
+      0 1px 0 rgba(255, 255, 255, 0.78) inset;
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease,
@@ -80,11 +81,29 @@
       transform 160ms ease;
   }
 
+  .surface-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), transparent 34%),
+      radial-gradient(circle at 92% 8%, rgba(20, 184, 166, 0.1), transparent 30%);
+    opacity: 0.62;
+  }
+
+  .surface-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .surface-card:hover {
     border-color: rgba(59, 130, 246, 0.32);
     box-shadow:
-      0 18px 48px rgba(15, 23, 42, 0.09),
-      0 1px 0 rgba(255, 255, 255, 0.86) inset;
+      0 24px 64px rgba(15, 23, 42, 0.1),
+      0 1px 0 rgba(255, 255, 255, 0.8) inset;
   }
 
   .surface-card:focus-within {
@@ -263,16 +282,23 @@
   .dark .surface-card {
     border-color: rgba(71, 85, 105, 0.58);
     background:
-      linear-gradient(180deg, rgba(21, 32, 50, 0.92), rgba(12, 22, 38, 0.9));
+      linear-gradient(145deg, rgba(22, 34, 52, 0.92), rgba(9, 17, 31, 0.92));
     box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.26),
+      0 24px 70px rgba(0, 0, 0, 0.32),
       0 1px 0 rgba(255, 255, 255, 0.035) inset;
+  }
+
+  .dark .surface-card::before {
+    background:
+      linear-gradient(120deg, rgba(148, 163, 184, 0.08), transparent 36%),
+      radial-gradient(circle at 92% 8%, rgba(20, 184, 166, 0.12), transparent 30%);
+    opacity: 0.72;
   }
 
   .dark .surface-card:hover {
     border-color: rgba(96, 165, 250, 0.38);
     box-shadow:
-      0 20px 54px rgba(0, 0, 0, 0.3),
+      0 26px 76px rgba(0, 0, 0, 0.36),
       0 1px 0 rgba(255, 255, 255, 0.03) inset;
   }
 
