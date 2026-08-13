@@ -50,6 +50,27 @@
     font: inherit;
   }
 
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
+  p,
+  span,
+  label,
+  dt,
+  dd,
+  li,
+  button,
+  input,
+  select,
+  textarea {
+    letter-spacing: 0;
+  }
+
   button {
     cursor: pointer;
   }
@@ -227,8 +248,8 @@
 
   .modal-eyebrow {
     font-size: 0.72rem;
-    font-weight: 650;
-    letter-spacing: 0.08em;
+    font-weight: 560;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: rgb(100, 116, 139);
   }
@@ -236,7 +257,7 @@
   .modal-title {
     margin-top: 0.25rem;
     font-size: 1.15rem;
-    font-weight: 700;
+    font-weight: 620;
     letter-spacing: 0;
     color: rgb(15, 23, 42);
   }
@@ -948,7 +969,7 @@
     padding-top: 0.72rem;
     padding-bottom: 0.72rem;
     font-size: 0.68rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
   }
 
   .base-clients-table .table-cell {
@@ -1080,8 +1101,8 @@
     padding: 0.78rem 0.9rem;
     color: #475569;
     font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-weight: 560;
+    letter-spacing: 0;
     line-height: 1.25;
     text-transform: uppercase;
     vertical-align: middle;
@@ -1696,8 +1717,21 @@
 
 @layer utilities {
   /* Overrides utilitarios para os pontos mais repetidos do portal no dark mode. */
-  .font-black { font-weight: 650; }
-  .font-extrabold { font-weight: 650; }
+  .font-black { font-weight: 640; }
+  .font-extrabold { font-weight: 620; }
+  .font-bold { font-weight: 600; }
+  .font-semibold { font-weight: 560; }
+  .tracking-tight,
+  .tracking-wide,
+  .tracking-wider,
+  .tracking-widest,
+  .tracking-\[0\.08em\],
+  .tracking-\[0\.12em\],
+  .tracking-\[0\.14em\],
+  .tracking-\[0\.16em\],
+  .tracking-\[0\.18em\] {
+    letter-spacing: 0;
+  }
   .dark .bg-white { background-color: rgb(31 41 55 / 0.96); }
   .dark .bg-white\/80 { background-color: rgb(31 41 55 / 0.8); }
   .dark .bg-white\/90 { background-color: rgb(31 41 55 / 0.9); }
