@@ -2715,7 +2715,11 @@ function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">{children}</main>
+        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">
+          <div key={page} className="page-transition min-w-0">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );
