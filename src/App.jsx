@@ -8192,7 +8192,7 @@ export default function App() {
 
     if (!perfil) {
       await logoutSupabase().catch(() => {});
-      return { ok: false, message: 'Usuário autenticado sem perfil em public.usuarios. Execute seed.sql e vincule auth_user_id.' };
+      return { ok: false, message: 'Usuário autenticado, mas sem perfil vinculado no portal. Verifique o cadastro do usuário e tente novamente.' };
     }
 
     if (perfil.status !== 'Ativo') {
@@ -8468,7 +8468,7 @@ export default function App() {
       try {
         const saved = await atualizarClienteSupabase(id, nextClient);
         nextClient = withClientDefaults({ ...nextClient, ...saved });
-        setSupabaseStatus({ connected: true, message: 'Atualizacao rapida salva no Supabase' });
+        setSupabaseStatus({ connected: true, message: 'Atualização rápida salva no Supabase' });
         syncedWithSupabase = true;
         const historicoResult = await registrarHistoricoPersistente({
           clienteId: id,
