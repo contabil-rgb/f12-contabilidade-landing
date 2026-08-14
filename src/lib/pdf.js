@@ -44,12 +44,12 @@ const ECD_ECF_LAYOUT = {
     { key: 'CNPJ', label: 'CNPJ', x: 132, width: 68 },
     { key: 'Responsavel', label: 'Resp.', x: 206, width: 56 },
     { key: 'Regime', label: 'Regime', x: 268, width: 74 },
-    { key: 'Obrigacao', label: 'Obrig.', x: 348, width: 42 },
-    { key: 'Ultima entregue', label: 'Ultima', x: 396, width: 52 },
+    { key: 'Obrigacao', label: 'Obrigação', x: 348, width: 42 },
+    { key: 'Ultima entregue', label: 'Última', x: 396, width: 52 },
     { key: 'Data de entrega', label: 'Entrega', x: 454, width: 56 },
     { key: 'Data enviada', label: 'Enviada', x: 516, width: 56 },
     { key: 'Recibo', label: 'Recibo', x: 578, width: 102 },
-    { key: 'Situacao', label: 'Situacao', x: 686, width: 132 },
+    { key: 'Situacao', label: 'Situação', x: 686, width: 132 },
   ],
 };
 

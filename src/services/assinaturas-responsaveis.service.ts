@@ -56,7 +56,7 @@ export function gerarUrlPublicaAssinaturaResponsavel(path?: string | null) {
 export async function salvarAssinaturaResponsavel(responsavel: Record<string, unknown>, file: File) {
   const responsavelId = normalizarTexto(responsavel?.id);
   if (!responsavelId) {
-    throw new Error('Responsavel invalido para salvar assinatura.');
+    throw new Error('Responsável inválido para salvar assinatura.');
   }
 
   validarArquivoAssinatura(file);
@@ -110,7 +110,7 @@ export async function salvarAssinaturaResponsavel(responsavel: Record<string, un
 export async function removerAssinaturaResponsavel(responsavel: Record<string, unknown>) {
   const responsavelId = normalizarTexto(responsavel?.id);
   if (!responsavelId) {
-    throw new Error('Responsavel invalido para remover assinatura.');
+    throw new Error('Responsável inválido para remover assinatura.');
   }
 
   const caminhoAnterior = normalizarTexto(responsavel?.assinatura_email_path);

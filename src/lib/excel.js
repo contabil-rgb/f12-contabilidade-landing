@@ -15,9 +15,9 @@ const LIST_HEADER_ROW = 0;
 const REQUIRED_BASE_FIELDS = ['cnpj', 'razao_social', 'tipo_cliente', 'regime_tributario', 'atividades'];
 const REQUIRED_BASE_FIELD_LABELS = {
   cnpj: 'CNPJ',
-  razao_social: 'Razao Social',
+  razao_social: 'Razão Social',
   tipo_cliente: 'Tipo de Cliente',
-  regime_tributario: 'Regime Tributario',
+  regime_tributario: 'Regime Tributário',
   atividades: 'Atividade',
 };
 
