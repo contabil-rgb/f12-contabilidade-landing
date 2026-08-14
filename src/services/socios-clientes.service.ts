@@ -50,7 +50,7 @@ export async function listarSociosClientes(clienteIds?: string[]) {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(`NÃ£o foi possÃ­vel carregar sÃ³cios dos clientes: ${error.message}`);
+    throw new Error(`Não foi possível carregar sócios dos clientes: ${error.message}`);
   }
 
   return (data ?? []).map((row) => normalizeSocioRow(row as Record<string, unknown>));
@@ -59,13 +59,13 @@ export async function listarSociosClientes(clienteIds?: string[]) {
 export async function salvarSociosCliente(clienteId: string, socios: Array<Record<string, unknown>> = []) {
   const id = String(clienteId ?? '').trim();
   if (!id) {
-    throw new Error('Cliente invÃ¡lido para salvar sÃ³cios.');
+    throw new Error('Cliente inválido para salvar sócios.');
   }
 
   const payload = normalizeSociosPayload(socios);
   const invalid = payload.find((socio) => socio.cpf.length !== CPF_DIGITS_LENGTH);
   if (invalid) {
-    throw new Error('CPF do sÃ³cio deve ter 11 dÃ­gitos.');
+    throw new Error('CPF do sócio deve ter 11 dígitos.');
   }
 
   const { data, error } = await supabase.rpc('salvar_socios_cliente_portal', {
@@ -74,7 +74,7 @@ export async function salvarSociosCliente(clienteId: string, socios: Array<Recor
   });
 
   if (error) {
-    throw new Error(`NÃ£o foi possÃ­vel salvar sÃ³cios do cliente: ${error.message}`);
+    throw new Error(`Não foi possível salvar sócios do cliente: ${error.message}`);
   }
 
   return (data ?? []).map((row: Record<string, unknown>) => normalizeSocioRow(row));

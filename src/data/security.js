@@ -32,7 +32,7 @@ export const PERMISSIONS = {
 export const ACCESS_PROFILES = {
   [ACCESS_PROFILE_KEYS.COORDINATOR_ADMIN]: {
     label: 'Coordenador / Administrador',
-    description: 'Acesso completo ao portal, clientes, importaÃ§Ã£o, relatÃ³rios, histÃ³rico e configuraÃ§Ãµes principais.',
+    description: 'Acesso completo ao portal, clientes, importação, relatórios, histórico e configurações principais.',
     permissions: Object.values(PERMISSIONS),
   },
   [ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL]: {

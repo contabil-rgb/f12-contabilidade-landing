@@ -146,7 +146,7 @@ export async function atualizarUsuarioPortal(id: string, dados: Record<string, u
     });
 
     if (error) {
-      throw new Error(`NÃ£o foi possÃ­vel atualizar usuÃ¡rio no Supabase: ${error.message}`);
+      throw new Error(`Não foi possível atualizar usuário no Supabase: ${error.message}`);
     }
 
     const row = Array.isArray(data) ? data[0] : data;
