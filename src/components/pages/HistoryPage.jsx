@@ -42,8 +42,8 @@ export default function HistoryPage({
     if (!canDelete || !selectedCount || deleting) return;
     const confirmed = window.confirm(
       selectedCount === 1
-        ? 'Excluir o registro selecionado do historico? Esta acao nao pode ser desfeita.'
-        : `Excluir ${selectedCount} registros selecionados do historico? Esta acao nao pode ser desfeita.`,
+        ? 'Excluir o registro selecionado do histórico? Esta ação não pode ser desfeita.'
+        : `Excluir ${selectedCount} registros selecionados do histórico? Esta ação não pode ser desfeita.`,
     );
     if (!confirmed) return;
 

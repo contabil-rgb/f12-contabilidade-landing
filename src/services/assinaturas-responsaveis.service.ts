@@ -19,7 +19,7 @@ function validarArquivoAssinatura(file: File) {
   }
 
   if (file.size > MAX_ASSINATURA_BYTES) {
-    throw new Error('A assinatura deve ter no maximo 5 MB.');
+    throw new Error('A assinatura deve ter no máximo 5 MB.');
   }
 }
 
@@ -84,7 +84,7 @@ export async function salvarAssinaturaResponsavel(responsavel: Record<string, un
     });
 
     if (error) {
-      throw new Error(`Nao foi possivel salvar assinatura no Supabase: ${error.message}`);
+      throw new Error(`Não foi possível salvar assinatura no Supabase: ${error.message}`);
     }
 
     if (caminhoAnterior && caminhoAnterior !== novoPath) {
@@ -120,14 +120,14 @@ export async function removerAssinaturaResponsavel(responsavel: Record<string, u
   });
 
   if (error) {
-    throw new Error(`Nao foi possivel remover assinatura no Supabase: ${error.message}`);
+    throw new Error(`Não foi possível remover assinatura no Supabase: ${error.message}`);
   }
 
   if (caminhoAnterior) {
     try {
       await removerArquivoAssinatura(caminhoAnterior);
     } catch (cleanupError) {
-      console.warn('[assinaturas-responsaveis] Falha ao remover arquivo de assinatura apos limpar metadados.', cleanupError);
+      console.warn('[assinaturas-responsaveis] Falha ao remover arquivo de assinatura após limpar metadados.', cleanupError);
     }
   }
 

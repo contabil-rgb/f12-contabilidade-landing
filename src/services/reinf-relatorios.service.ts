@@ -75,7 +75,7 @@ export async function excluirReinfRelatorio(relatorioId: string) {
   });
 
   if (error) {
-    throw new Error(`Nao foi possivel excluir relatorio REINF: ${error.message}`);
+    throw new Error(`Não foi possível excluir relatório REINF: ${error.message}`);
   }
 
   const row = Array.isArray(data) ? data[0] : data;

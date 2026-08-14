@@ -161,7 +161,7 @@ import { supabase } from './lib/supabase';
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
 const LazyHistoryPage = lazy(() => import('./components/pages/HistoryPage.jsx'));
 const INITIAL_METADATA = Object.freeze({
-  source: 'Inicializacao do portal',
+  source: 'Inicialização do portal',
   importedAt: '',
   baseRows: 0,
   sheets: [],
@@ -1536,7 +1536,7 @@ function getPersistedReinfStatusLabel(client) {
   if (persistedLabel) return persistedLabel;
 
   const code = getPersistedReinfStatusCode(client);
-  if (code === 'concluido') return 'Concluido';
+  if (code === 'concluido') return 'Concluído';
   if (code === 'em_atraso') return 'Em atraso';
   if (code === 'aguardando_envio') return 'Aguardando envio';
   return 'Sem data';
@@ -1738,17 +1738,17 @@ function getClientAlertSignals(client) {
 const PENDENCIA_ACTION_BY_SIGNAL = {
   reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da distribuição de lucro.' },
   recibo_reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar comprovante da distribuição de lucro.' },
-  ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
-  ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Media', nextAction: 'Validar status e envio da ECD.' },
-  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Media', nextAction: 'Definir responsável pela ECD.' },
+  ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Média', nextAction: 'Validar status e envio da ECD.' },
+  ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Média', nextAction: 'Validar status e envio da ECD.' },
+  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Média', nextAction: 'Definir responsável pela ECD.' },
   recibo_ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 82, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECD.' },
-  ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Media', nextAction: 'Validar status da ECF.' },
-  ecf_envio: { key: 'ecf_envio', area: 'ECF', route: 'ecd', priority: 77, priorityLabel: 'Media', nextAction: 'Confirmar envio da ECF.' },
+  ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Média', nextAction: 'Validar status da ECF.' },
+  ecf_envio: { key: 'ecf_envio', area: 'ECF', route: 'ecd', priority: 77, priorityLabel: 'Média', nextAction: 'Confirmar envio da ECF.' },
   recibo_ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 80, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECF.' },
-  documentos: { key: 'documentos', area: 'Documentação', route: 'cliente', priority: 68, priorityLabel: 'Media', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
-  ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Media', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
-  comunicacao: { key: 'comunicacao', area: 'Comunicação', route: 'cliente', priority: 70, priorityLabel: 'Media', nextAction: 'Notificar cliente e registrar retorno.' },
-  retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Media', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
+  documentos: { key: 'documentos', area: 'Documentação', route: 'cliente', priority: 68, priorityLabel: 'Média', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
+  ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Média', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
+  comunicacao: { key: 'comunicacao', area: 'Comunicação', route: 'cliente', priority: 70, priorityLabel: 'Média', nextAction: 'Notificar cliente e registrar retorno.' },
+  retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Média', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
 };
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
@@ -5485,7 +5485,7 @@ function getEcdEcfReportInfo(client, tipo) {
     data_entrega: formatDateDisplay(deliveryDate),
     data_enviada: formatDateDisplay(sentDate),
     recibo: attached ? attachment.name || 'Anexado' : 'Sem anexo',
-    situacao: concluded ? 'Entregue/Concluido' : 'Pendente/Sem anexo',
+    situacao: concluded ? 'Entregue/Concluído' : 'Pendente/Sem anexo',
     situacao_codigo: concluded ? 'concluido' : 'pendente',
   };
 }
@@ -5683,7 +5683,7 @@ function ReportsPage({
       .filter(Boolean)
   );
   const obrigacaoOptions = ['ECD', 'ECF'];
-  const situacaoOptions = ['Entregues/Concluidos', 'Pendentes/Sem anexo'];
+  const situacaoOptions = ['Entregues/Concluídos', 'Pendentes/Sem anexo'];
   const baseClientesReportRows = reportScope.filter((client) => {
     const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
@@ -8118,10 +8118,10 @@ export default function App() {
     }
   }
 
-  async function resyncSupabaseAfterMutation(context = 'atualizacao') {
+  async function resyncSupabaseAfterMutation(context = 'atualização') {
     const ok = await carregarDadosSupabase({ silent: true });
     if (!ok) {
-      console.warn(`[supabase] Falha ao reidratar dados apos ${context}.`);
+      console.warn(`[supabase] Falha ao reidratar dados após ${context}.`);
     }
     return ok;
   }
@@ -8159,7 +8159,7 @@ export default function App() {
       await enviarResetSenhaSupabase(email);
       return { ok: true };
     } catch (error) {
-      return { ok: false, errors: [error.message || 'Falha ao enviar link de criacao de senha.'] };
+      return { ok: false, errors: [error.message || 'Falha ao enviar link de criação de senha.'] };
     }
   }
 
@@ -8301,7 +8301,7 @@ export default function App() {
       );
       return result ?? { ok: true };
     } catch (error) {
-      console.warn('[historico] Falha ao registrar alteracao persistente:', error);
+      console.warn('[historico] Falha ao registrar alteração persistente:', error);
       if (notifyOnError) {
         setToast({
           title: 'Histórico não confirmado',
@@ -8378,7 +8378,7 @@ export default function App() {
           const previousFromDb = await buscarClientePorIdSupabase(previous.id);
           if (previousFromDb) previousForHistory = previousFromDb;
         } catch (error) {
-          console.warn('[historico] Falha ao buscar cliente atual para comparacao:', error);
+          console.warn('[historico] Falha ao buscar cliente atual para comparação:', error);
         }
         try {
           const saved = await atualizarClienteSupabase(previous.id, mergedClient);
@@ -8405,7 +8405,7 @@ export default function App() {
           setSupabaseStatus({ connected: false, message: 'Falha ao salvar no Supabase' });
           setToast({
             title: 'Falha ao salvar no Supabase',
-            message: `${error.message}. Nenhuma alteracao local paralela foi aplicada.`,
+            message: `${error.message}. Nenhuma alteração local paralela foi aplicada.`,
           });
           return;
         }
@@ -8446,7 +8446,7 @@ export default function App() {
 
   async function quickUpdateClient(id, patch) {
     if (!currentUserFull) return;
-    if (!ensureSupabaseWriteReady('salvar a atualizacao rapida')) return;
+    if (!ensureSupabaseWriteReady('salvar a atualização rápida')) return;
     const previous = clients.find((client) => client.id === id);
     if (!previous || !canViewClient(currentUserFull, previous)) return;
     patch = applyResponsavelEcdFallback(previous, patch);
@@ -8463,7 +8463,7 @@ export default function App() {
         const previousFromDb = await buscarClientePorIdSupabase(id);
         if (previousFromDb) previousForHistory = previousFromDb;
       } catch (error) {
-        console.warn('[historico] Falha ao buscar cliente atual para comparacao:', error);
+        console.warn('[historico] Falha ao buscar cliente atual para comparação:', error);
       }
       try {
         const saved = await atualizarClienteSupabase(id, nextClient);
@@ -8482,10 +8482,10 @@ export default function App() {
           await recarregarHistoricoClienteAtivo(id);
         }
       } catch (error) {
-        setSupabaseStatus({ connected: false, message: 'Falha na atualizacao do Supabase' });
+        setSupabaseStatus({ connected: false, message: 'Falha na atualização do Supabase' });
         setToast({
           title: 'Falha ao salvar no Supabase',
-          message: `${error.message}. Nenhuma alteracao local paralela foi aplicada.`,
+          message: `${error.message}. Nenhuma alteração local paralela foi aplicada.`,
         });
         return;
       }
@@ -8496,7 +8496,7 @@ export default function App() {
     );
     persist(nextClients);
     if (syncedWithSupabase) {
-      void resyncSupabaseAfterMutation('atualizacao rapida');
+      void resyncSupabaseAfterMutation('atualização rápida');
     }
   }
 
@@ -8555,7 +8555,7 @@ export default function App() {
         const previousFromDb = await buscarClientePorIdSupabase(client.id);
         if (previousFromDb) previousForHistory = previousFromDb;
       } catch (error) {
-        console.warn('[historico] Falha ao buscar cliente atual para alteracao em lote:', error);
+        console.warn('[historico] Falha ao buscar cliente atual para alteração em lote:', error);
       }
 
       try {
@@ -8592,7 +8592,7 @@ export default function App() {
         connected: true,
         message: `${formatNumber(atualizados.size)} responsável(is) atualizado(s) no Supabase`,
       });
-      void resyncSupabaseAfterMutation('alteracao de responsavel em lote');
+      void resyncSupabaseAfterMutation('alteração de responsável em lote');
     }
 
     if (falhas.length) {
@@ -8666,7 +8666,7 @@ export default function App() {
       message: `${nomeCampo}: ${anexo?.nome_arquivo ?? 'registro atualizado'}.`,
     });
     if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId)) {
-      void resyncSupabaseAfterMutation('atualizacao de anexo');
+      void resyncSupabaseAfterMutation('atualização de anexo');
     }
   }
 
@@ -8777,7 +8777,7 @@ export default function App() {
         const previousFromDb = await buscarClientePorIdSupabase(client.id);
         if (previousFromDb) previousForHistory = previousFromDb;
       } catch (error) {
-        console.warn('[historico] Falha ao buscar cliente atual para inativacao:', error);
+        console.warn('[historico] Falha ao buscar cliente atual para inativação:', error);
       }
       try {
         await inativarClienteSupabase(client.id);
@@ -8809,7 +8809,7 @@ export default function App() {
       message: client.nome_identificacao || client.razao_social,
     });
     if (isUuid(client.id)) {
-      void resyncSupabaseAfterMutation('inativacao de cliente');
+      void resyncSupabaseAfterMutation('inativação de cliente');
     }
   }
 
@@ -8846,7 +8846,7 @@ export default function App() {
 
   async function confirmarImportacaoExcel() {
     if (!importPreview?.buffer || !importPreview?.fileName) return;
-    if (!ensureSupabaseWriteReady('confirmar a importacao')) return;
+    if (!ensureSupabaseWriteReady('confirmar a importação')) return;
     setImportBusy(true);
     try {
       const clientesAntesImportacao = [...clients];
@@ -9484,7 +9484,7 @@ export default function App() {
         page={page}
         setPage={setPage}
         onImportClick={() => {
-          if (!ensureSupabaseWriteReady('abrir a importacao')) return;
+          if (!ensureSupabaseWriteReady('abrir a importação')) return;
           importInputRef.current?.click();
         }}
         metadata={metadata}
