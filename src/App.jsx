@@ -4481,10 +4481,10 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 
   if (!client) return null;
 
-  return (
-    <div className="modal-backdrop z-[70] overflow-y-auto">
-      <div className="modal-panel modal-panel-xl mx-auto my-6">
-        <div className="modal-header sticky top-0 z-10 flex items-start justify-between gap-3">
+  const modalContent = (
+    <div className="modal-backdrop reinf-modal-backdrop z-[70] overflow-y-auto">
+      <div className="modal-panel modal-panel-xl reinf-modal-panel mx-auto my-3 sm:my-4">
+        <div className="modal-header flex items-start justify-between gap-3">
           <div>
             <p className="modal-eyebrow">Preparação da Distribuição de Lucro</p>
             <h2 className="modal-title">{getClientDisplayName(client)}</h2>
@@ -4500,7 +4500,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           </button>
         </div>
 
-        <div className="modal-body space-y-4">
+        <div className="modal-body reinf-modal-body space-y-4">
           <section className="modal-section">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -4862,7 +4862,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           </section>
         </div>
 
-        <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="modal-footer flex flex-col gap-3">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="min-h-4 text-left sm:min-w-[150px] sm:text-right">
               {sendStatus ? (
@@ -4914,6 +4914,10 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }
 
 function ReinfPage({
