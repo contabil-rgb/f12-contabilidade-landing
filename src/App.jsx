@@ -1901,10 +1901,79 @@ function getReinfReportSocioTotals(reportSocio) {
   return reportSocio?.valoresTotais ?? reportSocio?.valores_totais ?? {};
 }
 
-function hasReinfTotalsValues(reportSocios = []) {
-  return (reportSocios ?? []).some((reportSocio) => (
-    REINF_TOTAL_FIELD_OPTIONS.some((field) => parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]) > 0)
-  ));
+function getReinfReportSocioMonthlyTotals(reportSocio) {
+  return reportSocio?.valoresTotaisPorMes ?? reportSocio?.valores_totais_por_mes ?? {};
+}
+
+function getReinfTotalMonthlyValue(reportSocio, fieldKey, month) {
+  const monthlyTotals = getReinfReportSocioMonthlyTotals(reportSocio);
+  const fieldValues = monthlyTotals?.[fieldKey] ?? {};
+  const value = fieldValues?.[month];
+  if (String(value ?? '').trim()) return value;
+  if (fieldKey === 'totalDistribuidoTributavel') {
+    return reportSocio?.valoresPorMes?.[month] ?? reportSocio?.valores_por_mes?.[month] ?? '';
+  }
+  return '';
+}
+
+function hasReinfTotalsValues(reportSocios = [], months = []) {
+  return (reportSocios ?? []).some((reportSocio) => {
+    const valoresPorMes = reportSocio?.valoresPorMes ?? {};
+    const sourceMonths = months.length ? months : Object.keys(valoresPorMes);
+
+    return (
+      REINF_TOTAL_FIELD_OPTIONS.some((field) => parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]) > 0)
+      || REINF_TOTAL_FIELD_OPTIONS.some((field) => (
+        sourceMonths.some((month) => parseCurrencyNumber(getReinfTotalMonthlyValue(reportSocio, field.key, month)) > 0)
+      ))
+    );
+  });
+}
+
+function getReinfTotalsMonthlySum(reportSocio, fieldKey, months = []) {
+  return (months ?? []).reduce((sum, month) => (
+    sum + parseCurrencyNumber(getReinfTotalMonthlyValue(reportSocio, fieldKey, month))
+  ), 0);
+}
+
+function getReinfTotalsDisplayValue(reportSocio, fieldKey, months = []) {
+  if (months.length) {
+    const monthlyTotal = getReinfTotalsMonthlySum(reportSocio, fieldKey, months);
+    if (monthlyTotal) return formatCurrencyDisplay(monthlyTotal);
+  }
+  return formatCurrencyDisplay(getReinfReportSocioTotals(reportSocio)?.[fieldKey]) || '';
+}
+
+function getReinfTotalsTableRows(reportSocios = [], months = []) {
+  const sourceSocios = reportSocios.length
+    ? reportSocios
+    : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {}, valoresTotais: {} }];
+  const sourceMonths = months.length ? months : [''];
+
+  return sourceSocios.flatMap((reportSocio) => sourceMonths.map((month, monthIndex) => ({
+    reportSocio,
+    month,
+    monthIndex,
+    socioNome: reportSocio.socio?.nome || 'Sócio não informado',
+    socioCpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+    monthLabel: month ? getReinfMonthLabel(month) : '',
+    tributavel: month
+      ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoTributavel', month)) || ''
+      : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoTributavel', months),
+    isentoAta: month
+      ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoIsentoAta', month)) || ''
+      : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoIsentoAta', months),
+  })));
+}
+
+function getReinfTotalsGrandTotal(reportSocios = [], fieldKey, months = []) {
+  return (reportSocios ?? []).reduce((sum, reportSocio) => {
+    if (months.length) {
+      const monthlyTotal = getReinfTotalsMonthlySum(reportSocio, fieldKey, months);
+      return sum + (monthlyTotal || parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[fieldKey]));
+    }
+    return sum + parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[fieldKey]);
+  }, 0);
 }
 
 function parseCurrencyNumber(value) {
@@ -2076,26 +2145,32 @@ function buildPlainTextTable(rows = []) {
 function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY, assinaturaNome = '' }) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const header = isTotalsModel
-    ? ['SÓCIO', 'CPF', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
+    ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
     : ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
-  const rows = reportSocios.length
-    ? reportSocios.map((reportSocio) => {
-      const totals = getReinfReportSocioTotals(reportSocio);
+  const rows = isTotalsModel
+    ? getReinfTotalsTableRows(reportSocios, months).map((row) => [
+      row.monthIndex === 0 ? row.socioNome : '',
+      row.monthIndex === 0 ? row.socioCpf : '',
+      row.monthLabel,
+      row.isentoAta,
+      row.tributavel,
+    ])
+    : (reportSocios.length
+      ? reportSocios.map((reportSocio) => {
       return [
         reportSocio.socio?.nome || 'Sócio não informado',
         reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
-        ...(isTotalsModel
-          ? REINF_TOTAL_FIELD_OPTIONS.map((field) => formatCurrencyDisplay(totals?.[field.key]) || '')
-          : months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || '')),
+        ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
       ];
     })
-    : [['Sem sócio', '', ...(isTotalsModel ? REINF_TOTAL_FIELD_OPTIONS.map(() => '') : months.map(() => ''))]];
+      : [['Sem sócio', '', ...months.map(() => '')]]);
   const totalRow = isTotalsModel && reportSocios.length
     ? [
       'TOTAL',
       '',
+      '',
       ...REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-        const total = reportSocios.reduce((sum, reportSocio) => sum + parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]), 0);
+        const total = getReinfTotalsGrandTotal(reportSocios, field.key, months);
         return total ? formatCurrencyDisplay(total) : '';
       }),
     ]
@@ -2123,21 +2198,28 @@ function buildReinfFiscalHtmlParagraphs(lines = []) {
 function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY, assinaturaUrl = '', assinaturaNome = '' }) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const headerLabels = isTotalsModel
-    ? ['SÓCIO', 'CPF', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
+    ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
     : ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
   const headerCells = headerLabels
     .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
     .join('');
-  const bodyRows = (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {} }])
-    .map((reportSocio) => {
-      const totals = getReinfReportSocioTotals(reportSocio);
-      const cells = [
+  const bodyRows = (isTotalsModel
+    ? getReinfTotalsTableRows(reportSocios, months).map((row) => [
+      row.monthIndex === 0 ? row.socioNome : '',
+      row.monthIndex === 0 ? row.socioCpf : '',
+      row.monthLabel,
+      row.isentoAta,
+      row.tributavel,
+    ])
+    : (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {} }])
+      .map((reportSocio) => {
+      return [
         reportSocio.socio?.nome || 'Sócio não informado',
         reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
-        ...(isTotalsModel
-          ? REINF_TOTAL_FIELD_OPTIONS.map((field) => formatCurrencyDisplay(totals?.[field.key]) || '')
-          : months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || '')),
+        ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
       ];
+    }))
+    .map((cells) => {
       return `<tr>${cells.map((cell) => `<td style="border:1px solid #111;padding:4px 8px;background:#fff;color:#111;">${escapeHtml(cell)}</td>`).join('')}</tr>`;
     })
     .join('');
@@ -2145,8 +2227,9 @@ function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], mon
     ? `<tr>${[
       'TOTAL',
       '',
+      '',
       ...REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-        const total = reportSocios.reduce((sum, reportSocio) => sum + parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]), 0);
+        const total = getReinfTotalsGrandTotal(reportSocios, field.key, months);
         return total ? formatCurrencyDisplay(total) : '';
       }),
     ].map((cell) => `<td style="border:1px solid #111;padding:4px 8px;background:#f8fafc;color:#111;font-weight:600;">${escapeHtml(cell)}</td>`).join('')}</tr>`
@@ -2171,19 +2254,32 @@ function buildReinfReportSociosSnapshot(reportSocios = [], months = [], modeloTa
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   return (reportSocios ?? []).map((reportSocio) => {
     const valoresPorMes = {};
+    const valoresTotaisPorMes = REINF_TOTAL_FIELD_OPTIONS.reduce((values, field) => ({
+      ...values,
+      [field.key]: {},
+    }), {});
     let total = 0;
     months.forEach((month) => {
-      const formattedValue = formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || '';
+      const formattedValue = isTotalsModel
+        ? (formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoTributavel', month)) || '')
+        : (formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || '');
       valoresPorMes[month] = formattedValue;
-      total += parseCurrencyNumber(reportSocio.valoresPorMes?.[month]);
+      total += parseCurrencyNumber(formattedValue);
+      if (isTotalsModel) {
+        REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+          valoresTotaisPorMes[field.key][month] = formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, field.key, month)) || '';
+        });
+      }
     });
     const valoresTotais = {};
     let totalDistribuido = 0;
     REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
-      const formattedValue = formatCurrencyDisplay(getReinfReportSocioTotals(reportSocio)?.[field.key]) || '';
+      const formattedValue = isTotalsModel
+        ? getReinfTotalsDisplayValue(reportSocio, field.key, months)
+        : (formatCurrencyDisplay(getReinfReportSocioTotals(reportSocio)?.[field.key]) || '');
       valoresTotais[field.key] = formattedValue;
       if (field.key === 'totalDistribuidoTributavel') {
-        totalDistribuido += parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]);
+        totalDistribuido += parseCurrencyNumber(formattedValue);
       }
     });
     return {
@@ -2191,6 +2287,7 @@ function buildReinfReportSociosSnapshot(reportSocios = [], months = [], modeloTa
       nome: reportSocio.socio?.nome || 'Sócio não informado',
       cpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
       valores_por_mes: valoresPorMes,
+      valores_totais_por_mes: valoresTotaisPorMes,
       valores_totais: valoresTotais,
       total: isTotalsModel
         ? (totalDistribuido ? formatCurrencyDisplay(totalDistribuido) : '')
@@ -4088,7 +4185,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   const getSocioByKey = (socioKey) => socios.find((socio, index) => getReinfSocioOptionKey(socio, index) === socioKey) ?? null;
   const createInitialReportSocios = () => {
     const initialKey = currentSocioKey || (socios[0] ? getReinfSocioOptionKey(socios[0], 0) : '');
-    return initialKey ? [{ socioKey: initialKey, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues() }] : [];
+    return initialKey ? [{ socioKey: initialKey, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {} }] : [];
   };
   const [reportSocios, setReportSocios] = useState(createInitialReportSocios);
   const [socioToAdd, setSocioToAdd] = useState('');
@@ -4190,7 +4287,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 
   function addReportSocio() {
     if (!socioToAdd || selectedReportSocioKeys.has(socioToAdd)) return;
-    setReportSocios((current) => [...current, { socioKey: socioToAdd, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues() }]);
+    setReportSocios((current) => [...current, { socioKey: socioToAdd, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {} }]);
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
@@ -4209,11 +4306,17 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       const currentMeses = reportSocio.meses ?? [];
       if (currentMeses.includes(month)) {
         const nextValues = { ...(reportSocio.valoresPorMes ?? {}) };
+        const nextTotalMonthlyValues = { ...(reportSocio.valoresTotaisPorMes ?? {}) };
         delete nextValues[month];
+        REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+          nextTotalMonthlyValues[field.key] = { ...(nextTotalMonthlyValues[field.key] ?? {}) };
+          delete nextTotalMonthlyValues[field.key][month];
+        });
         return {
           ...reportSocio,
           meses: currentMeses.filter((item) => item !== month),
           valoresPorMes: nextValues,
+          valoresTotaisPorMes: nextTotalMonthlyValues,
         };
       }
       return {
@@ -4229,7 +4332,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   function clearMeses(socioKey) {
     setReportSocios((current) => current.map((reportSocio) => (
       reportSocio.socioKey === socioKey
-        ? { ...reportSocio, meses: [], valoresPorMes: {} }
+        ? { ...reportSocio, meses: [], valoresPorMes: {}, valoresTotaisPorMes: {} }
         : reportSocio
     )));
     setMensagemEditada(false);
@@ -4245,6 +4348,13 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           valoresPorMes: {
             ...(reportSocio.valoresPorMes ?? {}),
             [month]: value,
+          },
+          valoresTotaisPorMes: {
+            ...(reportSocio.valoresTotaisPorMes ?? {}),
+            totalDistribuidoTributavel: {
+              ...(reportSocio.valoresTotaisPorMes?.totalDistribuidoTributavel ?? {}),
+              [month]: value,
+            },
           },
         }
         : reportSocio
@@ -4265,7 +4375,65 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           ...(reportSocio.valoresPorMes ?? {}),
           [month]: formatted,
         },
+        valoresTotaisPorMes: {
+          ...(reportSocio.valoresTotaisPorMes ?? {}),
+          totalDistribuidoTributavel: {
+            ...(reportSocio.valoresTotaisPorMes?.totalDistribuidoTributavel ?? {}),
+            [month]: formatted,
+          },
+        },
       };
+    }));
+  }
+
+  function updateValorTotalMes(socioKey, fieldKey, month, value) {
+    setReportSocios((current) => current.map((reportSocio) => {
+      if (reportSocio.socioKey !== socioKey) return reportSocio;
+      const nextReportSocio = {
+        ...reportSocio,
+        valoresTotaisPorMes: {
+          ...(reportSocio.valoresTotaisPorMes ?? {}),
+          [fieldKey]: {
+            ...(reportSocio.valoresTotaisPorMes?.[fieldKey] ?? {}),
+            [month]: value,
+          },
+        },
+      };
+      if (fieldKey === 'totalDistribuidoTributavel') {
+        nextReportSocio.valoresPorMes = {
+          ...(reportSocio.valoresPorMes ?? {}),
+          [month]: value,
+        };
+      }
+      return nextReportSocio;
+    }));
+    setMensagemEditada(false);
+    setCopied(false);
+    setCopyStatus('');
+  }
+
+  function formatValorTotalMes(socioKey, fieldKey, month) {
+    setReportSocios((current) => current.map((reportSocio) => {
+      if (reportSocio.socioKey !== socioKey) return reportSocio;
+      const formatted = formatCurrencyInput(getReinfTotalMonthlyValue(reportSocio, fieldKey, month));
+      if (!formatted) return reportSocio;
+      const nextReportSocio = {
+        ...reportSocio,
+        valoresTotaisPorMes: {
+          ...(reportSocio.valoresTotaisPorMes ?? {}),
+          [fieldKey]: {
+            ...(reportSocio.valoresTotaisPorMes?.[fieldKey] ?? {}),
+            [month]: formatted,
+          },
+        },
+      };
+      if (fieldKey === 'totalDistribuidoTributavel') {
+        nextReportSocio.valoresPorMes = {
+          ...(reportSocio.valoresPorMes ?? {}),
+          [month]: formatted,
+        };
+      }
+      return nextReportSocio;
     }));
   }
 
@@ -4359,7 +4527,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       setSaveStatus(isTotalsModel ? 'Selecione ao menos um mês de referência' : 'Selecione ao menos um mês');
       return;
     }
-    if (isTotalsModel && !hasReinfTotalsValues(reportSociosHydrated)) {
+    if (isTotalsModel && !hasReinfTotalsValues(reportSociosHydrated, reportMonths)) {
       setSaveStatus('Informe ao menos um valor na tabela de totais');
       return;
     }
@@ -4405,7 +4573,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       setSendStatus(isTotalsModel ? 'Selecione ao menos um mês de referência' : 'Selecione ao menos um mês');
       return;
     }
-    if (isTotalsModel && !hasReinfTotalsValues(reportSociosHydrated)) {
+    if (isTotalsModel && !hasReinfTotalsValues(reportSociosHydrated, reportMonths)) {
       setSendStatus('Informe ao menos um valor na tabela de totais');
       return;
     }
@@ -4625,22 +4793,60 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                   </div>
 
                   {isTotalsModel ? (
-                    <div className="mt-4">
-                      <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores do modelo de totais</p>
-                      <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
-                          <label key={field.key} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                            {field.label}
-                            <input
-                              value={reportSocio.valoresTotais?.[field.key] ?? ''}
-                              onChange={(event) => updateValorTotal(reportSocio.socioKey, field.key, event.target.value)}
-                              onBlur={() => formatValorTotal(reportSocio.socioKey, field.key)}
-                              inputMode="decimal"
-                              placeholder="0,00"
-                              className="form-control-shell mt-1"
-                            />
-                          </label>
-                        ))}
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores por mês selecionado</p>
+                        {reportMonths.length ? (
+                          <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                            {reportMonths.map((month) => (
+                              <div key={month} className="rounded-lg border border-slate-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-950/30">
+                                <p className="text-sm font-black text-slate-700 dark:text-gray-200">{getReinfMonthLabel(month)}</p>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
+                                    <label key={field.key} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                                      {field.label}
+                                      <input
+                                        value={getReinfTotalMonthlyValue(reportSocio, field.key, month)}
+                                        onChange={(event) => updateValorTotalMes(reportSocio.socioKey, field.key, month, event.target.value)}
+                                        onBlur={() => formatValorTotalMes(reportSocio.socioKey, field.key, month)}
+                                        inputMode="decimal"
+                                        placeholder="0,00"
+                                        className="form-control-shell mt-1"
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                            Selecione um ou mais meses de referência para informar os valores deste sócio.
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Totais consolidados</p>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          {REINF_TOTAL_FIELD_OPTIONS.map((field) => {
+                            const isComputedTotal = reportMonths.length > 0;
+                            return (
+                              <label key={field.key} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                                {field.label}
+                                <input
+                                  value={isComputedTotal ? getReinfTotalsDisplayValue(reportSocio, field.key, reportMonths) : (reportSocio.valoresTotais?.[field.key] ?? '')}
+                                  onChange={(event) => updateValorTotal(reportSocio.socioKey, field.key, event.target.value)}
+                                  onBlur={() => formatValorTotal(reportSocio.socioKey, field.key)}
+                                  inputMode="decimal"
+                                  placeholder="0,00"
+                                  readOnly={isComputedTotal}
+                                  className={`form-control-shell mt-1 ${isComputedTotal ? 'cursor-not-allowed opacity-80' : ''}`}
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -4780,8 +4986,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                       <table className="min-w-[760px] border-collapse border border-slate-950 bg-white text-left text-[13px] leading-5 text-slate-950">
                         <thead>
                           <tr>
-                            <th className="w-[28%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SÓCIO</th>
+                            <th className="w-[26%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SÓCIO</th>
                             <th className="w-[16%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF</th>
+                            <th className="w-[12%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">MÊS</th>
                             {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
                               <th key={field.key} className="border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">
                                 {field.label.toUpperCase()}
@@ -4790,23 +4997,22 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                           </tr>
                         </thead>
                         <tbody>
-                          {(reportSociosHydrated.length ? reportSociosHydrated : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresTotais: {} }]).map((reportSocio, index) => (
-                            <tr key={reportSocio.socioKey ?? `empty-${index}`}>
-                              <td className="border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.nome || 'Sócio não informado'}</td>
-                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : ''}</td>
-                              {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
-                                <td key={field.key} className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">
-                                  {formatCurrencyDisplay(getReinfReportSocioTotals(reportSocio)?.[field.key])}
-                                </td>
-                              ))}
+                          {getReinfTotalsTableRows(reportSociosHydrated, reportMonths).map((row, index) => (
+                            <tr key={`${row.reportSocio.socioKey ?? 'empty'}-${row.month || index}`}>
+                              <td className="border border-slate-950 bg-white px-2 py-1 align-top">{row.monthIndex === 0 ? row.socioNome : ''}</td>
+                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.monthIndex === 0 ? row.socioCpf : ''}</td>
+                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.monthLabel}</td>
+                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.isentoAta}</td>
+                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.tributavel}</td>
                             </tr>
                           ))}
                           {reportSociosHydrated.length ? (
                             <tr className="font-semibold">
                               <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top">TOTAL</td>
                               <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top" />
+                              <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top" />
                               {REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-                                const total = reportSociosHydrated.reduce((sum, reportSocio) => sum + parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[field.key]), 0);
+                                const total = getReinfTotalsGrandTotal(reportSociosHydrated, field.key, reportMonths);
                                 return (
                                   <td key={field.key} className="whitespace-nowrap border border-slate-950 bg-slate-50 px-2 py-1 align-top">
                                     {total ? formatCurrencyDisplay(total) : ''}
@@ -5731,14 +5937,13 @@ function ReportsPage({
         const valoresTotais = socio.valores_totais ?? socio.valoresTotais ?? {};
         const valoresSelecionados = {};
         let total = 0;
-        if (relatorioIsTotalsModel) {
+        mesesSelecionados.forEach((month) => {
+          const valor = valoresPorMes[month] ?? '';
+          valoresSelecionados[month] = valor;
+          total += parseCurrencyNumber(valor);
+        });
+        if (relatorioIsTotalsModel && !total) {
           total = parseCurrencyNumber(socio.total);
-        } else {
-          mesesSelecionados.forEach((month) => {
-            const valor = valoresPorMes[month] ?? '';
-            valoresSelecionados[month] = valor;
-            total += parseCurrencyNumber(valor);
-          });
         }
 
         return {
