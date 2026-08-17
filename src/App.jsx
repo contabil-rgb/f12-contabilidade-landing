@@ -4154,6 +4154,14 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setPeriodicidade(isTotalsModel ? 'Mensal' : suggestedPeriodicity);
   }, [isTotalsModel, suggestedPeriodicity]);
 
+  useEffect(() => {
+    if (!client || typeof document === 'undefined') return undefined;
+    document.body.classList.add('reinf-modal-open');
+    return () => {
+      document.body.classList.remove('reinf-modal-open');
+    };
+  }, [client]);
+
   const generatedSubject = useMemo(() => buildReinfFiscalSubject({
     client,
     months: reportMonths,
@@ -4482,8 +4490,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   if (!client) return null;
 
   const modalContent = (
-    <div className="modal-backdrop reinf-modal-backdrop z-[70] overflow-y-auto">
-      <div className="modal-panel modal-panel-xl reinf-modal-panel mx-auto my-3 sm:my-4">
+    <div className="modal-backdrop reinf-modal-backdrop z-[70]">
+      <div className="modal-panel modal-panel-xl reinf-modal-panel">
         <div className="modal-header flex items-start justify-between gap-3">
           <div>
             <p className="modal-eyebrow">Preparação da Distribuição de Lucro</p>
