@@ -1858,7 +1858,7 @@ function ReinfSocioCpfCell({ client, selectedSocioByClientId }) {
 const REINF_MONTH_OPTIONS = [
   { value: 'janeiro', label: 'Janeiro' },
   { value: 'fevereiro', label: 'Fevereiro' },
-  { value: 'marco', label: 'Marco' },
+  { value: 'marco', label: 'Março' },
   { value: 'abril', label: 'Abril' },
   { value: 'maio', label: 'Maio' },
   { value: 'junho', label: 'Junho' },
@@ -1950,30 +1950,40 @@ function getReinfTotalsTableRows(reportSocios = [], months = []) {
     : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {}, valoresTotais: {} }];
   const sourceMonths = months.length ? months : [''];
 
-  return sourceSocios.flatMap((reportSocio) => sourceMonths.map((month, monthIndex) => ({
-    reportSocio,
-    month,
-    monthIndex,
-    socioNome: reportSocio.socio?.nome || 'Sócio não informado',
-    socioCpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
-    monthLabel: month ? getReinfMonthLabel(month) : '',
-    tributavel: month
-      ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoTributavel', month)) || ''
-      : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoTributavel', months),
-    isentoAta: month
-      ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoIsentoAta', month)) || ''
-      : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoIsentoAta', months),
-  })));
-}
+  return sourceSocios.flatMap((reportSocio) => {
+    const monthRows = sourceMonths.map((month, monthIndex) => ({
+      reportSocio,
+      month,
+      monthIndex,
+      isTotal: false,
+      socioNome: reportSocio.socio?.nome || 'Sócio não informado',
+      socioCpf: reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+      monthLabel: month ? getReinfMonthLabel(month) : '',
+      tributavel: month
+        ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoTributavel', month)) || ''
+        : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoTributavel', months),
+      isentoAta: month
+        ? formatCurrencyDisplay(getReinfTotalMonthlyValue(reportSocio, 'totalDistribuidoIsentoAta', month)) || ''
+        : getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoIsentoAta', months),
+    }));
 
-function getReinfTotalsGrandTotal(reportSocios = [], fieldKey, months = []) {
-  return (reportSocios ?? []).reduce((sum, reportSocio) => {
-    if (months.length) {
-      const monthlyTotal = getReinfTotalsMonthlySum(reportSocio, fieldKey, months);
-      return sum + (monthlyTotal || parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[fieldKey]));
-    }
-    return sum + parseCurrencyNumber(getReinfReportSocioTotals(reportSocio)?.[fieldKey]);
-  }, 0);
+    if (!months.length) return monthRows;
+
+    return [
+      ...monthRows,
+      {
+        reportSocio,
+        month: '',
+        monthIndex: sourceMonths.length,
+        isTotal: true,
+        socioNome: 'TOTAL DO SÓCIO',
+        socioCpf: '',
+        monthLabel: '',
+        tributavel: getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoTributavel', months),
+        isentoAta: getReinfTotalsDisplayValue(reportSocio, 'totalDistribuidoIsentoAta', months),
+      },
+    ];
+  });
 }
 
 function parseCurrencyNumber(value) {
@@ -2149,8 +2159,8 @@ function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], mo
     : ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
   const rows = isTotalsModel
     ? getReinfTotalsTableRows(reportSocios, months).map((row) => [
-      row.monthIndex === 0 ? row.socioNome : '',
-      row.monthIndex === 0 ? row.socioCpf : '',
+      row.isTotal ? 'TOTAL DO SÓCIO' : (row.monthIndex === 0 ? row.socioNome : ''),
+      row.isTotal ? '' : (row.monthIndex === 0 ? row.socioCpf : ''),
       row.monthLabel,
       row.isentoAta,
       row.tributavel,
@@ -2164,17 +2174,7 @@ function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], mo
       ];
     })
       : [['Sem sócio', '', ...months.map(() => '')]]);
-  const totalRow = isTotalsModel && reportSocios.length
-    ? [
-      'TOTAL',
-      '',
-      '',
-      ...REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-        const total = getReinfTotalsGrandTotal(reportSocios, field.key, months);
-        return total ? formatCurrencyDisplay(total) : '';
-      }),
-    ]
-    : null;
+  const totalRow = null;
   const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
 
   return [
@@ -2204,36 +2204,35 @@ function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], mon
     .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
     .join('');
   const bodyRows = (isTotalsModel
-    ? getReinfTotalsTableRows(reportSocios, months).map((row) => [
-      row.monthIndex === 0 ? row.socioNome : '',
-      row.monthIndex === 0 ? row.socioCpf : '',
-      row.monthLabel,
-      row.isentoAta,
-      row.tributavel,
-    ])
+    ? getReinfTotalsTableRows(reportSocios, months).map((row) => ({
+      isTotal: row.isTotal,
+      cells: [
+        row.isTotal ? 'TOTAL DO SÓCIO' : (row.monthIndex === 0 ? row.socioNome : ''),
+        row.isTotal ? '' : (row.monthIndex === 0 ? row.socioCpf : ''),
+        row.monthLabel,
+        row.isentoAta,
+        row.tributavel,
+      ],
+    }))
     : (reportSocios.length ? reportSocios : [{ socio: { nome: 'Sem sócio', cpf: '' }, valoresPorMes: {} }])
       .map((reportSocio) => {
-      return [
-        reportSocio.socio?.nome || 'Sócio não informado',
-        reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
-        ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
-      ];
+      return {
+        isTotal: false,
+        cells: [
+          reportSocio.socio?.nome || 'Sócio não informado',
+          reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : '',
+          ...months.map((month) => formatCurrencyDisplay(reportSocio.valoresPorMes?.[month]) || ''),
+        ],
+      };
     }))
-    .map((cells) => {
-      return `<tr>${cells.map((cell) => `<td style="border:1px solid #111;padding:4px 8px;background:#fff;color:#111;">${escapeHtml(cell)}</td>`).join('')}</tr>`;
+    .map(({ cells, isTotal }) => {
+      const cellStyle = isTotal
+        ? 'border:1px solid #111;padding:4px 8px;background:#f8fafc;color:#111;font-weight:600;'
+        : 'border:1px solid #111;padding:4px 8px;background:#fff;color:#111;';
+      return `<tr>${cells.map((cell) => `<td style="${cellStyle}">${escapeHtml(cell)}</td>`).join('')}</tr>`;
     })
     .join('');
-  const totalRow = isTotalsModel && reportSocios.length
-    ? `<tr>${[
-      'TOTAL',
-      '',
-      '',
-      ...REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-        const total = getReinfTotalsGrandTotal(reportSocios, field.key, months);
-        return total ? formatCurrencyDisplay(total) : '';
-      }),
-    ].map((cell) => `<td style="border:1px solid #111;padding:4px 8px;background:#f8fafc;color:#111;font-weight:600;">${escapeHtml(cell)}</td>`).join('')}</tr>`
-    : '';
+  const totalRow = '';
   const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
 
   return `
@@ -4997,30 +4996,23 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                           </tr>
                         </thead>
                         <tbody>
-                          {getReinfTotalsTableRows(reportSociosHydrated, reportMonths).map((row, index) => (
-                            <tr key={`${row.reportSocio.socioKey ?? 'empty'}-${row.month || index}`}>
-                              <td className="border border-slate-950 bg-white px-2 py-1 align-top">{row.monthIndex === 0 ? row.socioNome : ''}</td>
-                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.monthIndex === 0 ? row.socioCpf : ''}</td>
-                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.monthLabel}</td>
-                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.isentoAta}</td>
-                              <td className="whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top">{row.tributavel}</td>
-                            </tr>
-                          ))}
-                          {reportSociosHydrated.length ? (
-                            <tr className="font-semibold">
-                              <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top">TOTAL</td>
-                              <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top" />
-                              <td className="border border-slate-950 bg-slate-50 px-2 py-1 align-top" />
-                              {REINF_TOTAL_FIELD_OPTIONS.map((field) => {
-                                const total = getReinfTotalsGrandTotal(reportSociosHydrated, field.key, reportMonths);
-                                return (
-                                  <td key={field.key} className="whitespace-nowrap border border-slate-950 bg-slate-50 px-2 py-1 align-top">
-                                    {total ? formatCurrencyDisplay(total) : ''}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ) : null}
+                          {getReinfTotalsTableRows(reportSociosHydrated, reportMonths).map((row, index) => {
+                            const cellClassName = row.isTotal
+                              ? 'border border-slate-950 bg-slate-50 px-2 py-1 align-top font-semibold'
+                              : 'border border-slate-950 bg-white px-2 py-1 align-top';
+                            const nowrapCellClassName = row.isTotal
+                              ? 'whitespace-nowrap border border-slate-950 bg-slate-50 px-2 py-1 align-top font-semibold'
+                              : 'whitespace-nowrap border border-slate-950 bg-white px-2 py-1 align-top';
+                            return (
+                              <tr key={`${row.reportSocio.socioKey ?? 'empty'}-${row.month || index}`}>
+                                <td className={cellClassName}>{row.isTotal ? 'TOTAL DO SÓCIO' : (row.monthIndex === 0 ? row.socioNome : '')}</td>
+                                <td className={nowrapCellClassName}>{row.isTotal ? '' : (row.monthIndex === 0 ? row.socioCpf : '')}</td>
+                                <td className={nowrapCellClassName}>{row.monthLabel}</td>
+                                <td className={nowrapCellClassName}>{row.isentoAta}</td>
+                                <td className={nowrapCellClassName}>{row.tributavel}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     ) : (
