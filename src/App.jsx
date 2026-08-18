@@ -2341,7 +2341,7 @@ function buildReinfRelatoriosExportRows(relatorios = []) {
         Responsável: relatorio.responsavel || '',
         Revisor: relatorio.revisor || '',
         'Modelo da tabela': relatorio.modelo_tabela_label || getReinfTableModelLabel(relatorio.modelo_tabela),
-        Periodicidade: relatorio.periodicidade || '',
+        Periodicidade: getReinfRelatorioPeriodicityLabel(relatorio),
         Ano: relatorio.ano_referencia || '',
         Meses: meses.map(getReinfMonthLabel).join(', '),
         Sócio: socio.nome || '',
@@ -2377,6 +2377,17 @@ function getReinfRelatorioMonthsLabel(relatorio) {
   const meses = Array.isArray(relatorio?.meses) ? relatorio.meses : [];
   const labels = meses.map(getReinfMonthShortLabel).filter(Boolean);
   return labels.length ? labels.join(', ') : 'Sem mês informado';
+}
+
+function getReinfPeriodicityLabelFromMonths(months = [], fallback = '') {
+  const monthsCount = Array.isArray(months) ? months.length : 0;
+  if (monthsCount === 1) return 'Mensal';
+  if (monthsCount === 3) return 'Trimestral';
+  return fallback || 'Não informado';
+}
+
+function getReinfRelatorioPeriodicityLabel(relatorio) {
+  return getReinfPeriodicityLabelFromMonths(relatorio?.meses, relatorio?.periodicidade);
 }
 
 function slugifyFilenamePart(value, fallback = 'relatorio') {
@@ -5948,7 +5959,7 @@ function ReportsPage({
           cnpj: relatorio.cnpj || '',
           responsavel: relatorio.responsavel || '',
           revisor: relatorio.revisor || '',
-          periodicidade: relatorio.periodicidade || '',
+          periodicidade: getReinfPeriodicityLabelFromMonths(mesesSelecionados, relatorio.periodicidade || ''),
           ano_referencia: relatorio.ano_referencia || '',
           meses: mesesSelecionados,
           socio: socio.nome || 'Sem sócio',
@@ -5974,7 +5985,7 @@ function ReportsPage({
       Responsável: row.responsavel,
       Revisor: row.revisor,
       'Modelo da tabela': row.modelo_tabela_label || getReinfTableModelLabel(row.modelo_tabela),
-      Periodicidade: row.periodicidade,
+      Periodicidade: getReinfPeriodicityLabelFromMonths(row.meses, row.periodicidade),
       Ano: row.ano_referencia,
       Meses: row.meses.map(getReinfMonthLabel).join(', '),
       Período: row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Não informado',
@@ -6698,7 +6709,7 @@ function ReportsPage({
                           <td className="break-words px-3 py-3 font-semibold leading-snug">{relatorio.responsavel || '-'}</td>
                           <td className="break-words px-3 py-3 font-semibold leading-snug">{relatorio.revisor || '-'}</td>
                           <td className="break-words px-3 py-3 font-semibold leading-snug">
-                            <p className="font-black">{relatorio.periodicidade || '-'}</p>
+                            <p className="font-black">{getReinfRelatorioPeriodicityLabel(relatorio)}</p>
                             <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                               {getReinfRelatorioMonthsLabel(relatorio)} {relatorio.ano_referencia || ''}
                             </p>
