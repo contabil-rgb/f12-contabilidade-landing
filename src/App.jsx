@@ -5157,6 +5157,7 @@ function ReinfPage({
     cnpj: '',
     responsavel: '',
     revisor: '',
+    sociosStatus: '',
   };
   const [filters, setFilters] = useState(emptyFilters);
   const [focusedClientId, setFocusedClientId] = useState('');
@@ -5188,6 +5189,9 @@ function ReinfPage({
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
     if (filters.responsavel && normalizeText(client.responsavel) !== normalizeText(filters.responsavel)) return false;
     if (filters.revisor && normalizeText(client.revisor) !== normalizeText(filters.revisor)) return false;
+    const sociosCount = getReinfSocios(client).length;
+    if (filters.sociosStatus === 'com_socios' && sociosCount === 0) return false;
+    if (filters.sociosStatus === 'sem_socios' && sociosCount > 0) return false;
     return true;
   });
   const reinfModalClient = clients.find((client) => String(client.id ?? '') === String(reinfModalClientId)) ?? null;
@@ -5241,7 +5245,7 @@ function ReinfPage({
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 grid max-w-5xl gap-3 md:grid-cols-[minmax(240px,360px)_minmax(180px,240px)_minmax(160px,220px)_minmax(160px,220px)]">
+        <div className="mt-4 grid max-w-6xl gap-3 md:grid-cols-[minmax(240px,360px)_minmax(180px,240px)_minmax(160px,220px)_minmax(160px,220px)_minmax(160px,220px)]">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -5261,6 +5265,15 @@ function ReinfPage({
             value={filters.revisor}
             options={uniqueValues(clients.map((client) => client.revisor))}
             onChange={(value) => updateFilter({ revisor: value })}
+          />
+          <FilterSelect
+            label="Sócios"
+            value={filters.sociosStatus}
+            options={[
+              { value: 'com_socios', label: 'Com sócios' },
+              { value: 'sem_socios', label: 'Sem sócios' },
+            ]}
+            onChange={(value) => updateFilter({ sociosStatus: value })}
           />
         </div>
       </section>
