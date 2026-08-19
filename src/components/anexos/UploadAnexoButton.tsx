@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { Download, Eye, Upload } from 'lucide-react';
+import { Download, Eye, Trash2, Upload } from 'lucide-react';
 import {
   gerarUrlDownloadAnexo,
   gerarUrlVisualizacaoAnexo,
+  removerAnexoCliente,
   substituirAnexoCliente,
   uploadAnexoCliente,
 } from '../../services/anexos.service';
@@ -16,6 +17,7 @@ type Props = {
   labelAnexar?: string;
   labelSubstituir?: string;
   onSuccess?: (anexo: AnexoCliente) => void;
+  onRemove?: (anexo: AnexoCliente | null) => void | Promise<void>;
   onError?: (message: string) => void;
 };
 
@@ -27,6 +29,7 @@ export function UploadAnexoButton({
   labelAnexar = 'Anexar',
   labelSubstituir = 'Substituir',
   onSuccess,
+  onRemove,
   onError,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -77,39 +80,80 @@ export function UploadAnexoButton({
     }
   }
 
+  async function remover() {
+    if (!anexo || !hasAnexo) return;
+
+    const nomeArquivo = anexo.nome_arquivo || 'este anexo';
+    if (!window.confirm(`Remover ${nomeArquivo}?`)) return;
+
+    try {
+      setLoading(true);
+      const anexoRemovido = await removerAnexoCliente({ cliente, tipoAnexo, anexo });
+      await onRemove?.(anexoRemovido ?? anexo ?? null);
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : 'Não foi possível remover o anexo.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const neutralButtonClass =
+    'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50';
+  const dangerButtonClass =
+    'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10';
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={hasAnexo ? 'anexo-actions-grid grid w-fit grid-cols-2 gap-2' : 'flex flex-wrap gap-2'}>
       {hasAnexo ? (
         <>
           <button
             type="button"
             onClick={visualizar}
             disabled={disabled || loading}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+            className={neutralButtonClass}
           >
             <Eye size={14} aria-hidden="true" />
             Visualizar
           </button>
           <button
             type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={disabled || loading}
+            className={neutralButtonClass}
+          >
+            <Upload size={14} aria-hidden="true" />
+            {loading ? 'Enviando...' : labelSubstituir}
+          </button>
+          <button
+            type="button"
             onClick={baixar}
             disabled={disabled || loading}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+            className={neutralButtonClass}
           >
             <Download size={14} aria-hidden="true" />
             Baixar
           </button>
+          <button
+            type="button"
+            onClick={remover}
+            disabled={disabled || loading}
+            className={dangerButtonClass}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            Remover
+          </button>
         </>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled || loading}
-        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Upload size={14} aria-hidden="true" />
-        {loading ? 'Enviando...' : hasAnexo ? labelSubstituir : labelAnexar}
-      </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={disabled || loading}
+          className={neutralButtonClass}
+        >
+          <Upload size={14} aria-hidden="true" />
+          {loading ? 'Enviando...' : labelAnexar}
+        </button>
+      )}
       <input
         ref={inputRef}
         type="file"

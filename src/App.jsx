@@ -1751,7 +1751,7 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Média', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
 };
 
-function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onError }) {
+function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onRemove, onError }) {
   const anexo = fieldValueToAnexo(client[fieldKey], tipoAnexo, client);
 
   return (
@@ -1763,6 +1763,7 @@ function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onEr
         anexo={anexo}
         disabled={disabled}
         onSuccess={(novoAnexo) => onSuccess?.(client.id, tipoAnexo, novoAnexo)}
+        onRemove={(anexoRemovido) => onRemove?.(client.id, tipoAnexo, anexoRemovido ?? anexo)}
         onError={onError}
         labelAnexar="Anexar"
         labelSubstituir="Substituir"
@@ -3817,6 +3818,7 @@ function DetailPage({
   canEditCurrent,
   canManageAttachments,
   onAnexoSuccess,
+  onAnexoRemove,
   onAnexoError,
   historicoRows = [],
   historicoLoading = false,
@@ -3885,6 +3887,7 @@ function DetailPage({
         cliente={client}
         disabled={!canManageAttachments}
         onSuccess={(tipoAnexo, anexo) => onAnexoSuccess?.(client.id, tipoAnexo, anexo)}
+        onRemove={(tipoAnexo, anexo) => onAnexoRemove?.(client.id, tipoAnexo, anexo)}
         onError={onAnexoError}
       />
     </div>
@@ -5341,7 +5344,7 @@ function ReinfPage({
   );
 }
 
-function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate, onQuickUpdate, onAnexoSuccess, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
+function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate, onQuickUpdate, onAnexoSuccess, onAnexoRemove, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -5508,6 +5511,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
                   tipoAnexo={TIPOS_ANEXO.RECIBO_ECD}
                   disabled={!canManageAttachments?.(client, 'anexo_recibo_ecd')}
                   onSuccess={onAnexoSuccess}
+                  onRemove={onAnexoRemove}
                   onError={onAnexoError}
                 />
               );
@@ -5520,6 +5524,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
                   tipoAnexo={TIPOS_ANEXO.RECIBO_ECF}
                   disabled={!canManageAttachments?.(client, 'anexo_recibo_ecf')}
                   onSuccess={onAnexoSuccess}
+                  onRemove={onAnexoRemove}
                   onError={onAnexoError}
                 />
               );
@@ -7155,7 +7160,7 @@ function FullscreenStatusState({ label }) {
   );
 }
 
-function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient, onAnexoSuccess, onAnexoError }) {
+function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient, onAnexoSuccess, onAnexoRemove, onAnexoError }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
     ...client,
@@ -7276,6 +7281,11 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
                           const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
                           if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
                           onAnexoSuccess?.(form.id, tipoAnexo, anexo);
+                        }}
+                        onAttachmentRemove={(tipoAnexo, anexo) => {
+                          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
+                          if (fieldKey) updateField(fieldKey, '');
+                          onAnexoRemove?.(form.id, tipoAnexo, anexo);
                         }}
                         onAttachmentError={onAnexoError}
                       />
@@ -7462,6 +7472,7 @@ function FormField({
   disabledReason = 'Sem permissão para alterar este campo.',
   cliente,
   onAttachmentSuccess,
+  onAttachmentRemove,
   onAttachmentError,
 }) {
   const baseClass =
@@ -7501,6 +7512,10 @@ function FormField({
                   onSuccess={(novoAnexo) => {
                     onChange(anexoToFieldValue(novoAnexo));
                     onAttachmentSuccess?.(tipoAnexo, novoAnexo);
+                  }}
+                  onRemove={(anexoRemovido) => {
+                    onChange('');
+                    onAttachmentRemove?.(tipoAnexo, anexoRemovido ?? anexo);
                   }}
                   onError={onAttachmentError}
                   labelAnexar={field.key === 'anexo_recibo_reinf' ? 'Anexar recibo REINF' : 'Anexar'}
@@ -8893,7 +8908,7 @@ export default function App() {
       }
     }
 
-    const nomeCampo = fieldKey ? getFieldLabel(fieldKey) : 'Anexo';
+    const nomeCampo = fieldKey ? getFieldLabel(FIELD_DEFINITIONS, fieldKey) : 'Anexo';
     setToast({
       title: tinhaAnexoAntes ? 'Arquivo substituído com sucesso' : 'Arquivo anexado com sucesso',
       message: `${nomeCampo}: ${anexo?.nome_arquivo ?? 'registro atualizado'}.`,
@@ -8903,9 +8918,75 @@ export default function App() {
     }
   }
 
+  async function handleAnexoRemove(clientId, tipoAnexo, anexo) {
+    const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
+    const fieldIsTrackedInClientBase = FIELD_DEFINITIONS.some((field) => field.key === fieldKey);
+    const clienteAtual = clients.find((client) => client.id === clientId);
+    const valorAnteriorBruto = fieldKey ? clienteAtual?.[fieldKey] ?? '' : '';
+    const nomeAnterior = anexo?.nome_arquivo || parseAttachment(valorAnteriorBruto).name || valorAnteriorBruto || null;
+
+    function getOrigemAnexoByPage() {
+      if (page === 'reinf') return 'Distribuição de Lucro';
+      if (page === 'ecd') return 'ECD / ECF';
+      if (page === 'detalhe') return 'Detalhe do Cliente';
+      return 'Base de Clientes';
+    }
+
+    if (fieldKey && fieldIsTrackedInClientBase) {
+      updateClientsPersisted((current) =>
+        current.map((client) =>
+          client.id === clientId
+            ? clearPersistedObrigacoes({
+              ...client,
+              [fieldKey]: '',
+              atualizado_em: new Date().toISOString(),
+            })
+            : client,
+        ),
+      );
+    }
+
+    if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId)) {
+      try {
+        await atualizarClienteSupabase(clientId, { [fieldKey]: '' });
+      } catch (error) {
+        console.warn('[anexos] Falha ao limpar campo legado do cliente após remoção:', error);
+      }
+    }
+
+    if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId) && currentUserFull?.id) {
+      try {
+        await registrarEventoHistoricoSupabase({
+          clienteId: clientId,
+          usuarioLogado: currentUserFull,
+          campoAlterado: fieldKey,
+          valorAnterior: nomeAnterior,
+          valorNovo: null,
+          tipoAcao: 'anexo_removido',
+          origem: getOrigemAnexoByPage(),
+        });
+        if (selectedClient?.id === clientId) {
+          await carregarHistoricoCliente(clientId);
+        }
+      } catch (error) {
+        console.warn('[historico] Falha ao registrar remoção de anexo:', error);
+      }
+    }
+
+    const nomeCampo = fieldKey ? getFieldLabel(FIELD_DEFINITIONS, fieldKey) : 'Anexo';
+    setToast({
+      title: 'Anexo removido com sucesso',
+      message: `${nomeCampo} removido.`,
+    });
+
+    if (fieldKey && fieldIsTrackedInClientBase && isUuid(clientId)) {
+      void resyncSupabaseAfterMutation('remoção de anexo');
+    }
+  }
+
   function handleAnexoError(message) {
     setToast({
-      title: 'Erro ao anexar arquivo',
+      title: 'Erro ao processar anexo',
       message,
     });
   }
@@ -9574,6 +9655,7 @@ export default function App() {
               tipoAnexo={tipoAnexo}
               disabled={!canManageAttachment(client, fieldKey)}
               onSuccess={handleAnexoSuccess}
+              onRemove={handleAnexoRemove}
               onError={handleAnexoError}
             />
           );
@@ -9591,6 +9673,7 @@ export default function App() {
         canEditCurrent={selectedClient ? canWritePortalData && canEditClient(currentUserFull, selectedClient) : false}
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
         onAnexoSuccess={handleAnexoSuccess}
+        onAnexoRemove={handleAnexoRemove}
         onAnexoError={handleAnexoError}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
@@ -9621,6 +9704,7 @@ export default function App() {
         canEditDeliveryDate={(client, fieldKey = 'data_entrega_ecd') => canWritePortalData && isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
         onQuickUpdate={quickUpdateClient}
         onAnexoSuccess={handleAnexoSuccess}
+        onAnexoRemove={handleAnexoRemove}
         onAnexoError={handleAnexoError}
         supabaseStatus={supabaseStatus}
         metadata={metadata}
@@ -9747,6 +9831,7 @@ export default function App() {
           onSave={saveClient}
           canEditFieldForClient={(fieldKey) => !editingClient.id || canEditClientField(currentUserFull, fieldKey)}
           onAnexoSuccess={handleAnexoSuccess}
+          onAnexoRemove={handleAnexoRemove}
           onAnexoError={handleAnexoError}
         />
       ) : null}

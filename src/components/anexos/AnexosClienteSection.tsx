@@ -15,6 +15,7 @@ type Props = {
   anexosIniciais?: AnexoCliente[];
   disabled?: boolean;
   onSuccess?: (tipoAnexo: TipoAnexo, anexo: AnexoCliente) => void;
+  onRemove?: (tipoAnexo: TipoAnexo, anexo: AnexoCliente | null) => void | Promise<void>;
   onError?: (message: string) => void;
 };
 
@@ -115,6 +116,7 @@ export function AnexosClienteSection({
   anexosIniciais,
   disabled = false,
   onSuccess,
+  onRemove,
   onError,
 }: Props) {
   const anexosFallbackCliente = useMemo(
@@ -177,6 +179,11 @@ export function AnexosClienteSection({
     onSuccess?.(tipoAnexo, anexo);
   }
 
+  async function handleRemove(tipoAnexo: TipoAnexo, anexo: AnexoCliente | null) {
+    setAnexos((current) => current.filter((item) => item.tipo_anexo !== tipoAnexo));
+    await onRemove?.(tipoAnexo, anexo);
+  }
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -225,6 +232,7 @@ export function AnexosClienteSection({
                   anexo={anexo}
                   disabled={disabled}
                   onSuccess={(novoAnexo) => handleSuccess(tipo, novoAnexo)}
+                  onRemove={(anexoRemovido) => handleRemove(tipo, anexoRemovido ?? anexo ?? null)}
                   onError={onError}
                   labelAnexar="Anexar"
                   labelSubstituir="Substituir"

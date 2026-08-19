@@ -95,6 +95,7 @@ async function uploadArquivoStorage(path: string, file: File) {
 async function removerArquivoStorage(path?: string | null) {
   const caminho = String(path ?? '').trim();
   if (!caminho) return;
+  if (/^(blob:|https?:\/\/)/i.test(caminho)) return;
 
   const { error } = await supabase.storage
     .from(BUCKET_DOCUMENTOS_CLIENTES)
@@ -314,6 +315,69 @@ export async function substituirAnexoCliente(params: {
     }
     throw error;
   }
+}
+
+export async function removerAnexoCliente(params: {
+  cliente: ClienteAnexoRef;
+  tipoAnexo: TipoAnexo;
+  anexo?: AnexoCliente | null;
+}) {
+  const clienteId = ensureClientePersistido(await resolveClientePersistidoId(params.cliente));
+
+  const { data, error: selectError } = await supabase
+    .from('anexos')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .eq('tipo_anexo', params.tipoAnexo);
+
+  if (selectError) {
+    throw new Error(`Não foi possível localizar anexo para remoção: ${selectError.message}`);
+  }
+
+  const anexosBanco = (data ?? []).map((row) => normalizeAnexoRow(row as Record<string, unknown>));
+  const anexosParaRemover = anexosBanco.length
+    ? anexosBanco
+    : params.anexo
+      ? [params.anexo]
+      : [];
+  const ids = anexosParaRemover
+    .map((anexo) => String(anexo.id ?? '').trim())
+    .filter((id) => isUuid(id));
+
+  if (ids.length) {
+    const { error } = await supabase
+      .from('anexos')
+      .delete()
+      .in('id', ids);
+
+    if (error) {
+      throw new Error(`Não foi possível remover anexo: ${error.message}`);
+    }
+  } else {
+    const { error } = await supabase
+      .from('anexos')
+      .delete()
+      .eq('cliente_id', clienteId)
+      .eq('tipo_anexo', params.tipoAnexo);
+
+    if (error) {
+      throw new Error(`Não foi possível remover anexo: ${error.message}`);
+    }
+  }
+
+  const caminhos = [
+    ...new Set(anexosParaRemover.map((anexo) => String(anexo.caminho_arquivo ?? '').trim()).filter(Boolean)),
+  ];
+
+  await Promise.all(caminhos.map(async (caminho) => {
+    try {
+      await removerArquivoStorage(caminho);
+    } catch (cleanupError) {
+      console.warn('[anexos] Falha ao remover arquivo do Storage após limpar vínculo.', cleanupError);
+    }
+  }));
+
+  return anexosParaRemover[0] ?? null;
 }
 
 export async function gerarUrlAssinada(caminhoArquivo: string, expires = 600) {

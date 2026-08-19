@@ -125,7 +125,7 @@ with check (
 
 drop policy if exists "anexos_delete_authenticated_active" on public.anexos;
 drop policy if exists "anexos_delete_coordenador_active" on public.anexos;
-create policy "anexos_delete_coordenador_active"
+create policy "anexos_delete_authenticated_active"
 on public.anexos
 for delete
 to authenticated
@@ -135,7 +135,10 @@ using (
     from public.usuarios u
     where u.auth_user_id = auth.uid()
       and u.status = 'Ativo'
-      and u.perfil_acesso = 'coordenador_administrador'
+      and u.perfil_acesso in (
+        'coordenador_administrador',
+        'setor_contabil_operacional'
+      )
   )
 );
 
