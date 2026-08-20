@@ -1714,7 +1714,7 @@ function getEcdEcfCurrentStatus(client, tipo = 'ecd') {
   const hasRecibo = hasObrigacaoComprovante(client, anexoFlagKey, anexoKey);
 
   if (!hasEcdEcfStatusEvidence(client, tipo)) return null;
-  if (obrigatoria && isBlank(client?.[ultimaKey])) return { code: 'obrigacao_pendente', label: `${tipoLabel} pendente`, tone: 'warning' };
+  if (obrigatoria && isBlank(client?.[ultimaKey])) return { code: 'comprovante_pendente', label: `Recibo ${tipoLabel} pendente`, tone: 'warning' };
   if (!isBlank(entrega) && isBlank(envio)) return { code: 'aguardando_envio', label: `Aguardando envio da ${tipoLabel}`, tone: 'warning' };
   if (!isEcf && obrigatoria && isBlank(getObrigacaoResponsavel(client))) return { code: 'responsavel_pendente', label: 'Responsável pendente', tone: 'warning' };
   if (obrigatoria && !hasRecibo) return { code: 'comprovante_pendente', label: `Recibo ${tipoLabel} pendente`, tone: 'warning' };
@@ -1730,7 +1730,7 @@ function getPersistedEcdEcfStatus(client, tipo = 'ecd') {
 
   const tipoLabel = isEcf ? 'ECF' : 'ECD';
   const labelMap = {
-    obrigacao_pendente: `${tipoLabel} pendente`,
+    obrigacao_pendente: `Recibo ${tipoLabel} pendente`,
     aguardando_envio: `Aguardando envio da ${tipoLabel}`,
     responsavel_pendente: 'Responsável pendente',
     comprovante_pendente: `Recibo ${tipoLabel} pendente`,
@@ -1746,8 +1746,13 @@ function getPersistedEcdEcfStatus(client, tipo = 'ecd') {
     concluido: 'success',
   };
 
+  const codeMap = {
+    obrigacao_pendente: 'comprovante_pendente',
+    concluido: 'em_dia',
+  };
+
   return {
-    code: persistedCode === 'concluido' ? 'em_dia' : persistedCode,
+    code: codeMap[persistedCode] || persistedCode,
     label: labelMap[persistedCode] || 'Status',
     tone: toneMap[persistedCode] || 'neutral',
   };
@@ -1764,11 +1769,12 @@ function matchesEcdEcfStatusMode(client, mode, tipo = 'ecd') {
 
   const isEcf = tipo === 'ecf';
   const statusCode = getEcdEcfObrigacaoStatus(client, tipo).code;
-  if (mode === 'ecd-pendente') return !isEcf && statusCode === 'obrigacao_pendente';
-  if (mode === 'ecf-pendente') return isEcf && statusCode === 'obrigacao_pendente';
+  if (mode === 'em-dia') return statusCode === 'em_dia';
+  if (mode === 'ecd-pendente') return !isEcf && ['obrigacao_pendente', 'comprovante_pendente'].includes(statusCode);
+  if (mode === 'ecf-pendente') return isEcf && ['obrigacao_pendente', 'comprovante_pendente'].includes(statusCode);
   if (mode === 'aguardando-envio') return statusCode === 'aguardando_envio';
   if (mode === 'sem-responsavel') return !isEcf && statusCode === 'responsavel_pendente';
-  if (mode === 'comprovante-pendente') return statusCode === 'comprovante_pendente';
+  if (mode === 'comprovante-pendente') return ['obrigacao_pendente', 'comprovante_pendente'].includes(statusCode);
   return true;
 }
 
@@ -5420,15 +5426,12 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
     statusTipo === 'ecf'
       ? [
           { value: 'todos', label: 'Todos' },
-          { value: 'ecf-pendente', label: 'ECF pendente' },
-          { value: 'aguardando-envio', label: 'Aguardando envio da ECF' },
+          { value: 'em-dia', label: 'Em dia' },
           { value: 'comprovante-pendente', label: 'Recibo ECF pendente' },
         ]
       : [
           { value: 'todos', label: 'Todos' },
-          { value: 'ecd-pendente', label: 'ECD pendente' },
-          { value: 'aguardando-envio', label: 'Aguardando envio da ECD' },
-          { value: 'sem-responsavel', label: 'Responsável pendente' },
+          { value: 'em-dia', label: 'Em dia' },
           { value: 'comprovante-pendente', label: 'Recibo ECD pendente' },
         ]
   ), [statusTipo]);
@@ -5441,6 +5444,9 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const dateColumns = dateView === 'ecf'
     ? ['ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'anexo_recibo_ecf']
     : ['ultima_ecd_entregue', 'data_entrega_ecd', 'data_envio_ecd', 'anexo_recibo_ecd'];
+  const activeAttachmentFilterKey = statusTipo === 'ecf' ? 'anexo_recibo_ecf' : 'anexo_recibo_ecd';
+  const activeAttachmentFlagKey = statusTipo === 'ecf' ? 'ecf_comprovante_anexado' : 'ecd_comprovante_anexado';
+  const activeAttachmentFilterLabel = statusTipo === 'ecf' ? 'Anexo recibo ECF' : 'Anexo recibo ECD';
 
   useEffect(() => {
     const validModes = new Set(modeOptions.map((option) => option.value));
@@ -5461,18 +5467,16 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
     if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
     const responsavelAtual = getObrigacaoResponsavel(client);
-    const reciboEcdAnexado = hasObrigacaoComprovante(client, 'ecd_comprovante_anexado', 'anexo_recibo_ecd');
-    const reciboEcfAnexado = hasObrigacaoComprovante(client, 'ecf_comprovante_anexado', 'anexo_recibo_ecf');
+    const attachmentFilter = filters[activeAttachmentFilterKey];
+    const reciboAnexado = hasObrigacaoComprovante(client, activeAttachmentFlagKey, activeAttachmentFilterKey);
     const modeMatches = matchesEcdEcfStatusMode(client, mode, statusTipo);
     if (!modeMatches) return false;
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
     if (filters.regime_tributario && normalizeText(client.regime_tributario) !== normalizeText(filters.regime_tributario)) return false;
     if (filters.responsavel_ecd && normalizeText(responsavelAtual) !== normalizeText(filters.responsavel_ecd)) return false;
-    if (filters.anexo_recibo_ecd === 'attached' && !reciboEcdAnexado) return false;
-    if (filters.anexo_recibo_ecd === 'missing' && reciboEcdAnexado) return false;
-    if (filters.anexo_recibo_ecf === 'attached' && !reciboEcfAnexado) return false;
-    if (filters.anexo_recibo_ecf === 'missing' && reciboEcfAnexado) return false;
+    if (attachmentFilter === 'attached' && !reciboAnexado) return false;
+    if (attachmentFilter === 'missing' && reciboAnexado) return false;
     return true;
   });
 
@@ -5504,9 +5508,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
-          <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -5515,10 +5517,11 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(scopedClients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
-          <FilterSelect label="Anexo recibo ECD" value={filters.anexo_recibo_ecd} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecd: value })} includeBlank={false} />
-          <FilterSelect label="Anexo recibo ECF" value={filters.anexo_recibo_ecf} options={attachmentOptions} onChange={(value) => updateFilter({ anexo_recibo_ecf: value })} includeBlank={false} />
+          <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
+          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
+          <FilterSelect label={activeAttachmentFilterLabel} value={filters[activeAttachmentFilterKey]} options={attachmentOptions} onChange={(value) => updateFilter({ [activeAttachmentFilterKey]: value })} includeBlank={false} />
+          <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
         </div>
       </section>
 
