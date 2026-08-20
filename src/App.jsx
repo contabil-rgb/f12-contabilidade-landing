@@ -1580,7 +1580,7 @@ function getReinfDataEntregaValue(client) {
 }
 
 function hasObrigacaoComprovante(client, key, fallbackField) {
-  return getObrigacaoFlag(client, key, hasAttachment(client?.[fallbackField]));
+  return hasAttachment(client?.[fallbackField]) || getObrigacaoFlag(client, key, false);
 }
 
 function isReinfEnviada(client) {
@@ -1674,16 +1674,102 @@ function isPendenciaCritica(client) {
 }
 
 function hasPendenciaObrigacaoEcd(client) {
-  return (
-    isEcdPendente(client)
-    || isEcdAguardandoEnvio(client)
-    || isEcdResponsavelPendente(client)
-    || isReciboEcdPendente(client)
-  );
+  return getEcdEcfObrigacaoStatus(client, 'ecd').code !== 'em_dia';
 }
 
 function hasPendenciaObrigacaoEcf(client) {
-  return isEcfPendente(client) || isEcfAguardandoEnvio(client) || isReciboEcfPendente(client);
+  return getEcdEcfObrigacaoStatus(client, 'ecf').code !== 'em_dia';
+}
+
+function hasEcdEcfStatusEvidence(client, tipo = 'ecd') {
+  const isEcf = tipo === 'ecf';
+  const obrigacaoKey = isEcf ? 'ecf' : 'ecd';
+  const ultimaKey = isEcf ? 'ultima_ecf_entregue' : 'ultima_ecd_entregue';
+  const entregaKey = isEcf ? 'data_entrega_ecf' : 'data_entrega_ecd';
+  const envioKey = isEcf ? 'data_envio_ecf' : 'data_envio_ecd';
+  const anexoKey = isEcf ? 'anexo_recibo_ecf' : 'anexo_recibo_ecd';
+  const responsavelKey = isEcf ? '' : 'responsavel_ecd';
+
+  return (
+    isYes(client?.[obrigacaoKey])
+    || !isBlank(client?.[ultimaKey])
+    || !isBlank(client?.[entregaKey])
+    || !isBlank(client?.[envioKey])
+    || hasObrigacaoComprovante(client, isEcf ? 'ecf_comprovante_anexado' : 'ecd_comprovante_anexado', anexoKey)
+    || (!isEcf && !isBlank(getObrigacaoResponsavel(client) || client?.[responsavelKey]))
+  );
+}
+
+function getEcdEcfCurrentStatus(client, tipo = 'ecd') {
+  const isEcf = tipo === 'ecf';
+  const obrigacaoKey = isEcf ? 'ecf' : 'ecd';
+  const ultimaKey = isEcf ? 'ultima_ecf_entregue' : 'ultima_ecd_entregue';
+  const entregaKey = isEcf ? 'data_entrega_ecf' : 'data_entrega_ecd';
+  const anexoKey = isEcf ? 'anexo_recibo_ecf' : 'anexo_recibo_ecd';
+  const anexoFlagKey = isEcf ? 'ecf_comprovante_anexado' : 'ecd_comprovante_anexado';
+  const tipoLabel = isEcf ? 'ECF' : 'ECD';
+  const obrigatoria = isYes(client?.[obrigacaoKey]);
+  const entrega = client?.[entregaKey];
+  const envio = getEcdEcfSentDateValue(client, tipo);
+  const hasRecibo = hasObrigacaoComprovante(client, anexoFlagKey, anexoKey);
+
+  if (!hasEcdEcfStatusEvidence(client, tipo)) return null;
+  if (obrigatoria && isBlank(client?.[ultimaKey])) return { code: 'obrigacao_pendente', label: `${tipoLabel} pendente`, tone: 'warning' };
+  if (!isBlank(entrega) && isBlank(envio)) return { code: 'aguardando_envio', label: `Aguardando envio da ${tipoLabel}`, tone: 'warning' };
+  if (!isEcf && obrigatoria && isBlank(getObrigacaoResponsavel(client))) return { code: 'responsavel_pendente', label: 'Responsável pendente', tone: 'warning' };
+  if (obrigatoria && !hasRecibo) return { code: 'comprovante_pendente', label: `Recibo ${tipoLabel} pendente`, tone: 'warning' };
+  return { code: 'em_dia', label: 'Em dia', tone: 'success' };
+}
+
+function getPersistedEcdEcfStatus(client, tipo = 'ecd') {
+  const isEcf = tipo === 'ecf';
+  const persisted = getObrigacoesPersistidas(client);
+  const persistedCode = normalizeText(persisted?.[isEcf ? 'ecf_status_codigo' : 'ecd_status_codigo'] || '');
+
+  if (!persistedCode) return null;
+
+  const tipoLabel = isEcf ? 'ECF' : 'ECD';
+  const labelMap = {
+    obrigacao_pendente: `${tipoLabel} pendente`,
+    aguardando_envio: `Aguardando envio da ${tipoLabel}`,
+    responsavel_pendente: 'Responsável pendente',
+    comprovante_pendente: `Recibo ${tipoLabel} pendente`,
+    em_dia: 'Em dia',
+    concluido: 'Em dia',
+  };
+  const toneMap = {
+    obrigacao_pendente: 'warning',
+    aguardando_envio: 'warning',
+    responsavel_pendente: 'warning',
+    comprovante_pendente: 'warning',
+    em_dia: 'success',
+    concluido: 'success',
+  };
+
+  return {
+    code: persistedCode === 'concluido' ? 'em_dia' : persistedCode,
+    label: labelMap[persistedCode] || 'Status',
+    tone: toneMap[persistedCode] || 'neutral',
+  };
+}
+
+function getEcdEcfObrigacaoStatus(client, tipo = 'ecd') {
+  return getEcdEcfCurrentStatus(client, tipo)
+    || getPersistedEcdEcfStatus(client, tipo)
+    || { code: 'em_dia', label: 'Em dia', tone: 'success' };
+}
+
+function matchesEcdEcfStatusMode(client, mode, tipo = 'ecd') {
+  if (mode === 'todos') return true;
+
+  const isEcf = tipo === 'ecf';
+  const statusCode = getEcdEcfObrigacaoStatus(client, tipo).code;
+  if (mode === 'ecd-pendente') return !isEcf && statusCode === 'obrigacao_pendente';
+  if (mode === 'ecf-pendente') return isEcf && statusCode === 'obrigacao_pendente';
+  if (mode === 'aguardando-envio') return statusCode === 'aguardando_envio';
+  if (mode === 'sem-responsavel') return !isEcf && statusCode === 'responsavel_pendente';
+  if (mode === 'comprovante-pendente') return statusCode === 'comprovante_pendente';
+  return true;
 }
 
 function hasComprovanteObrigacaoPendente(client) {
@@ -2500,39 +2586,8 @@ function EcdEcfSentDateCell({ client, tipo = 'ecd' }) {
   return <span className="font-semibold text-slate-700 dark:text-gray-200">{formatDateDisplay(rawDate)}</span>;
 }
 
-function EcdEcfObrigacaoStatusCell({ client }) {
-  if (hasObrigacoesPersistidas(client)) {
-    const persistedCode = getPersistedObrigacoesStatusCode(client);
-    const toneMap = {
-      obrigacao_pendente: 'warning',
-      aguardando_envio: 'warning',
-      responsavel_pendente: 'warning',
-      comprovante_pendente: 'warning',
-      em_dia: 'success',
-    };
-    return (
-      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(toneMap[persistedCode] || 'neutral')}`}>
-        {getPersistedObrigacoesStatusLabel(client) || 'Status'}
-      </span>
-    );
-  }
-
-  const analysis = getClientAnalysis(client);
-  const status = (() => {
-    if (analysis.ecdPendente || analysis.ecfPendente) {
-      return { label: 'Obrigação pendente', tone: 'warning' };
-    }
-    if (analysis.ecdAguardandoEnvio || analysis.ecfAguardandoEnvio) {
-      return { label: 'Aguardando envio', tone: 'warning' };
-    }
-    if (isEcdResponsavelPendente(client)) {
-      return { label: 'Responsável pendente', tone: 'warning' };
-    }
-    if (analysis.reciboEcdPendente || analysis.reciboEcfPendente) {
-      return { label: 'Comprovante pendente', tone: 'warning' };
-    }
-    return { label: 'Em dia', tone: 'success' };
-  })();
+function EcdEcfObrigacaoStatusCell({ client, tipo = 'ecd' }) {
+  const status = getEcdEcfObrigacaoStatus(client, tipo);
 
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(status.tone)}`}>
@@ -5360,14 +5415,23 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
   const allowedRegimes = ['lucro presumido', 'lucro real'];
-  const modeOptions = [
-    { value: 'todos', label: 'Todos' },
-    { value: 'ecd-pendente', label: 'ECD pendente' },
-    { value: 'ecf-pendente', label: 'ECF pendente' },
-    { value: 'aguardando-envio', label: 'Aguardando envio' },
-    { value: 'sem-responsavel', label: 'Responsável pendente' },
-    { value: 'comprovante-pendente', label: 'Comprovante pendente' },
-  ];
+  const statusTipo = dateView === 'ecf' ? 'ecf' : 'ecd';
+  const modeOptions = useMemo(() => (
+    statusTipo === 'ecf'
+      ? [
+          { value: 'todos', label: 'Todos' },
+          { value: 'ecf-pendente', label: 'ECF pendente' },
+          { value: 'aguardando-envio', label: 'Aguardando envio da ECF' },
+          { value: 'comprovante-pendente', label: 'Recibo ECF pendente' },
+        ]
+      : [
+          { value: 'todos', label: 'Todos' },
+          { value: 'ecd-pendente', label: 'ECD pendente' },
+          { value: 'aguardando-envio', label: 'Aguardando envio da ECD' },
+          { value: 'sem-responsavel', label: 'Responsável pendente' },
+          { value: 'comprovante-pendente', label: 'Recibo ECD pendente' },
+        ]
+  ), [statusTipo]);
   const dateViewOptions = [
     { value: 'ecd', label: 'Datas e anexo da ECD' },
     { value: 'ecf', label: 'Datas e anexo da ECF' },
@@ -5377,6 +5441,11 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const dateColumns = dateView === 'ecf'
     ? ['ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'anexo_recibo_ecf']
     : ['ultima_ecd_entregue', 'data_entrega_ecd', 'data_envio_ecd', 'anexo_recibo_ecd'];
+
+  useEffect(() => {
+    const validModes = new Set(modeOptions.map((option) => option.value));
+    if (!validModes.has(mode)) setMode('todos');
+  }, [mode, modeOptions]);
 
   useEffect(() => {
     const nextClientId = String(searchContext?.clientId ?? '');
@@ -5391,17 +5460,10 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const rows = scopedClients.filter((client) => {
     if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
-    const reciboEcfPendente = isReciboEcfPendente(client);
     const responsavelAtual = getObrigacaoResponsavel(client);
     const reciboEcdAnexado = hasObrigacaoComprovante(client, 'ecd_comprovante_anexado', 'anexo_recibo_ecd');
     const reciboEcfAnexado = hasObrigacaoComprovante(client, 'ecf_comprovante_anexado', 'anexo_recibo_ecf');
-    const modeMatches =
-      mode === 'todos' ||
-      (mode === 'ecd-pendente' && isEcdPendente(client)) ||
-      (mode === 'ecf-pendente' && isEcfPendente(client)) ||
-      (mode === 'aguardando-envio' && (isEcdAguardandoEnvio(client) || isEcfAguardandoEnvio(client))) ||
-      (mode === 'sem-responsavel' && isEcdResponsavelPendente(client)) ||
-      (mode === 'comprovante-pendente' && (isReciboEcdPendente(client) || reciboEcfPendente));
+    const modeMatches = matchesEcdEcfStatusMode(client, mode, statusTipo);
     if (!modeMatches) return false;
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
@@ -5531,7 +5593,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
             }
             return undefined;
           }}
-          trailing={(client) => <EcdEcfObrigacaoStatusCell client={client} />}
+          trailing={(client) => <EcdEcfObrigacaoStatusCell client={client} tipo={statusTipo} />}
         />
       </section>
     </div>
