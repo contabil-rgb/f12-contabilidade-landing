@@ -13,6 +13,8 @@ function normalizeRow(row: Record<string, unknown>) {
     nome_identificacao: String(row.nome_identificacao ?? '').trim(),
     responsavel: String(row.responsavel ?? '').trim(),
     revisor: String(row.revisor ?? '').trim(),
+    modelo_tabela: String(row.modelo_tabela ?? '').trim(),
+    modelo_tabela_label: String(row.modelo_tabela_label ?? '').trim(),
     periodicidade: String(row.periodicidade ?? '').trim(),
     ano_referencia: String(row.ano_referencia ?? '').trim(),
     meses: normalizeJsonArray(row.meses),

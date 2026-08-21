@@ -2008,6 +2008,10 @@ function getReinfTotalMonthlyValue(reportSocio, fieldKey, month) {
   return '';
 }
 
+function getReinfReportSocioMonthValue(reportSocio, month) {
+  return reportSocio?.valoresPorMes?.[month] ?? reportSocio?.valores_por_mes?.[month] ?? '';
+}
+
 function hasReinfTotalsValues(reportSocios = [], months = []) {
   return (reportSocios ?? []).some((reportSocio) => {
     const valoresPorMes = reportSocio?.valoresPorMes ?? {};
@@ -2404,6 +2408,131 @@ function buildReinfReportPayload({ client, modeloTabela = REINF_TABLE_MODEL_MONT
     assunto,
     corpo_mensagem: mensagem,
     socios: sociosSnapshot,
+  };
+}
+
+function getReinfHistoryClientKeys(relatorio) {
+  return [
+    String(relatorio?.cliente_id ?? '').trim(),
+    normalizeCnpj(relatorio?.cnpj),
+  ].filter(Boolean);
+}
+
+function getReinfHistorySocioKeys(socio, fallbackIndex = 0) {
+  return [
+    String(socio?.socio_id ?? socio?.id ?? '').trim(),
+    normalizeCpfDigits(socio?.cpf),
+    normalizeText(socio?.nome),
+    getReinfSocioOptionKey({ id: socio?.socio_id ?? socio?.id, cpf: socio?.cpf, nome: socio?.nome }, fallbackIndex),
+  ].filter(Boolean);
+}
+
+function getReinfHistoryValueKey({ clientKey, socioKey, anoReferencia, month, modeloTabela, fieldKey = 'valor' }) {
+  return [
+    clientKey,
+    socioKey,
+    String(anoReferencia ?? '').trim(),
+    String(month ?? '').trim(),
+    modeloTabela || REINF_TABLE_MODEL_MONTHLY,
+    fieldKey,
+  ].join('|');
+}
+
+function createReinfHistoryValueIndex({ relatorios = [], client }) {
+  const index = new Map();
+  const currentClientKeys = new Set([
+    String(client?.id ?? '').trim(),
+    normalizeCnpj(client?.cnpj),
+  ].filter(Boolean));
+
+  (relatorios ?? []).forEach((relatorio) => {
+    const reportMatchesClient = getReinfHistoryClientKeys(relatorio)
+      .some((clientKey) => currentClientKeys.has(clientKey));
+    if (!reportMatchesClient) return;
+
+    const modeloTabela = relatorio?.modelo_tabela || REINF_TABLE_MODEL_MONTHLY;
+    const anoReferencia = relatorio?.ano_referencia || '';
+    const meses = Array.isArray(relatorio?.meses) ? relatorio.meses : [];
+    const socios = Array.isArray(relatorio?.socios) ? relatorio.socios : [];
+
+    socios.forEach((socio, socioIndex) => {
+      const socioKeys = getReinfHistorySocioKeys(socio, socioIndex);
+      meses.forEach((month) => {
+        if (isReinfTotalsTableModel(modeloTabela)) {
+          REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+            const value = getReinfTotalMonthlyValue(socio, field.key, month);
+            if (!String(value ?? '').trim()) return;
+            socioKeys.forEach((socioKey) => {
+              currentClientKeys.forEach((clientKey) => {
+                const historyKey = getReinfHistoryValueKey({
+                  clientKey,
+                  socioKey,
+                  anoReferencia,
+                  month,
+                  modeloTabela,
+                  fieldKey: field.key,
+                });
+                if (!index.has(historyKey)) index.set(historyKey, value);
+              });
+            });
+          });
+          return;
+        }
+
+        const value = getReinfReportSocioMonthValue(socio, month);
+        if (!String(value ?? '').trim()) return;
+        socioKeys.forEach((socioKey) => {
+          currentClientKeys.forEach((clientKey) => {
+            const historyKey = getReinfHistoryValueKey({
+              clientKey,
+              socioKey,
+              anoReferencia,
+              month,
+              modeloTabela,
+            });
+            if (!index.has(historyKey)) index.set(historyKey, value);
+          });
+        });
+      });
+    });
+  });
+
+  return index;
+}
+
+function findReinfHistoryValue(historyIndex, { client, socio, socioIndex = 0, anoReferencia, month, modeloTabela, fieldKey = 'valor' }) {
+  if (!historyIndex?.size) return '';
+  const clientKeys = [
+    String(client?.id ?? '').trim(),
+    normalizeCnpj(client?.cnpj),
+  ].filter(Boolean);
+  const socioKeys = getReinfHistorySocioKeys(socio, socioIndex);
+
+  for (const clientKey of clientKeys) {
+    for (const socioKey of socioKeys) {
+      const historyKey = getReinfHistoryValueKey({
+        clientKey,
+        socioKey,
+        anoReferencia,
+        month,
+        modeloTabela,
+        fieldKey,
+      });
+      const value = historyIndex.get(historyKey);
+      if (String(value ?? '').trim()) return value;
+    }
+  }
+
+  return '';
+}
+
+function clearReinfReportSocioValues(reportSocio) {
+  return {
+    ...reportSocio,
+    meses: [],
+    valoresPorMes: {},
+    valoresTotais: createEmptyReinfTotalValues(),
+    valoresTotaisPorMes: {},
   };
 }
 
@@ -4241,7 +4370,7 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
   );
 }
 
-function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOptions = [], onSelectSocio, onSaveReport, onSendEmail, onClose }) {
+function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOptions = [], reinfRelatorios = [], onSelectSocio, onSaveReport, onSendEmail, onClose }) {
   const socios = getReinfSocios(client);
   const clientKey = String(client?.id ?? client?.cnpj ?? '').trim();
   const responsavelAssinatura = useMemo(() => {
@@ -4294,6 +4423,116 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       ? REINF_MONTH_OPTIONS.map((month) => month.value).filter((month) => mesesReferenciaTotal.includes(month))
       : getReinfReportMonths(reportSociosHydrated)
   ), [isTotalsModel, mesesReferenciaTotal, reportSociosHydrated]);
+  const reinfHistoryValueIndex = useMemo(() => createReinfHistoryValueIndex({
+    relatorios: reinfRelatorios,
+    client,
+  }), [reinfRelatorios, client?.id, client?.cnpj]);
+
+  function hydrateReportSocioFromHistory(reportSocio, months = []) {
+    if (!reinfHistoryValueIndex.size || !months.length) return reportSocio;
+
+    const socio = getSocioByKey(reportSocio.socioKey);
+    if (!socio) return reportSocio;
+
+    const socioIndex = socios.indexOf(socio);
+    let changed = false;
+
+    if (isTotalsModel) {
+      const nextValoresPorMes = { ...(reportSocio.valoresPorMes ?? {}) };
+      const nextValoresTotaisPorMes = {
+        ...(reportSocio.valoresTotaisPorMes ?? {}),
+      };
+
+      REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+        nextValoresTotaisPorMes[field.key] = {
+          ...(nextValoresTotaisPorMes[field.key] ?? {}),
+        };
+      });
+
+      months.forEach((month) => {
+        REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+          const currentValue = getReinfTotalMonthlyValue({
+            ...reportSocio,
+            valoresPorMes: nextValoresPorMes,
+            valoresTotaisPorMes: nextValoresTotaisPorMes,
+          }, field.key, month);
+          if (String(currentValue ?? '').trim()) return;
+
+          const historyValue = findReinfHistoryValue(reinfHistoryValueIndex, {
+            client,
+            socio,
+            socioIndex,
+            anoReferencia,
+            month,
+            modeloTabela,
+            fieldKey: field.key,
+          });
+          if (!String(historyValue ?? '').trim()) return;
+
+          nextValoresTotaisPorMes[field.key][month] = historyValue;
+          if (field.key === 'totalDistribuidoTributavel') {
+            nextValoresPorMes[month] = historyValue;
+          }
+          changed = true;
+        });
+      });
+
+      return changed
+        ? {
+          ...reportSocio,
+          valoresPorMes: nextValoresPorMes,
+          valoresTotaisPorMes: nextValoresTotaisPorMes,
+        }
+        : reportSocio;
+    }
+
+    const nextValoresPorMes = { ...(reportSocio.valoresPorMes ?? {}) };
+    const nextValoresTotaisPorMes = {
+      ...(reportSocio.valoresTotaisPorMes ?? {}),
+      totalDistribuidoTributavel: {
+        ...(reportSocio.valoresTotaisPorMes?.totalDistribuidoTributavel ?? {}),
+      },
+    };
+
+    months.forEach((month) => {
+      if (String(nextValoresPorMes[month] ?? '').trim()) return;
+      const historyValue = findReinfHistoryValue(reinfHistoryValueIndex, {
+        client,
+        socio,
+        socioIndex,
+        anoReferencia,
+        month,
+        modeloTabela,
+      });
+      if (!String(historyValue ?? '').trim()) return;
+
+      nextValoresPorMes[month] = historyValue;
+      nextValoresTotaisPorMes.totalDistribuidoTributavel[month] = historyValue;
+      changed = true;
+    });
+
+    return changed
+      ? {
+        ...reportSocio,
+        valoresPorMes: nextValoresPorMes,
+        valoresTotaisPorMes: nextValoresTotaisPorMes,
+      }
+      : reportSocio;
+  }
+
+  useEffect(() => {
+    if (!reinfHistoryValueIndex.size) return;
+    setReportSocios((current) => {
+      let changed = false;
+      const next = current.map((reportSocio) => {
+        const months = isTotalsModel ? reportMonths : (reportSocio.meses ?? []);
+        const hydrated = hydrateReportSocioFromHistory(reportSocio, months);
+        if (hydrated !== reportSocio) changed = true;
+        return hydrated;
+      });
+      return changed ? next : current;
+    });
+  }, [reinfHistoryValueIndex, anoReferencia, modeloTabela, reportMonths.join('|'), isTotalsModel]);
 
   useEffect(() => {
     setReportSocios(createInitialReportSocios());
@@ -4796,6 +5035,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                 options={REINF_TABLE_MODEL_OPTIONS}
                 onChange={(value) => {
                   setModeloTabela(value || REINF_TABLE_MODEL_MONTHLY);
+                  setMesesReferenciaTotal([]);
+                  setReportSocios((current) => current.map(clearReinfReportSocioValues));
                   setMensagemEditada(false);
                   setCopied(false);
                   setCopyStatus('');
@@ -4812,6 +5053,12 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                   value={anoReferencia}
                   onChange={(event) => {
                     setAnoReferencia(event.target.value.replace(/\D/g, '').slice(0, 4));
+                    setReportSocios((current) => current.map((reportSocio) => ({
+                      ...reportSocio,
+                      valoresPorMes: {},
+                      valoresTotais: createEmptyReinfTotalValues(),
+                      valoresTotaisPorMes: {},
+                    })));
                     setCopied(false);
                     setCopyStatus('');
                   }}
@@ -5203,6 +5450,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 function ReinfPage({
   clients,
   responsavelOptions = [],
+  reinfRelatorios = [],
   onView,
   onSaveReport,
   onSendEmail,
@@ -5394,6 +5642,7 @@ function ReinfPage({
           client={reinfModalClient}
           selectedSocioByClientId={selectedSocioByClientId}
           responsavelOptions={responsavelOptions}
+          reinfRelatorios={reinfRelatorios}
           onSelectSocio={updateSelectedSocio}
           onSaveReport={onSaveReport}
           onSendEmail={onSendEmail}
@@ -9747,6 +9996,7 @@ export default function App() {
       <ReinfPage
         clients={enrichedClients}
         responsavelOptions={responsavelCatalogo}
+        reinfRelatorios={reinfRelatorios}
         onView={openClient}
         onSaveReport={salvarRelatorioReinf}
         onSendEmail={enviarEmailReinf}
