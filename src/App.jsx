@@ -1969,6 +1969,7 @@ const REINF_TABLE_MODEL_OPTIONS = [
   { value: REINF_TABLE_MODEL_MONTHLY, label: 'Tabela por meses' },
   { value: REINF_TABLE_MODEL_TOTALS, label: 'Tabela de totais' },
 ];
+const REINF_RETIFICATION_NOTICE = 'Retificação do e-mail enviado';
 const REINF_TOTAL_FIELD_OPTIONS = [
   { key: 'totalDistribuidoIsentoAta', label: 'Total distribuido isento (ATA)' },
   { key: 'totalDistribuidoTributavel', label: 'Total distribuido tributavel' },
@@ -2010,6 +2011,132 @@ function getReinfTotalMonthlyValue(reportSocio, fieldKey, month) {
 
 function getReinfReportSocioMonthValue(reportSocio, month) {
   return reportSocio?.valoresPorMes?.[month] ?? reportSocio?.valores_por_mes?.[month] ?? '';
+}
+
+function createEmptyReinfHistoryMarks() {
+  return {
+    valoresPorMes: {},
+    valoresTotaisPorMes: {},
+  };
+}
+
+function markReinfHistoryMonthlyValue(currentMarks, month) {
+  return {
+    ...(currentMarks ?? createEmptyReinfHistoryMarks()),
+    valoresPorMes: {
+      ...(currentMarks?.valoresPorMes ?? {}),
+      [month]: true,
+    },
+  };
+}
+
+function markReinfHistoryTotalValue(currentMarks, fieldKey, month) {
+  return {
+    ...(currentMarks ?? createEmptyReinfHistoryMarks()),
+    valoresTotaisPorMes: {
+      ...(currentMarks?.valoresTotaisPorMes ?? {}),
+      [fieldKey]: {
+        ...(currentMarks?.valoresTotaisPorMes?.[fieldKey] ?? {}),
+        [month]: true,
+      },
+    },
+  };
+}
+
+function clearReinfHistoryMarksForMonth(currentMarks, month) {
+  const nextMarks = {
+    valoresPorMes: { ...(currentMarks?.valoresPorMes ?? {}) },
+    valoresTotaisPorMes: {},
+  };
+  delete nextMarks.valoresPorMes[month];
+  Object.entries(currentMarks?.valoresTotaisPorMes ?? {}).forEach(([fieldKey, values]) => {
+    nextMarks.valoresTotaisPorMes[fieldKey] = { ...(values ?? {}) };
+    delete nextMarks.valoresTotaisPorMes[fieldKey][month];
+  });
+  return nextMarks;
+}
+
+function clearReinfHistoryMonthlyValue(currentMarks, month) {
+  const nextMarks = {
+    ...(currentMarks ?? createEmptyReinfHistoryMarks()),
+    valoresPorMes: {
+      ...(currentMarks?.valoresPorMes ?? {}),
+    },
+  };
+  delete nextMarks.valoresPorMes[month];
+  return nextMarks;
+}
+
+function clearReinfHistoryTotalValue(currentMarks, fieldKey, month) {
+  const nextMarks = {
+    ...(currentMarks ?? createEmptyReinfHistoryMarks()),
+    valoresTotaisPorMes: {
+      ...(currentMarks?.valoresTotaisPorMes ?? {}),
+      [fieldKey]: {
+        ...(currentMarks?.valoresTotaisPorMes?.[fieldKey] ?? {}),
+      },
+    },
+  };
+  delete nextMarks.valoresTotaisPorMes[fieldKey][month];
+  return nextMarks;
+}
+
+function isReinfHistoryMonthlyValue(reportSocio, month) {
+  return Boolean(reportSocio?.valoresHistorico?.valoresPorMes?.[month]);
+}
+
+function isReinfHistoryTotalValue(reportSocio, fieldKey, month) {
+  return Boolean(reportSocio?.valoresHistorico?.valoresTotaisPorMes?.[fieldKey]?.[month]);
+}
+
+function hasReinfHistoryValues(reportSocios = [], months = [], isTotalsModel = false) {
+  return (reportSocios ?? []).some((reportSocio) => {
+    if (isTotalsModel) {
+      return months.some((month) => (
+        REINF_TOTAL_FIELD_OPTIONS.some((field) => isReinfHistoryTotalValue(reportSocio, field.key, month))
+      ));
+    }
+    return (reportSocio?.meses ?? []).some((month) => isReinfHistoryMonthlyValue(reportSocio, month));
+  });
+}
+
+function markReinfReportSociosAsHistory(reportSocios = [], months = [], isTotalsModel = false) {
+  return (reportSocios ?? []).map((reportSocio) => {
+    let nextMarks = reportSocio?.valoresHistorico ?? createEmptyReinfHistoryMarks();
+    let changed = false;
+
+    if (isTotalsModel) {
+      (months ?? []).forEach((month) => {
+        REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
+          const value = getReinfTotalMonthlyValue(reportSocio, field.key, month);
+          if (!String(value ?? '').trim()) return;
+          nextMarks = markReinfHistoryTotalValue(nextMarks, field.key, month);
+          if (field.key === 'totalDistribuidoTributavel') {
+            nextMarks = markReinfHistoryMonthlyValue(nextMarks, month);
+          }
+          changed = true;
+        });
+      });
+      return changed ? { ...reportSocio, valoresHistorico: nextMarks } : reportSocio;
+    }
+
+    (reportSocio?.meses ?? [])
+      .filter((month) => (months ?? []).includes(month))
+      .forEach((month) => {
+        const value = getReinfReportSocioMonthValue(reportSocio, month);
+        if (!String(value ?? '').trim()) return;
+        nextMarks = markReinfHistoryMonthlyValue(nextMarks, month);
+        nextMarks = markReinfHistoryTotalValue(nextMarks, 'totalDistribuidoTributavel', month);
+        changed = true;
+      });
+
+    return changed ? { ...reportSocio, valoresHistorico: nextMarks } : reportSocio;
+  });
+}
+
+function getReinfHistoryInputClassName(isHistoryValue, isRetificationEnabled = false) {
+  if (!isHistoryValue) return 'form-control-shell mt-1';
+  return `form-control-shell mt-1 border-amber-300/70 bg-amber-50/60 text-slate-600 opacity-90 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-gray-300 ${isRetificationEnabled ? '' : 'cursor-not-allowed'}`;
 }
 
 function hasReinfTotalsValues(reportSocios = [], months = []) {
@@ -2248,7 +2375,15 @@ function buildPlainTextTable(rows = []) {
   ].join('\n');
 }
 
-function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY, assinaturaNome = '' }) {
+function buildReinfFiscalPlainMessage({
+  assunto,
+  bodyText,
+  reportSocios = [],
+  months = [],
+  modeloTabela = REINF_TABLE_MODEL_MONTHLY,
+  assinaturaNome = '',
+  retificacao = false,
+}) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const header = isTotalsModel
     ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
@@ -2274,6 +2409,8 @@ function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], mo
   const { introLines, closingLines } = splitReinfFiscalBodyText(bodyText);
 
   return [
+    retificacao ? REINF_RETIFICATION_NOTICE : '',
+    retificacao ? '' : null,
     assunto ? `Assunto: ${assunto}` : '',
     '',
     introLines.join('\n'),
@@ -2282,7 +2419,7 @@ function buildReinfFiscalPlainMessage({ assunto, bodyText, reportSocios = [], mo
     '',
     closingLines.join('\n'),
     assinaturaNome ? `\nAssinatura digital: ${assinaturaNome}` : '',
-  ].filter((line) => line !== '').join('\n');
+  ].filter((line) => line !== '' && line !== null).join('\n');
 }
 
 function buildReinfFiscalHtmlParagraphs(lines = []) {
@@ -2291,7 +2428,16 @@ function buildReinfFiscalHtmlParagraphs(lines = []) {
     .join('');
 }
 
-function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY, assinaturaUrl = '', assinaturaNome = '' }) {
+function buildReinfFiscalHtmlMessage({
+  assunto,
+  bodyText,
+  reportSocios = [],
+  months = [],
+  modeloTabela = REINF_TABLE_MODEL_MONTHLY,
+  assinaturaUrl = '',
+  assinaturaNome = '',
+  retificacao = false,
+}) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const headerLabels = isTotalsModel
     ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
@@ -2333,6 +2479,7 @@ function buildReinfFiscalHtmlMessage({ assunto, bodyText, reportSocios = [], mon
 
   return `
     <div style="font-family:Arial,sans-serif;color:#111;font-size:14px;line-height:1.45;">
+      ${retificacao ? `<p style="margin:0 0 8px;font-size:16px;"><strong>${escapeHtml(REINF_RETIFICATION_NOTICE)}</strong></p>` : ''}
       ${assunto ? `<p style="margin:0 0 16px;font-size:18px;"><strong>${escapeHtml(assunto)}</strong></p>` : ''}
       ${buildReinfFiscalHtmlParagraphs(introLines)}
       <table style="border-collapse:collapse;margin:12px 0 20px;font-size:14px;border:1px solid #111;background:#fff;">
@@ -2533,6 +2680,7 @@ function clearReinfReportSocioValues(reportSocio) {
     valoresPorMes: {},
     valoresTotais: createEmptyReinfTotalValues(),
     valoresTotaisPorMes: {},
+    valoresHistorico: createEmptyReinfHistoryMarks(),
   };
 }
 
@@ -4387,7 +4535,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   const getSocioByKey = (socioKey) => socios.find((socio, index) => getReinfSocioOptionKey(socio, index) === socioKey) ?? null;
   const createInitialReportSocios = () => {
     const initialKey = currentSocioKey || (socios[0] ? getReinfSocioOptionKey(socios[0], 0) : '');
-    return initialKey ? [{ socioKey: initialKey, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {} }] : [];
+    return initialKey ? [{ socioKey: initialKey, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {}, valoresHistorico: createEmptyReinfHistoryMarks() }] : [];
   };
   const [reportSocios, setReportSocios] = useState(createInitialReportSocios);
   const [socioToAdd, setSocioToAdd] = useState('');
@@ -4406,6 +4554,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
   const [savedReportKey, setSavedReportKey] = useState('');
   const [sendStatus, setSendStatus] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [retificacaoAtiva, setRetificacaoAtiva] = useState(false);
   const reportSociosHydrated = useMemo(() => reportSocios
     .map((reportSocio) => ({
       ...reportSocio,
@@ -4427,6 +4576,11 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     relatorios: reinfRelatorios,
     client,
   }), [reinfRelatorios, client?.id, client?.cnpj]);
+  const hasValoresHistoricos = useMemo(() => hasReinfHistoryValues(
+    reportSociosHydrated,
+    reportMonths,
+    isTotalsModel,
+  ), [reportSociosHydrated, reportMonths, isTotalsModel]);
 
   function hydrateReportSocioFromHistory(reportSocio, months = []) {
     if (!reinfHistoryValueIndex.size || !months.length) return reportSocio;
@@ -4442,6 +4596,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       const nextValoresTotaisPorMes = {
         ...(reportSocio.valoresTotaisPorMes ?? {}),
       };
+      let nextValoresHistorico = reportSocio.valoresHistorico ?? createEmptyReinfHistoryMarks();
 
       REINF_TOTAL_FIELD_OPTIONS.forEach((field) => {
         nextValoresTotaisPorMes[field.key] = {
@@ -4470,8 +4625,10 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           if (!String(historyValue ?? '').trim()) return;
 
           nextValoresTotaisPorMes[field.key][month] = historyValue;
+          nextValoresHistorico = markReinfHistoryTotalValue(nextValoresHistorico, field.key, month);
           if (field.key === 'totalDistribuidoTributavel') {
             nextValoresPorMes[month] = historyValue;
+            nextValoresHistorico = markReinfHistoryMonthlyValue(nextValoresHistorico, month);
           }
           changed = true;
         });
@@ -4482,6 +4639,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           ...reportSocio,
           valoresPorMes: nextValoresPorMes,
           valoresTotaisPorMes: nextValoresTotaisPorMes,
+          valoresHistorico: nextValoresHistorico,
         }
         : reportSocio;
     }
@@ -4493,6 +4651,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
         ...(reportSocio.valoresTotaisPorMes?.totalDistribuidoTributavel ?? {}),
       },
     };
+    let nextValoresHistorico = reportSocio.valoresHistorico ?? createEmptyReinfHistoryMarks();
 
     months.forEach((month) => {
       if (String(nextValoresPorMes[month] ?? '').trim()) return;
@@ -4508,6 +4667,8 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 
       nextValoresPorMes[month] = historyValue;
       nextValoresTotaisPorMes.totalDistribuidoTributavel[month] = historyValue;
+      nextValoresHistorico = markReinfHistoryMonthlyValue(nextValoresHistorico, month);
+      nextValoresHistorico = markReinfHistoryTotalValue(nextValoresHistorico, 'totalDistribuidoTributavel', month);
       changed = true;
     });
 
@@ -4516,6 +4677,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
         ...reportSocio,
         valoresPorMes: nextValoresPorMes,
         valoresTotaisPorMes: nextValoresTotaisPorMes,
+        valoresHistorico: nextValoresHistorico,
       }
       : reportSocio;
   }
@@ -4550,6 +4712,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setSavedReportKey('');
     setSendStatus('');
     setSendingEmail(false);
+    setRetificacaoAtiva(false);
   }, [client?.id]);
 
   useEffect(() => {
@@ -4599,10 +4762,21 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 
   function addReportSocio() {
     if (!socioToAdd || selectedReportSocioKeys.has(socioToAdd)) return;
-    setReportSocios((current) => [...current, { socioKey: socioToAdd, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {} }]);
+    setReportSocios((current) => [...current, { socioKey: socioToAdd, meses: [], valoresPorMes: {}, valoresTotais: createEmptyReinfTotalValues(), valoresTotaisPorMes: {}, valoresHistorico: createEmptyReinfHistoryMarks() }]);
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
+    setRetificacaoAtiva(false);
+  }
+
+  function enableRetificacao() {
+    const confirmed = window.confirm(
+      'Esses valores já foram enviados anteriormente. Deseja habilitar a edição para fazer uma retificação?',
+    );
+    if (!confirmed) return;
+    setRetificacaoAtiva(true);
+    setSaveStatus('');
+    setSendStatus('Retificação habilitada');
   }
 
   function removeReportSocio(socioKey) {
@@ -4610,6 +4784,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
+    setRetificacaoAtiva(false);
   }
 
   function toggleMes(socioKey, month) {
@@ -4629,6 +4804,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           meses: currentMeses.filter((item) => item !== month),
           valoresPorMes: nextValues,
           valoresTotaisPorMes: nextTotalMonthlyValues,
+          valoresHistorico: clearReinfHistoryMarksForMonth(reportSocio.valoresHistorico, month),
         };
       }
       return {
@@ -4639,17 +4815,19 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
+    setRetificacaoAtiva(false);
   }
 
   function clearMeses(socioKey) {
     setReportSocios((current) => current.map((reportSocio) => (
       reportSocio.socioKey === socioKey
-        ? { ...reportSocio, meses: [], valoresPorMes: {}, valoresTotaisPorMes: {} }
+        ? { ...reportSocio, meses: [], valoresPorMes: {}, valoresTotaisPorMes: {}, valoresHistorico: createEmptyReinfHistoryMarks() }
         : reportSocio
     )));
     setMensagemEditada(false);
     setCopied(false);
     setCopyStatus('');
+    setRetificacaoAtiva(false);
   }
 
   function updateValorMes(socioKey, month, value) {
@@ -4668,6 +4846,11 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
               [month]: value,
             },
           },
+          valoresHistorico: clearReinfHistoryTotalValue(
+            clearReinfHistoryMonthlyValue(reportSocio.valoresHistorico, month),
+            'totalDistribuidoTributavel',
+            month,
+          ),
         }
         : reportSocio
     )));
@@ -4716,7 +4899,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           ...(reportSocio.valoresPorMes ?? {}),
           [month]: value,
         };
+        nextReportSocio.valoresHistorico = clearReinfHistoryMonthlyValue(nextReportSocio.valoresHistorico, month);
       }
+      nextReportSocio.valoresHistorico = clearReinfHistoryTotalValue(nextReportSocio.valoresHistorico, fieldKey, month);
       return nextReportSocio;
     }));
     setMensagemEditada(false);
@@ -4792,6 +4977,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       months: reportMonths,
       modeloTabela,
       assinaturaNome: assinaturaResponsavelUrl ? assinaturaResponsavelNome : '',
+      retificacao: retificacaoAtiva,
     });
     const htmlText = buildReinfFiscalHtmlMessage({
       assunto,
@@ -4801,6 +4987,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       modeloTabela,
       assinaturaUrl: assinaturaResponsavelUrl,
       assinaturaNome: assinaturaResponsavelNome,
+      retificacao: retificacaoAtiva,
     });
     try {
       await copyRichTextToClipboard({ htmlText, plainText });
@@ -4904,6 +5091,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       mensagem,
       reportSocios: reportSociosHydrated,
     });
+    const wasRetificacao = retificacaoAtiva;
     const plainText = buildReinfFiscalPlainMessage({
       assunto,
       bodyText: mensagem,
@@ -4911,6 +5099,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       months: reportMonths,
       modeloTabela,
       assinaturaNome: assinaturaResponsavelUrl ? assinaturaResponsavelNome : '',
+      retificacao: retificacaoAtiva,
     });
     const htmlText = buildReinfFiscalHtmlMessage({
       assunto,
@@ -4920,6 +5109,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
       modeloTabela,
       assinaturaUrl: assinaturaResponsavelUrl,
       assinaturaNome: assinaturaResponsavelNome,
+      retificacao: retificacaoAtiva,
     });
 
     setSendingEmail(true);
@@ -4938,7 +5128,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
 
         const reportKey = getReportSaveKey(relatorio);
         if (savedReportKey === reportKey) {
-          setSendStatus('E-mail enviado');
+          setReportSocios((current) => markReinfReportSociosAsHistory(current, reportMonths, isTotalsModel));
+          setRetificacaoAtiva(false);
+          setSendStatus(wasRetificacao ? 'Retificação enviada' : 'E-mail enviado');
           return;
         }
 
@@ -4947,8 +5139,10 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           const saved = await onSaveReport(relatorio);
           if (saved) {
             setSavedReportKey(reportKey);
-            setSaveStatus('Relatório salvo');
-            setSendStatus('E-mail enviado e relatório salvo');
+            setReportSocios((current) => markReinfReportSociosAsHistory(current, reportMonths, isTotalsModel));
+            setRetificacaoAtiva(false);
+            setSaveStatus(wasRetificacao ? 'Retificação salva' : 'Relatório salvo');
+            setSendStatus(wasRetificacao ? 'Retificação enviada e relatório salvo' : 'E-mail enviado e relatório salvo');
           } else {
             setSendStatus('E-mail enviado, mas relatório não foi salvo');
           }
@@ -5027,7 +5221,30 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
           </section>
 
           <section className="modal-section">
-            <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e período</h3>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-950 dark:text-gray-100">Valor e período</h3>
+                {retificacaoAtiva ? (
+                  <p className="mt-1 text-xs font-black uppercase tracking-normal text-amber-700 dark:text-amber-300">
+                    Retificação habilitada
+                  </p>
+                ) : null}
+              </div>
+              {hasValoresHistoricos ? (
+                <button
+                  type="button"
+                  onClick={enableRetificacao}
+                  disabled={retificacaoAtiva}
+                  className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
+                    retificacaoAtiva
+                      ? 'cursor-default border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300'
+                      : 'border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10'
+                  }`}
+                >
+                  {retificacaoAtiva ? 'Edição liberada' : 'Retificar valores enviados'}
+                </button>
+              ) : null}
+            </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-[220px_180px_minmax(180px,220px)_minmax(0,1fr)]">
               <DropdownFilterSelect
                 label="Modelo da tabela"
@@ -5042,6 +5259,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                   setCopyStatus('');
                   setSaveStatus('');
                   setSendStatus('');
+                  setRetificacaoAtiva(false);
                 }}
                 includeBlank={false}
                 labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
@@ -5058,9 +5276,11 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                       valoresPorMes: {},
                       valoresTotais: createEmptyReinfTotalValues(),
                       valoresTotaisPorMes: {},
+                      valoresHistorico: createEmptyReinfHistoryMarks(),
                     })));
                     setCopied(false);
                     setCopyStatus('');
+                    setRetificacaoAtiva(false);
                   }}
                   inputMode="numeric"
                   placeholder="2026"
@@ -5079,6 +5299,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                     setCopyStatus('');
                     setSaveStatus('');
                     setSendStatus('');
+                    setRetificacaoAtiva(false);
                   }}
                   emptyLabel="Selecione o mês"
                   labelClassName="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400"
@@ -5122,19 +5343,29 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                               <div key={month} className="rounded-lg border border-slate-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-950/30">
                                 <p className="text-sm font-black text-slate-700 dark:text-gray-200">{getReinfMonthLabel(month)}</p>
                                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                  {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
-                                    <label key={field.key} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                                      {field.label}
-                                      <input
-                                        value={getReinfTotalMonthlyValue(reportSocio, field.key, month)}
-                                        onChange={(event) => updateValorTotalMes(reportSocio.socioKey, field.key, month, event.target.value)}
-                                        onBlur={() => formatValorTotalMes(reportSocio.socioKey, field.key, month)}
-                                        inputMode="decimal"
-                                        placeholder="0,00"
-                                        className="form-control-shell mt-1"
-                                      />
-                                    </label>
-                                  ))}
+                                  {REINF_TOTAL_FIELD_OPTIONS.map((field) => {
+                                    const isHistoryValue = isReinfHistoryTotalValue(reportSocio, field.key, month);
+                                    return (
+                                      <label key={field.key} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                                        {field.label}
+                                        <input
+                                          value={getReinfTotalMonthlyValue(reportSocio, field.key, month)}
+                                          onChange={(event) => updateValorTotalMes(reportSocio.socioKey, field.key, month, event.target.value)}
+                                          onBlur={() => formatValorTotalMes(reportSocio.socioKey, field.key, month)}
+                                          inputMode="decimal"
+                                          placeholder="0,00"
+                                          readOnly={isHistoryValue && !retificacaoAtiva}
+                                          title={isHistoryValue && !retificacaoAtiva ? 'Valor já enviado. Use a retificação para editar.' : undefined}
+                                          className={getReinfHistoryInputClassName(isHistoryValue, retificacaoAtiva)}
+                                        />
+                                        {isHistoryValue ? (
+                                          <span className="mt-1 block text-[11px] font-black uppercase tracking-normal text-amber-700 dark:text-amber-300">
+                                            {retificacaoAtiva ? 'Em retificação' : 'Valor já enviado'}
+                                          </span>
+                                        ) : null}
+                                      </label>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ))}
@@ -5208,19 +5439,29 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                         <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Valores por mês selecionado</p>
                         {reportSocio.meses.length ? (
                           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {REINF_MONTH_OPTIONS.filter((month) => reportSocio.meses.includes(month.value)).map((month) => (
-                              <label key={month.value} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-                                {month.label}
-                                <input
-                                  value={reportSocio.valoresPorMes?.[month.value] ?? ''}
-                                  onChange={(event) => updateValorMes(reportSocio.socioKey, month.value, event.target.value)}
-                                  onBlur={() => formatValorMes(reportSocio.socioKey, month.value)}
-                                  inputMode="decimal"
-                                  placeholder="0,00"
-                                  className="form-control-shell mt-1"
-                                />
-                              </label>
-                            ))}
+                            {REINF_MONTH_OPTIONS.filter((month) => reportSocio.meses.includes(month.value)).map((month) => {
+                              const isHistoryValue = isReinfHistoryMonthlyValue(reportSocio, month.value);
+                              return (
+                                <label key={month.value} className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+                                  {month.label}
+                                  <input
+                                    value={reportSocio.valoresPorMes?.[month.value] ?? ''}
+                                    onChange={(event) => updateValorMes(reportSocio.socioKey, month.value, event.target.value)}
+                                    onBlur={() => formatValorMes(reportSocio.socioKey, month.value)}
+                                    inputMode="decimal"
+                                    placeholder="0,00"
+                                    readOnly={isHistoryValue && !retificacaoAtiva}
+                                    title={isHistoryValue && !retificacaoAtiva ? 'Valor já enviado. Use a retificação para editar.' : undefined}
+                                    className={getReinfHistoryInputClassName(isHistoryValue, retificacaoAtiva)}
+                                  />
+                                  {isHistoryValue ? (
+                                    <span className="mt-1 block text-[11px] font-black uppercase tracking-normal text-amber-700 dark:text-amber-300">
+                                      {retificacaoAtiva ? 'Em retificação' : 'Valor já enviado'}
+                                    </span>
+                                  ) : null}
+                                </label>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
@@ -5293,6 +5534,11 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
               <div>
                 <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Prévia formatada</p>
                 <div className="mt-1 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-950 shadow-sm dark:border-gray-700 dark:bg-white dark:text-slate-950">
+                  {retificacaoAtiva ? (
+                    <p className="mb-2 text-sm font-semibold text-slate-950">
+                      {REINF_RETIFICATION_NOTICE}
+                    </p>
+                  ) : null}
                   <p className="text-lg font-semibold leading-snug">{assunto || 'Assunto não informado'}</p>
                   <div className="mt-4 space-y-3">
                     {previewBodyParts.introLines.map((line, index) => (
