@@ -79,7 +79,6 @@ import {
   createEmptySecurityState,
   deniedReasonForField,
   getProfile,
-  isAdmin,
   sanitizeUser,
   validatePassword,
 } from './lib/auth.js';
@@ -9197,7 +9196,7 @@ export default function App() {
     event.target.value = '';
     if (!file) return;
     if (!can(currentUserFull, PERMISSIONS.IMPORT_EXCEL)) {
-      setToast({ title: 'Acesso negado', message: 'Apenas o Coordenador pode importar planilhas.' });
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode importar planilhas.' });
       return;
     }
     if (!ensureSupabaseWriteReady('importar clientes')) return;
@@ -9766,7 +9765,7 @@ export default function App() {
         clients={enrichedClients}
         onView={openClient}
         canManageAttachments={canManageAttachment}
-        canEditDeliveryDate={(client, fieldKey = 'data_entrega_ecd') => canWritePortalData && isAdmin(currentUserFull) && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
+        canEditDeliveryDate={(client, fieldKey = 'data_entrega_ecd') => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
         onQuickUpdate={quickUpdateClient}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoRemove={handleAnexoRemove}

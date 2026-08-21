@@ -56,10 +56,6 @@ export function getProfile(user) {
 
 export function can(user, permission) {
   if (!user) return false;
-  const email = String(user.email ?? '').trim().toLowerCase();
-  if (email === 'contabil@f12contabilidade.com.br' && permission === PERMISSIONS.USERS_MANAGE) {
-    return false;
-  }
   return getProfile(user).permissions.includes(permission);
 }
 

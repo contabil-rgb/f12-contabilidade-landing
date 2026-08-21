@@ -37,18 +37,8 @@ export const ACCESS_PROFILES = {
   },
   [ACCESS_PROFILE_KEYS.ACCOUNTING_OPERATIONAL]: {
     label: 'Setor Contabil / Operacional',
-    description: 'Acesso operacional compartilhado para consultar a base e atualizar competências e obrigações.',
-    permissions: [
-      PERMISSIONS.CLIENTS_VIEW_ALL,
-      PERMISSIONS.CLIENTS_CREATE,
-      PERMISSIONS.CLIENTS_EDIT_STATUS,
-      PERMISSIONS.CLIENTS_EDIT_OPERATIONAL,
-      PERMISSIONS.CHANGE_RESPONSIBLES,
-      PERMISSIONS.CLIENTS_INACTIVATE,
-      PERMISSIONS.DASHBOARDS_VIEW,
-      PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.REPORTS_EXPORT,
-    ],
+    description: 'Acesso completo ao portal, clientes, importação, relatórios, histórico e configurações principais.',
+    permissions: Object.values(PERMISSIONS),
   },
 };
 
