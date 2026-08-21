@@ -810,7 +810,7 @@ function normalizeSessionProfileSnapshot(profile) {
 
 function loadSession() {
   try {
-    const raw = window.localStorage.getItem(AUTH_SESSION_KEY);
+    const raw = window.sessionStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
@@ -836,20 +836,20 @@ function loadInitialSessionState() {
 function saveSession(session) {
   try {
     if (!session) {
-      window.localStorage.removeItem(AUTH_SESSION_KEY);
+      window.sessionStorage.removeItem(AUTH_SESSION_KEY);
       return;
     }
-    window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    window.sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
   } catch {
-    // ignore local storage failures
+    // ignore session storage failures
   }
 }
 
 function clearSession() {
   try {
-    window.localStorage.removeItem(AUTH_SESSION_KEY);
+    window.sessionStorage.removeItem(AUTH_SESSION_KEY);
   } catch {
-    // ignore local storage failures
+    // ignore session storage failures
   }
 }
 
@@ -8349,6 +8349,9 @@ export default function App() {
       ? 'Supabase indisponível no momento. O portal está em modo protegido com leitura da última sincronização e gravações bloqueadas até a reconexão.'
       : '';
   const authGateLabel = showRestoreUi ? 'Restaurando sessão...' : 'Validando sessão...';
+  const portalGateLabel = !supabaseBootstrapping && !supabaseStatus.connected
+    ? 'Não foi possível carregar os dados do portal. Verifique a conexão e tente entrar novamente.'
+    : 'Carregando dados do portal...';
   const supabaseStatusLabel = authRestoring && currentUserFull
     ? 'Sessão em restauração...'
     : !supabaseStatus.connected && (isSupabaseChecking || !showConnectionWarningUi)
@@ -8404,10 +8407,15 @@ export default function App() {
     }
     setSupabaseBootstrapping(true);
     void carregarDadosSupabase({ silent: true })
-      .finally(() => {
+      .then((ok) => {
         if (cancelled) return;
         setSupabaseBootstrapping(false);
-        setInitialPortalReady(true);
+        setInitialPortalReady(Boolean(ok || clients.length));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSupabaseBootstrapping(false);
+        setInitialPortalReady(Boolean(clients.length));
       });
 
     return () => {
@@ -8936,6 +8944,7 @@ export default function App() {
   function startSession(perfil) {
     if (!perfil?.id || !perfil?.auth_user_id) return;
     const profileSnapshot = normalizeSessionProfileSnapshot(perfil);
+    setInitialPortalReady(Boolean(clients.length));
     setSessionProfile(profileSnapshot);
     const nextSession = {
       usuario_id: perfil.id,
@@ -10110,7 +10119,7 @@ export default function App() {
   }
 
   if (currentUserFull && !initialPortalReady) {
-    return <FullscreenStatusState label="Carregando dados do portal..." />;
+    return <FullscreenStatusState label={portalGateLabel} />;
   }
 
   if (!currentUserFull) {
