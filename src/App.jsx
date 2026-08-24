@@ -2759,6 +2759,103 @@ function getReinfRelatorioPeriodicityLabel(relatorio) {
   return getReinfPeriodicityLabelFromMonths(relatorio?.meses, relatorio?.periodicidade);
 }
 
+function getReinfRelatorioClientKeys(relatorio) {
+  return [
+    String(relatorio?.cliente_id ?? '').trim(),
+    normalizeCnpj(relatorio?.cnpj),
+  ].filter(Boolean);
+}
+
+function getClientReinfRelatorioKeys(client) {
+  return [
+    String(client?.id ?? '').trim(),
+    normalizeCnpj(client?.cnpj),
+  ].filter(Boolean);
+}
+
+function isReinfRelatorioFromClient(relatorio, client) {
+  const clientKeys = new Set(getClientReinfRelatorioKeys(client));
+  if (!clientKeys.size) return false;
+  return getReinfRelatorioClientKeys(relatorio).some((key) => clientKeys.has(key));
+}
+
+function getReinfRelatorioTimestamp(relatorio) {
+  const timestamp = new Date(relatorio?.criado_em ?? '').getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getLatestReinfRelatorioByClient(relatorios = [], client) {
+  return (relatorios ?? [])
+    .filter((relatorio) => isReinfRelatorioFromClient(relatorio, client))
+    .sort((a, b) => getReinfRelatorioTimestamp(b) - getReinfRelatorioTimestamp(a))[0] ?? null;
+}
+
+function getReinfRelatorioSocioTotalValue(socio, months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY) {
+  if (isReinfTotalsTableModel(modeloTabela)) {
+    const monthlyTotal = (months ?? []).reduce((sum, month) => (
+      sum
+      + parseCurrencyNumber(getReinfTotalMonthlyValue(socio, 'totalDistribuidoIsentoAta', month))
+      + parseCurrencyNumber(getReinfTotalMonthlyValue(socio, 'totalDistribuidoTributavel', month))
+    ), 0);
+    if (monthlyTotal) return monthlyTotal;
+
+    const totals = getReinfReportSocioTotals(socio);
+    return REINF_TOTAL_FIELD_OPTIONS.reduce((sum, field) => (
+      sum + parseCurrencyNumber(totals?.[field.key])
+    ), 0);
+  }
+
+  const monthlyTotal = (months ?? []).reduce((sum, month) => (
+    sum + parseCurrencyNumber(getReinfReportSocioMonthValue(socio, month))
+  ), 0);
+  return monthlyTotal || parseCurrencyNumber(socio?.total);
+}
+
+function getReinfRelatorioTotalValue(relatorio) {
+  const months = Array.isArray(relatorio?.meses) ? relatorio.meses : [];
+  const socios = Array.isArray(relatorio?.socios) ? relatorio.socios : [];
+  const modeloTabela = relatorio?.modelo_tabela || REINF_TABLE_MODEL_MONTHLY;
+  return socios.reduce((sum, socio) => (
+    sum + getReinfRelatorioSocioTotalValue(socio, months, modeloTabela)
+  ), 0);
+}
+
+function buildClientDistribuicaoLucroSummary(client, relatorios = []) {
+  const latestRelatorio = getLatestReinfRelatorioByClient(relatorios, client);
+  if (!latestRelatorio) {
+    return {
+      relatorio: null,
+      fields: [
+        { label: 'Último envio', value: 'Sem envio registrado' },
+        { label: 'Período enviado', value: 'Não informado' },
+        { label: 'Modelo utilizado', value: 'Não informado' },
+        { label: 'Sócios enviados', value: '0' },
+        { label: 'Total distribuído', value: '0,00' },
+        { label: 'Status', value: 'Sem histórico salvo' },
+      ],
+    };
+  }
+
+  const months = Array.isArray(latestRelatorio.meses) ? latestRelatorio.meses : [];
+  const total = getReinfRelatorioTotalValue(latestRelatorio);
+  return {
+    relatorio: latestRelatorio,
+    fields: [
+      { label: 'Último envio', value: formatDateTime(latestRelatorio.criado_em) },
+      {
+        label: 'Período enviado',
+        value: months.length
+          ? `${getReinfRelatorioMonthsLabel(latestRelatorio)} ${latestRelatorio.ano_referencia || ''}`.trim()
+          : 'Não informado',
+      },
+      { label: 'Modelo utilizado', value: latestRelatorio.modelo_tabela_label || getReinfTableModelLabel(latestRelatorio.modelo_tabela) },
+      { label: 'Sócios enviados', value: String(getReinfRelatorioSociosCount(latestRelatorio)) },
+      { label: 'Total distribuído', value: formatCurrencyDisplay(total) || '0,00' },
+      { label: 'Status', value: 'Envio salvo no histórico' },
+    ],
+  };
+}
+
 function slugifyFilenamePart(value, fallback = 'relatorio') {
   const normalized = String(value || fallback)
     .normalize('NFD')
@@ -4159,6 +4256,7 @@ function DetailPage({
   onAnexoError,
   historicoRows = [],
   historicoLoading = false,
+  reinfRelatorios = [],
 }) {
   if (!client) {
     return (
@@ -4174,6 +4272,7 @@ function DetailPage({
   const visibleDetailSections = DETAIL_SECTIONS.filter(
     (section) => !['Documentação', 'Responsáveis e Revisão', 'Alertas e Pendências'].includes(section.title),
   );
+  const distribuicaoLucroSummary = buildClientDistribuicaoLucroSummary(client, reinfRelatorios);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -4218,6 +4317,23 @@ function DetailPage({
             </dl>
           </article>
         ))}
+        <article className="surface-card p-5">
+          <h3 className="text-lg font-black text-slate-950 dark:text-gray-100">Distribuição de Lucro</h3>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+            {distribuicaoLucroSummary.fields.map((field) => (
+              <div key={field.label} className="rounded-lg bg-slate-50 p-3 dark:bg-gray-800">
+                <dt className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">{field.label}</dt>
+                <dd className="mt-1 text-sm font-bold text-slate-900 dark:text-gray-100">
+                  {field.label === 'Status' ? (
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${distribuicaoLucroSummary.relatorio ? chipClass('success') : chipClass('muted')}`}>
+                      {field.value}
+                    </span>
+                  ) : field.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </article>
       </section>
 
       <AnexosClienteSection
@@ -10245,6 +10361,7 @@ export default function App() {
         onAnexoError={handleAnexoError}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
+        reinfRelatorios={reinfRelatorios}
       />
     ),
     reinf: (
