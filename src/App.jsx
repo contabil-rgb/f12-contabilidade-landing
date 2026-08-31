@@ -10527,6 +10527,10 @@ export default function App() {
         setSort={setSort}
         onView={openClient}
         onEdit={(client) => {
+          if (isClientArchived(client)) {
+            setToast({ title: 'Cliente arquivado', message: 'Restaure o cliente antes de editar.' });
+            return;
+          }
           if (!ensureSupabaseWriteReady('editar o cliente')) return;
           setEditingClient(client);
         }}
@@ -10536,7 +10540,7 @@ export default function App() {
         canCreateClientEnabled={canCreateClient && canWritePortalData}
         createDisabledReason={writeBlockedReason}
         allClients={enrichedClients}
-        canEditRow={(client) => canWritePortalData && canEditClient(currentUserFull, client)}
+        canEditRow={(client) => canWritePortalData && !isClientArchived(client) && canEditClient(currentUserFull, client)}
         canInactivateRow={(client) => canWritePortalData && !isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         canRestoreRow={(client) => canWritePortalData && isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         canBatchUpdateResponsavel={(client) => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'responsavel')}
@@ -10570,10 +10574,14 @@ export default function App() {
         client={selectedClient}
         onBack={() => setPage('clientes')}
         onEdit={(client) => {
+          if (isClientArchived(client)) {
+            setToast({ title: 'Cliente arquivado', message: 'Restaure o cliente antes de editar.' });
+            return;
+          }
           if (!ensureSupabaseWriteReady('editar o cliente')) return;
           setEditingClient(client);
         }}
-        canEditCurrent={selectedClient ? canWritePortalData && canEditClient(currentUserFull, selectedClient) : false}
+        canEditCurrent={selectedClient ? canWritePortalData && !isClientArchived(selectedClient) && canEditClient(currentUserFull, selectedClient) : false}
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoRemove={handleAnexoRemove}
