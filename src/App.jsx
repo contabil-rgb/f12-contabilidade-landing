@@ -8220,7 +8220,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
 
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
         <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-          Nome do sócio
+          Nome do sócio/holding
           <input
             value={draft.nome}
             onChange={(event) => {
@@ -8274,7 +8274,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
                   value={socio.nome}
                   onChange={(event) => updateSocio(index, 'nome', event.target.value)}
                   disabled={disabled}
-                  aria-label="Nome do sócio"
+                  aria-label="Nome do sócio/holding"
                   className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
                 />
                 <input

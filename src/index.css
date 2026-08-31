@@ -1137,6 +1137,15 @@
     gap: 0.35rem;
   }
 
+  .anexo-actions-grid {
+    display: grid;
+    width: max-content;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: repeat(2, minmax(5.85rem, max-content));
+    gap: 0.35rem;
+  }
+
   .base-client-attachment-cell > .anexo-actions-grid {
     display: grid;
     width: max-content;

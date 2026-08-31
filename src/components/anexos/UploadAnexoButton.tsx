@@ -101,9 +101,21 @@ export function UploadAnexoButton({
     'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50';
   const dangerButtonClass =
     'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10';
+  const actionsGridStyle = hasAnexo
+    ? {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(5.85rem, max-content))',
+      gap: '0.5rem',
+      width: 'max-content',
+      maxWidth: '100%',
+    }
+    : undefined;
 
   return (
-    <div className={hasAnexo ? 'anexo-actions-grid grid w-fit grid-cols-2 gap-2' : 'flex flex-wrap gap-2'}>
+    <div
+      className={hasAnexo ? 'anexo-actions-grid' : 'flex flex-wrap gap-2'}
+      style={actionsGridStyle}
+    >
       {hasAnexo ? (
         <>
           <button
