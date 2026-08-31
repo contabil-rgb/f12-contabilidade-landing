@@ -13,8 +13,12 @@ create table if not exists public.clientes_socios (
   atualizado_por uuid references public.usuarios(id),
   criado_em timestamp with time zone not null default now(),
   atualizado_em timestamp with time zone not null default now(),
-  constraint clientes_socios_cpf_digits_check check (cpf ~ '^[0-9]{11}$')
+  constraint clientes_socios_cpf_digits_check check (cpf ~ '^([0-9]{11}|[0-9]{14})$')
 );
+
+alter table public.clientes_socios
+  drop constraint if exists clientes_socios_cpf_digits_check,
+  add constraint clientes_socios_cpf_digits_check check (cpf ~ '^([0-9]{11}|[0-9]{14})$');
 
 create index if not exists idx_clientes_socios_cliente_id
   on public.clientes_socios(cliente_id);
@@ -134,15 +138,15 @@ begin
     v_usuario_id
   from jsonb_array_elements(p_socios) with ordinality as socios(item, ordinality)
   where nullif(btrim(item->>'nome'), '') is not null
-    and regexp_replace(coalesce(item->>'cpf', ''), '\D', '', 'g') ~ '^[0-9]{11}$';
+    and regexp_replace(coalesce(item->>'cpf', ''), '\D', '', 'g') ~ '^([0-9]{11}|[0-9]{14})$';
 
   if exists (
     select 1
     from jsonb_array_elements(p_socios) as socios(item)
     where nullif(btrim(item->>'nome'), '') is not null
-      and regexp_replace(coalesce(item->>'cpf', ''), '\D', '', 'g') !~ '^[0-9]{11}$'
+      and regexp_replace(coalesce(item->>'cpf', ''), '\D', '', 'g') !~ '^([0-9]{11}|[0-9]{14})$'
   ) then
-    raise exception 'CPF do socio deve ter 11 digitos.';
+    raise exception 'CPF/CNPJ do socio deve ter 11 ou 14 digitos.';
   end if;
 
   return query

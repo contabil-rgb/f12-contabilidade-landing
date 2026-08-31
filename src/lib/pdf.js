@@ -69,7 +69,7 @@ const REINF_REPORT_LAYOUT = {
     { key: 'Periodicidade', label: 'Período', x: 396, width: 48 },
     { key: 'Meses', label: 'Meses', x: 450, width: 74 },
     { key: 'Sócio', label: 'Sócio', x: 530, width: 92 },
-    { key: 'CPF', label: 'CPF', x: 628, width: 62 },
+    { key: 'CPF', label: 'CPF/CNPJ', x: 628, width: 62 },
     { key: 'Valores por mês', label: 'Valores por mês', x: 696, width: 122 },
   ],
 };
@@ -285,7 +285,7 @@ function buildReinfReportPages(rows, title) {
     { key: 'CNPJ', label: 'CNPJ', width: cnpjWidth },
     { key: 'Responsavel', label: 'RESP.', width: responsavelWidth },
     { key: 'Socio', label: 'SÓCIO', width: socioWidth },
-    { key: 'CPF', label: 'CPF', width: cpfWidth },
+    { key: 'CPF', label: 'CPF/CNPJ', width: cpfWidth },
     { key: 'Periodo', label: 'PERIODO', width: periodoWidth },
     ...(months.length
       ? months.map((month) => ({ key: month, label: month, width: monthWidth }))

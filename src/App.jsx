@@ -547,7 +547,12 @@ function withClientDefaults(client) {
 }
 
 function normalizeCpfDigits(value) {
-  return String(value ?? '').replace(/\D/g, '').slice(0, 11);
+  return String(value ?? '').replace(/\D/g, '').slice(0, 14);
+}
+
+function isCpfCnpjDigitsValid(value) {
+  const length = normalizeCpfDigits(value).length;
+  return length === 11 || length === 14;
 }
 
 function formatCpfInput(value) {
@@ -556,7 +561,11 @@ function formatCpfInput(value) {
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
   if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  if (digits.length <= 11) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }
 
 function normalizeSociosClienteInput(socios = []) {
@@ -2402,8 +2411,8 @@ function buildReinfFiscalPlainMessage({
 }) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const header = isTotalsModel
-    ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
-    : ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
+    ? ['SÓCIO', 'CPF/CNPJ', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
+    : ['SÓCIO', 'CPF/CNPJ', ...months.map(getReinfMonthShortLabel)];
   const rows = isTotalsModel
     ? getReinfTotalsTableRows(reportSocios, months).map((row) => [
       row.isTotal ? 'TOTAL DO SÓCIO' : (row.monthIndex === 0 ? row.socioNome : ''),
@@ -2456,8 +2465,8 @@ function buildReinfFiscalHtmlMessage({
 }) {
   const isTotalsModel = isReinfTotalsTableModel(modeloTabela);
   const headerLabels = isTotalsModel
-    ? ['SÓCIO', 'CPF', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
-    : ['SÓCIO', 'CPF', ...months.map(getReinfMonthShortLabel)];
+    ? ['SÓCIO', 'CPF/CNPJ', 'MÊS', ...REINF_TOTAL_FIELD_OPTIONS.map((field) => field.label.toUpperCase())]
+    : ['SÓCIO', 'CPF/CNPJ', ...months.map(getReinfMonthShortLabel)];
   const headerCells = headerLabels
     .map((cell) => `<th style="border:1px solid #111;padding:4px 8px;text-align:left;font-weight:600;background:#f8fafc;color:#111;">${escapeHtml(cell)}</th>`)
     .join('');
@@ -2730,7 +2739,7 @@ function buildReinfRelatoriosExportRows(relatorios = []) {
         Ano: relatorio.ano_referencia || '',
         Meses: meses.map(getReinfMonthLabel).join(', '),
         Sócio: socio.nome || '',
-        CPF: socio.cpf || '',
+        'CPF/CNPJ': socio.cpf ? formatCpfInput(socio.cpf) : '',
       };
 
       meses.forEach((month) => {
@@ -5527,7 +5536,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                     <div>
                       <p className="text-sm font-black text-slate-950 dark:text-gray-100">{reportSocio.socio?.nome || 'Sócio sem nome'}</p>
                       <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                        CPF: {reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : 'CPF não informado'}
+                        CPF/CNPJ: {reportSocio.socio?.cpf ? formatCpfInput(reportSocio.socio.cpf) : 'CPF/CNPJ não informado'}
                       </p>
                     </div>
                     <button
@@ -5759,7 +5768,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                         <thead>
                           <tr>
                             <th className="w-[26%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SÓCIO</th>
-                            <th className="w-[16%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF</th>
+                            <th className="w-[16%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF/CNPJ</th>
                             <th className="w-[12%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">MÊS</th>
                             {REINF_TOTAL_FIELD_OPTIONS.map((field) => (
                               <th key={field.key} className="border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">
@@ -5793,7 +5802,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                         <thead>
                           <tr>
                             <th className="w-[42%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">SÓCIO</th>
-                            <th className="w-[22%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF</th>
+                            <th className="w-[22%] border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">CPF/CNPJ</th>
                             {reportMonths.map((month) => (
                               <th key={month} className="border border-slate-950 bg-slate-50 px-2 py-1 font-semibold">
                                 {getReinfMonthShortLabel(month)}
@@ -6054,7 +6063,7 @@ function ReinfPage({
            ]}
             columnLabels={{
               reinf_socio: 'Sócio',
-              reinf_socio_cpf: 'CPF',
+              reinf_socio_cpf: 'CPF/CNPJ',
               data_envio_recibo_reinf: 'Data enviada',
             }}
             renderCell={(client, column) => {
@@ -6662,7 +6671,7 @@ function ReportsPage({
   }, [reinfRelatorioIdsKey]);
   const reportTypes = [
     { value: 'clientes', label: 'Base de Clientes', eyebrow: 'Carteira', description: 'Clientes, CNPJ, responsável e regime tributário.' },
-    { value: 'lucros', label: 'Distribuição de Lucro', eyebrow: 'Valores', description: 'Sócios, CPF, empresa e valores por mês.' },
+    { value: 'lucros', label: 'Distribuição de Lucro', eyebrow: 'Valores', description: 'Sócios, CPF/CNPJ, empresa e valores por mês.' },
     { value: 'ecd_ecf', label: 'ECD / ECF', eyebrow: 'Obrigações', description: 'Entrega, anexos, pendências e conclusões.' },
     { value: 'observacoes', label: 'Pendências/Observações', eyebrow: 'Registros', description: 'Observações registradas nos clientes.' },
   ];
@@ -6773,7 +6782,7 @@ function ReportsPage({
       Meses: row.meses.map(getReinfMonthLabel).join(', '),
       Período: row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Não informado',
       Sócio: row.socio,
-      CPF: row.cpf,
+      'CPF/CNPJ': row.cpf ? formatCpfInput(row.cpf) : '',
     };
 
     lucrosSelectedMonths.forEach((month) => {
@@ -6995,7 +7004,7 @@ function ReportsPage({
                   <th className="px-3 py-2">Responsável</th>
                   <th className="px-3 py-2">Modelo</th>
                   <th className="px-3 py-2">Sócio</th>
-                  <th className="px-3 py-2">CPF</th>
+                  <th className="px-3 py-2">CPF/CNPJ</th>
                   <th className="px-3 py-2">Período</th>
                   {lucrosSelectedMonths.map((month) => (
                     <th key={month} className="px-3 py-2 text-right">{getReinfMonthShortLabel(month)}</th>
@@ -7015,7 +7024,7 @@ function ReportsPage({
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.responsavel || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.modelo_tabela_label || '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">{row.socio || '-'}</td>
-                      <td className="break-words px-3 py-2 font-semibold leading-snug">{row.cpf || '-'}</td>
+                      <td className="break-words px-3 py-2 font-semibold leading-snug">{row.cpf ? formatCpfInput(row.cpf) : '-'}</td>
                       <td className="break-words px-3 py-2 font-semibold leading-snug">
                         {row.meses.length ? `${row.meses.map(getReinfMonthShortLabel).join(', ')} ${row.ano_referencia || ''}`.trim() : 'Não informado'}
                       </td>
@@ -7815,10 +7824,10 @@ function UserModal({ user, users, onClose, onSave }) {
       nextErrors.push('Informe o nome do sócio.');
     }
     if (sociosValidos.some((socio) => socio.nome && !socio.cpf)) {
-      nextErrors.push('Informe o CPF do sócio.');
+      nextErrors.push('Informe o CPF/CNPJ do sócio.');
     }
-    if (sociosValidos.some((socio) => socio.cpf && socio.cpf.length !== 11)) {
-      nextErrors.push('CPF do sócio deve ter 11 dígitos.');
+    if (sociosValidos.some((socio) => socio.cpf && !isCpfCnpjDigitsValid(socio.cpf))) {
+      nextErrors.push('CPF/CNPJ do sócio deve ter 11 ou 14 dígitos.');
     }
 
     if (nextErrors.length) {
@@ -8100,15 +8109,15 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
     const nome = String(draft.nome ?? '').trim();
     const cpf = normalizeCpfDigits(draft.cpf);
     if (!nome || !cpf) {
-      setError('Informe nome e CPF para adicionar o sócio.');
+      setError('Informe nome e CPF/CNPJ para adicionar o sócio.');
       return;
     }
-    if (cpf.length !== 11) {
-      setError('CPF deve ter 11 dígitos.');
+    if (!isCpfCnpjDigitsValid(cpf)) {
+      setError('CPF/CNPJ deve ter 11 ou 14 dígitos.');
       return;
     }
     if (normalizedSocios.some((socio) => socio.cpf === cpf)) {
-      setError('Este CPF já foi cadastrado para o cliente.');
+      setError('Este CPF/CNPJ já foi cadastrado para o cliente.');
       return;
     }
     onChange([...normalizedSocios, { nome, cpf }]);
@@ -8157,7 +8166,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
           />
         </label>
         <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-          CPF
+          CPF/CNPJ
           <input
             value={formatCpfInput(draft.cpf)}
             onChange={(event) => {
@@ -8165,7 +8174,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
               setError('');
             }}
             disabled={disabled}
-            placeholder="000.000.000-00"
+            placeholder="000.000.000-00 ou 00.000.000/0000-00"
             className="form-control-shell mt-1 disabled:bg-slate-100 disabled:text-slate-400"
           />
         </label>
@@ -8205,7 +8214,7 @@ function SociosEmpresaSection({ socios, disabled = false, onChange }) {
                   value={formatCpfInput(socio.cpf)}
                   onChange={(event) => updateSocio(index, 'cpf', event.target.value)}
                   disabled={disabled}
-                  aria-label="CPF do sócio"
+                  aria-label="CPF/CNPJ do sócio"
                   className="form-control-shell disabled:bg-slate-100 disabled:text-slate-400"
                 />
                 <button

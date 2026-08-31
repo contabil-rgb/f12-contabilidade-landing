@@ -1,9 +1,14 @@
 import { supabase } from '../lib/supabase';
 
-const CPF_DIGITS_LENGTH = 11;
+const DOCUMENT_DIGITS_LENGTHS = new Set([11, 14]);
+const DOCUMENT_MAX_DIGITS_LENGTH = 14;
 
 function normalizeCpfDigits(value: unknown) {
-  return String(value ?? '').replace(/\D/g, '').slice(0, CPF_DIGITS_LENGTH);
+  return String(value ?? '').replace(/\D/g, '').slice(0, DOCUMENT_MAX_DIGITS_LENGTH);
+}
+
+function isCpfCnpjDigitsValid(value: unknown) {
+  return DOCUMENT_DIGITS_LENGTHS.has(normalizeCpfDigits(value).length);
 }
 
 function normalizeSocioRow(row: Record<string, unknown>) {
@@ -63,9 +68,9 @@ export async function salvarSociosCliente(clienteId: string, socios: Array<Recor
   }
 
   const payload = normalizeSociosPayload(socios);
-  const invalid = payload.find((socio) => socio.cpf.length !== CPF_DIGITS_LENGTH);
+  const invalid = payload.find((socio) => !isCpfCnpjDigitsValid(socio.cpf));
   if (invalid) {
-    throw new Error('CPF do sócio deve ter 11 dígitos.');
+    throw new Error('CPF/CNPJ do sócio deve ter 11 ou 14 dígitos.');
   }
 
   const { data, error } = await supabase.rpc('salvar_socios_cliente_portal', {
