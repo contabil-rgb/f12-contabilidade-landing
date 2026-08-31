@@ -85,6 +85,10 @@ import {
   validatePassword,
 } from './lib/auth.js';
 import { AnexosClienteSection } from './components/anexos/AnexosClienteSection';
+import {
+  ContratoSocialTableCell,
+  ContratosSociaisClienteSection,
+} from './components/anexos/ContratosSociaisClienteSection';
 import { UploadAnexoButton } from './components/anexos/UploadAnexoButton';
 import ActionButton from './components/ui/ActionButton';
 import AlertBanner from './components/ui/AlertBanner';
@@ -96,6 +100,7 @@ import ThemeToggle from './components/ui/ThemeToggle.jsx';
 import f12Logo from './assets/logo-f12.png';
 import { TIPOS_ANEXO } from './types/anexo';
 import { listarUltimosAnexosPorClientes } from './services/anexos.service';
+import { listarUltimosContratosSociaisPorClientes } from './services/contratos-sociais.service';
 import {
   buscarClientePorId as buscarClientePorIdSupabase,
   atualizarCliente as atualizarClienteSupabase,
@@ -316,9 +321,20 @@ const BASE_CLIENTS_VISIBLE_KEYS = new Set([
   'revisor',
 ]);
 
-const BASE_CLIENTS_TABLE_COLUMNS = TABLE_COLUMNS.filter((field) =>
-  BASE_CLIENTS_VISIBLE_KEYS.has(field.key),
-);
+const CONTRATO_SOCIAL_TABLE_FIELD = {
+  key: 'contrato_social',
+  label: 'Contrato Social',
+  group: 'Identificação',
+  type: 'contrato_social',
+};
+
+const BASE_CLIENTS_TABLE_COLUMNS = TABLE_COLUMNS
+  .filter((field) => BASE_CLIENTS_VISIBLE_KEYS.has(field.key))
+  .flatMap((field) => (
+    field.key === 'anexo_cartao_qsa'
+      ? [field, CONTRATO_SOCIAL_TABLE_FIELD]
+      : [field]
+  ));
 
 const EDIT_MODAL_HIDDEN_FIELDS = new Set([
   'data_enviada_reinf',
@@ -536,7 +552,7 @@ function isAuthTimeoutError(error) {
 }
 
 function isUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value ?? ''));
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value ?? ''));
 }
 
 function withClientDefaults(client) {
@@ -1114,6 +1130,26 @@ async function hydrateClientesComAnexos(clientesBase, fallbackAttachmentSnapshot
       });
       return next;
     });
+  }
+}
+
+async function hydrateClientesComContratosSociais(clientesBase) {
+  const normalized = (clientesBase ?? []).map(withClientDefaults);
+  const ids = normalized
+    .map((client) => String(client.id ?? '').trim())
+    .filter((id) => isUuid(id));
+
+  if (!ids.length) return normalized;
+
+  try {
+    const contratosPorCliente = await listarUltimosContratosSociaisPorClientes(ids);
+    return normalized.map((client) => ({
+      ...client,
+      _contrato_social_atual: contratosPorCliente[String(client.id ?? '')] ?? client._contrato_social_atual ?? null,
+    }));
+  } catch (error) {
+    console.warn('[contratos-sociais] Falha ao hidratar contratos sociais por cliente:', error);
+    return normalized;
   }
 }
 
@@ -4063,7 +4099,7 @@ function ClientsTable({
         </div>
       </div>
       <TableScrollArea className="border-x-0 border-b-0 rounded-none shadow-none" topClassName="mx-4 mt-3 sm:mx-5">
-        <table className="table-base base-clients-table min-w-[1560px] 2xl:min-w-[1640px]">
+        <table className="table-base base-clients-table min-w-[1760px] 2xl:min-w-[1840px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
               <th className="table-head-cell table-sticky-left w-72 px-4">
@@ -4350,9 +4386,11 @@ function DetailPage({
   onEdit,
   canEditCurrent,
   canManageAttachments,
+  canManageContratosSociais,
   onAnexoSuccess,
   onAnexoRemove,
   onAnexoError,
+  onContratoSocialSuccess,
   historicoRows = [],
   historicoLoading = false,
   reinfRelatorios = [],
@@ -4440,6 +4478,13 @@ function DetailPage({
         disabled={!canManageAttachments}
         onSuccess={(tipoAnexo, anexo) => onAnexoSuccess?.(client.id, tipoAnexo, anexo)}
         onRemove={(tipoAnexo, anexo) => onAnexoRemove?.(client.id, tipoAnexo, anexo)}
+        onError={onAnexoError}
+      />
+
+      <ContratosSociaisClienteSection
+        cliente={client}
+        disabled={!canManageContratosSociais}
+        onSuccess={(contrato) => onContratoSocialSuccess?.(contrato?.cliente_id || client.id, contrato, client.id)}
         onError={onAnexoError}
       />
     </div>
@@ -7934,7 +7979,18 @@ function FullscreenStatusState({ label }) {
   );
 }
 
-function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient, onAnexoSuccess, onAnexoRemove, onAnexoError }) {
+function ClientModal({
+  client,
+  listagens,
+  onClose,
+  onSave,
+  canEditFieldForClient,
+  canManageContratosSociais,
+  onAnexoSuccess,
+  onAnexoRemove,
+  onAnexoError,
+  onContratoSocialSuccess,
+}) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
     ...client,
@@ -8068,11 +8124,22 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
                   </div>
                 </section>
                 {group === FIELD_GROUPS[0] ? (
-                  <SociosEmpresaSection
-                    socios={form._socios ?? []}
-                    disabled={!canEditFieldForClient('nome_identificacao')}
-                    onChange={updateSocios}
-                  />
+                  <>
+                    <SociosEmpresaSection
+                      socios={form._socios ?? []}
+                      disabled={!canEditFieldForClient('nome_identificacao')}
+                      onChange={updateSocios}
+                    />
+                    {form.id ? (
+                      <ContratosSociaisClienteSection
+                        cliente={form}
+                        compact
+                        disabled={!canManageContratosSociais}
+                        onSuccess={(contrato) => onContratoSocialSuccess?.(contrato?.cliente_id || form.id, contrato, form.id)}
+                        onError={onAnexoError}
+                      />
+                    ) : null}
+                  </>
                 ) : null}
               </Fragment>
             );
@@ -9066,8 +9133,9 @@ export default function App() {
           : Promise.resolve({ ok: true, rows: [], skipped: true }),
       ]);
       const clientesHydrated = await hydrateClientesComAnexos(clientesSupabase, cachedAttachmentSnapshot);
+      const clientesComContratosSociais = await hydrateClientesComContratosSociais(clientesHydrated);
       const obrigacoesIndex = obrigacoesResult.ok ? indexarStatusObrigacoes(obrigacoesResult.rows) : {};
-      const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesHydrated, obrigacoesIndex);
+      const clientesComObrigacoes = hydrateClientesComObrigacoes(clientesComContratosSociais, obrigacoesIndex);
       const riscoIndex = riscoResult.ok ? indexarRiscoOperacional(riscoResult.rows) : {};
       const clientesComRisco = hydrateClientesComRiscoOperacional(clientesComObrigacoes, riscoIndex);
       const acompanhamentoIndex = acompanhamentoResult.ok ? indexarAcompanhamentoOperacional(acompanhamentoResult.rows) : {};
@@ -9799,6 +9867,46 @@ export default function App() {
     });
   }
 
+  async function handleContratoSocialSuccess(clientId, contrato, fallbackClientId = '') {
+    if (isUuid(clientId)) {
+      updateClientsPersisted((current) =>
+        current.map((client) =>
+          client.id === clientId || client.id === fallbackClientId
+            ? clearPersistedObrigacoes({
+              ...client,
+              _contrato_social_atual: contrato,
+              atualizado_em: new Date().toISOString(),
+            })
+            : client,
+        ),
+      );
+    }
+
+    setToast({
+      title: 'Contrato social anexado',
+      message: `Versão ${contrato?.versao ?? '-'}: ${contrato?.nome_arquivo ?? 'registro atualizado'}.`,
+    });
+
+    if (isUuid(clientId) && currentUserFull?.id) {
+      try {
+        await registrarEventoHistoricoSupabase({
+          clienteId,
+          usuarioLogado: currentUserFull,
+          campoAlterado: 'contrato_social',
+          valorAnterior: null,
+          valorNovo: contrato?.nome_arquivo || null,
+          tipoAcao: 'contrato_social_versionado',
+          origem: page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes',
+        });
+        if (selectedClient?.id === clientId) {
+          await carregarHistoricoCliente(clientId);
+        }
+      } catch (error) {
+        console.warn('[historico] Falha ao registrar contrato social no histórico:', error);
+      }
+    }
+  }
+
   async function salvarRelatorioReinf(payload) {
     if (!ensureSupabaseWriteReady('salvar o relatório de distribuição de lucro')) return false;
     try {
@@ -9884,6 +9992,19 @@ export default function App() {
   function canManageAttachment(client, fieldKey) {
     if (!currentUserFull || !client) return false;
     return canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey);
+  }
+
+  function canManageContratoSocial(client) {
+    if (!currentUserFull || !client) return false;
+    return (
+      canWritePortalData
+      && !isClientArchived(client)
+      && canViewClient(currentUserFull, client)
+      && (
+        canEditClientField(currentUserFull, 'anexo_cartao_cnpj')
+        || canEditClientField(currentUserFull, 'anexo_cartao_qsa')
+      )
+    );
   }
 
   async function inactivateClient(client) {
@@ -10553,6 +10674,17 @@ export default function App() {
           if (fieldKey === 'revisor') {
             return renderFieldValue(normalizeTeamMemberDisplayName(client?.revisor));
           }
+          if (fieldKey === 'contrato_social') {
+            return (
+              <ContratoSocialTableCell
+                cliente={client}
+                contrato={client._contrato_social_atual}
+                disabled={!canManageContratoSocial(client)}
+                onSuccess={(contrato) => handleContratoSocialSuccess(contrato?.cliente_id || client.id, contrato, client.id)}
+                onError={handleAnexoError}
+              />
+            );
+          }
           const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[fieldKey];
           if (!tipoAnexo) return undefined;
           return (
@@ -10583,9 +10715,11 @@ export default function App() {
         }}
         canEditCurrent={selectedClient ? canWritePortalData && !isClientArchived(selectedClient) && canEditClient(currentUserFull, selectedClient) : false}
         canManageAttachments={selectedClient ? canManageAttachment(selectedClient, 'anexo_recibo_reinf') : false}
+        canManageContratosSociais={selectedClient ? canManageContratoSocial(selectedClient) : false}
         onAnexoSuccess={handleAnexoSuccess}
         onAnexoRemove={handleAnexoRemove}
         onAnexoError={handleAnexoError}
+        onContratoSocialSuccess={handleContratoSocialSuccess}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
         reinfRelatorios={reinfRelatorios}
@@ -10743,9 +10877,11 @@ export default function App() {
           onClose={() => setEditingClient(null)}
           onSave={saveClient}
           canEditFieldForClient={(fieldKey) => !editingClient.id || canEditClientField(currentUserFull, fieldKey)}
+          canManageContratosSociais={editingClient?.id ? canManageContratoSocial(editingClient) : false}
           onAnexoSuccess={handleAnexoSuccess}
           onAnexoRemove={handleAnexoRemove}
           onAnexoError={handleAnexoError}
+          onContratoSocialSuccess={handleContratoSocialSuccess}
         />
       ) : null}
       {editingUser ? (

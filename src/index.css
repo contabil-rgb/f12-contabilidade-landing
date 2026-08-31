@@ -1076,30 +1076,27 @@
   .base-clients-table .table-head-cell:nth-child(2),
   .base-clients-table .table-cell:nth-child(2),
   .base-clients-table .table-head-cell:nth-child(3),
-  .base-clients-table .table-cell:nth-child(3) {
+  .base-clients-table .table-cell:nth-child(3),
+  .base-clients-table .table-head-cell:nth-child(4),
+  .base-clients-table .table-cell:nth-child(4) {
     width: 13rem;
   }
 
-  .base-clients-table .table-head-cell:nth-child(4),
-  .base-clients-table .table-cell:nth-child(4) {
+  .base-clients-table .table-head-cell:nth-child(5),
+  .base-clients-table .table-cell:nth-child(5) {
     width: 8rem;
   }
 
-  .base-clients-table .table-head-cell:nth-child(5),
-  .base-clients-table .table-cell:nth-child(5),
   .base-clients-table .table-head-cell:nth-child(6),
-  .base-clients-table .table-cell:nth-child(6) {
-    width: 9rem;
-  }
-
+  .base-clients-table .table-cell:nth-child(6),
   .base-clients-table .table-head-cell:nth-child(7),
   .base-clients-table .table-cell:nth-child(7) {
-    width: 8rem;
+    width: 9rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(8),
   .base-clients-table .table-cell:nth-child(8) {
-    width: 7.5rem;
+    width: 8rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(9),
@@ -1109,6 +1106,11 @@
 
   .base-clients-table .table-head-cell:nth-child(10),
   .base-clients-table .table-cell:nth-child(10) {
+    width: 7.5rem;
+  }
+
+  .base-clients-table .table-head-cell:nth-child(11),
+  .base-clients-table .table-cell:nth-child(11) {
     width: 6.75rem;
   }
 
