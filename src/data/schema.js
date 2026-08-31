@@ -1,9 +1,12 @@
+export const CLIENT_STATUS_OPTIONS = ['Início de contrato', 'Ativo', 'Em distrato'];
+
 export const FIELD_DEFINITIONS = [
   { key: 'anexo_cartao_cnpj', label: 'Cartão CNPJ', group: 'Identificação', type: 'attachment' },
   { key: 'anexo_cartao_qsa', label: 'Cartão QSA', group: 'Identificação', type: 'attachment' },
   { key: 'cnpj', label: 'CNPJ', group: 'Identificação', type: 'cnpj', required: true },
   { key: 'razao_social', label: 'Razão Social', group: 'Identificação', type: 'text', required: true },
   { key: 'nome_identificacao', label: 'Nome / Identificação', group: 'Identificação', type: 'text', required: true },
+  { key: 'status', label: 'Status do cliente', group: 'Identificação', type: 'select', listKey: 'status_cliente' },
   { key: 'tipo_cliente', label: 'Tipo de Cliente', group: 'Identificação', type: 'select', listKey: 'tipo_cliente' },
   { key: 'regime_tributario', label: 'Regime Tributário', group: 'Identificação', type: 'select', listKey: 'regime_tributario' },
   { key: 'atividades', label: 'Atividades', group: 'Identificação', type: 'select', listKey: 'atividades' },
@@ -85,6 +88,7 @@ export const EXCEL_HEADER_MAP = {
   CNPJ: 'cnpj',
   'Razão Social': 'razao_social',
   Nome: 'nome_identificacao',
+  'Status do cliente': 'status',
   'Tipo de Cliente': 'tipo_cliente',
   'Regime Tributário': 'regime_tributario',
   Atividades: 'atividades',
@@ -147,6 +151,7 @@ export const LIST_HEADER_MAP = {
   Atividades: 'atividades',
   Responsável: 'responsavel',
   Revisor: 'revisor',
+  'Status do cliente': 'status',
   'Competência em dia?': 'competencia_em_dia',
   Situação: 'situacao',
   'Enviam Documentos': 'enviam_documentos',
@@ -173,6 +178,7 @@ export const DEFAULT_LISTS = {
   atividades: ['Comércio', 'Serviço', 'Comércio e Serviço', 'Indústria', 'Holding'],
   responsavel: [],
   revisor: [],
+  status_cliente: CLIENT_STATUS_OPTIONS,
   competencia_em_dia: ['Sim', 'Não'],
   situacao: ['Em dia', 'Atrasado', 'Crítico', 'Culpa da F12', 'Inativo'],
   enviam_documentos: ['Sim', 'Parcialmente', 'Não'],

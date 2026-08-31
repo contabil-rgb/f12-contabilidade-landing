@@ -54,6 +54,10 @@ create table if not exists public.clientes (
   status_retorno_cliente text,
   data_retorno_cliente date,
   status text default 'Ativo',
+  arquivado boolean not null default false,
+  arquivado_em timestamptz,
+  arquivado_por uuid,
+  arquivado_motivo text,
   criado_em timestamptz default now(),
   atualizado_em timestamptz default now()
 );
@@ -81,5 +85,6 @@ create index if not exists idx_clientes_envio_reinf on public.clientes(envio_rei
 create index if not exists idx_clientes_ecd on public.clientes(ecd);
 create index if not exists idx_clientes_ecf on public.clientes(ecf);
 create index if not exists idx_clientes_status on public.clientes(status);
+create index if not exists idx_clientes_arquivado on public.clientes(arquivado);
 
 create index if not exists idx_listagens_categoria on public.listagens(categoria);

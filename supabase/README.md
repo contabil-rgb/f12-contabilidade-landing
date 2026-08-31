@@ -8,6 +8,7 @@ Arquivos SQL ativos do projeto.
 - `supabase/seed.sql` -> categorias estaveis iniciais de listagens
 - `supabase/auth-rls.sql` -> Auth + RLS basico de `clientes`, `listagens` e `usuarios`
 - `supabase/clientes-hardening.sql` -> funcoes seguras para operacoes sensiveis em clientes
+- `supabase/clientes-arquivamento.sql` -> colunas e funcoes seguras para arquivar/restaurar clientes sem excluir dados
 - `supabase/listagens-gestao-responsaveis.sql` -> policies e carga inicial do catalogo de responsaveis
 - `supabase/usuarios-hardening.sql` -> reforco de seguranca para a gestao de usuarios
 - `supabase/usuarios-campos-gestao.sql` -> campos complementares da gestao de usuarios
@@ -27,18 +28,19 @@ Arquivos SQL ativos do projeto.
 2. `seed.sql`
 3. `auth-rls.sql`
 4. `clientes-hardening.sql`
-5. `listagens-gestao-responsaveis.sql`
-6. `usuarios-hardening.sql`
-7. `usuarios-campos-gestao.sql`
-8. `historico.sql`
-9. `anexos.sql`
-10. `storage.sql`
-11. `anexos-storage-hardening.sql`
-12. `obrigacoes-status.sql`
-13. `clientes-campos-operacionais.sql`
-14. `clientes-campos-acompanhamento.sql`
-15. `acompanhamento-operacional.sql`
-16. `risco-operacional.sql`
+5. `clientes-arquivamento.sql`
+6. `listagens-gestao-responsaveis.sql`
+7. `usuarios-hardening.sql`
+8. `usuarios-campos-gestao.sql`
+9. `historico.sql`
+10. `anexos.sql`
+11. `storage.sql`
+12. `anexos-storage-hardening.sql`
+13. `obrigacoes-status.sql`
+14. `clientes-campos-operacionais.sql`
+15. `clientes-campos-acompanhamento.sql`
+16. `acompanhamento-operacional.sql`
+17. `risco-operacional.sql`
 
 ## Scripts auxiliares para bases ja existentes
 

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { CLIENT_STATUS_OPTIONS } from '../data/schema.js';
 import { sanitizeResponsavelEcdByRegime } from '../lib/ecdRules.js';
 
 const DATE_FIELDS = new Set([
@@ -15,6 +16,7 @@ const DATE_FIELDS = new Set([
 ]);
 const TIMESTAMP_FIELDS = new Set([
   'atualizado_em',
+  'arquivado_em',
 ]);
 const CLIENTE_FIELDS = new Set([
   'cnpj',
@@ -65,6 +67,10 @@ const CLIENTE_FIELDS = new Set([
   'status_retorno_cliente',
   'data_retorno_cliente',
   'status',
+  'arquivado',
+  'arquivado_em',
+  'arquivado_por',
+  'arquivado_motivo',
   'atualizado_em',
 ]);
 
@@ -114,6 +120,12 @@ function fromIsoDate(value: unknown) {
   return `${iso[3]}/${iso[2]}/${iso[1]}`;
 }
 
+function normalizeClientStatus(value: unknown) {
+  const normalized = normalizeText(value);
+  if (!normalized || normalized === 'inativo') return 'Ativo';
+  return CLIENT_STATUS_OPTIONS.find((option) => normalizeText(option) === normalized) ?? 'Ativo';
+}
+
 function normalizePatch(data: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
@@ -128,6 +140,10 @@ function normalizePatch(data: Record<string, unknown>) {
     } else if (key === 'valor_lucro_acumulado') {
       const n = Number(String(value ?? '').replace(',', '.'));
       out[key] = Number.isFinite(n) ? n : null;
+    } else if (key === 'arquivado') {
+      out[key] = Boolean(value);
+    } else if (key === 'status') {
+      out[key] = normalizeClientStatus(value);
     } else if (value === '') {
       out[key] = null;
     } else {
@@ -149,12 +165,26 @@ function normalizeRow(row: Record<string, unknown>) {
   return out;
 }
 
-export async function listarClientes() {
-  const { data, error } = await supabase
+type ListarClientesOptions = {
+  incluirArquivados?: boolean;
+  apenasArquivados?: boolean;
+};
+
+export async function listarClientes({ incluirArquivados = false, apenasArquivados = false }: ListarClientesOptions = {}) {
+  let query = supabase
     .from('clientes')
     .select('*')
-    .or('status.is.null,status.eq.Ativo,status.neq.Inativo')
     .order('razao_social', { ascending: true });
+
+  if (apenasArquivados) {
+    query = query.or('arquivado.eq.true,status.eq.Inativo');
+  } else if (!incluirArquivados) {
+    query = query
+      .or('arquivado.is.null,arquivado.eq.false')
+      .or('status.is.null,status.eq.Ativo,status.neq.Inativo');
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Não foi possível carregar clientes do Supabase: ${error.message}`);
@@ -208,10 +238,12 @@ export async function listarClientesVinculadosResponsavel(valor: string, { inclu
 
   let query = supabase
     .from('clientes')
-    .select('id, cnpj, nome_identificacao, razao_social, responsavel, responsavel_ecd, status, situacao');
+    .select('id, cnpj, nome_identificacao, razao_social, responsavel, responsavel_ecd, status, situacao, arquivado');
 
   if (!incluirInativos) {
-    query = query.or('status.is.null,status.eq.Ativo,status.neq.Inativo');
+    query = query
+      .or('arquivado.is.null,arquivado.eq.false')
+      .or('status.is.null,status.eq.Ativo,status.neq.Inativo');
   }
 
   const { data, error } = await query;
@@ -269,6 +301,33 @@ export async function inativarCliente(id: string) {
 
   if (error) {
     throw new Error(`Não foi possível inativar cliente no Supabase: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
+}
+
+export async function arquivarCliente(id: string, motivo?: string) {
+  const { data, error } = await supabase.rpc('arquivar_cliente_portal', {
+    p_cliente_id: id,
+    p_motivo: motivo ?? null,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível arquivar cliente no Supabase: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return normalizeRow(row as Record<string, unknown>);
+}
+
+export async function restaurarCliente(id: string) {
+  const { data, error } = await supabase.rpc('restaurar_cliente_portal', {
+    p_cliente_id: id,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível restaurar cliente no Supabase: ${error.message}`);
   }
 
   const row = Array.isArray(data) ? data[0] : data;

@@ -9,6 +9,12 @@
 alter table public.clientes
   add column if not exists pendencias_observacoes text;
 
+alter table public.clientes
+  add column if not exists arquivado boolean not null default false,
+  add column if not exists arquivado_em timestamptz,
+  add column if not exists arquivado_por uuid,
+  add column if not exists arquivado_motivo text;
+
 create or replace function public.criar_cliente_portal(p_cliente jsonb)
 returns public.clientes
 language plpgsql
@@ -292,7 +298,11 @@ begin
 
   update public.clientes
   set
-    status = 'Inativo',
+    status = case when lower(coalesce(status, '')) = 'inativo' then 'Ativo' else coalesce(nullif(btrim(coalesce(status, '')), ''), 'Ativo') end,
+    arquivado = true,
+    arquivado_em = coalesce(arquivado_em, now()),
+    arquivado_por = auth.uid(),
+    arquivado_motivo = coalesce(arquivado_motivo, 'Inativado pelo portal'),
     atualizado_em = now()
   where id = p_cliente_id
   returning * into v_cliente;

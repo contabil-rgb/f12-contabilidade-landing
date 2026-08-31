@@ -82,6 +82,7 @@ export const HISTORY_FIELDS = [
   'status_retorno_cliente',
   'data_retorno_cliente',
   'pendencias_observacoes',
+  'status',
 ];
 
 export const SENSITIVE_CLIENT_FIELDS = [
@@ -104,6 +105,7 @@ export const STATUS_CLIENT_FIELDS = [
   'data_notificacao_cliente',
   'status_retorno_cliente',
   'data_retorno_cliente',
+  'status',
 ];
 
 export const OPERATIONAL_CLIENT_FIELDS = [
@@ -116,6 +118,7 @@ export const OPERATIONAL_CLIENT_FIELDS = [
   'regime_tributario',
   'atividades',
   'dificuldade',
+  'status',
   'distribuicao_lucros',
   'lucro',
   'primeira_competencia',

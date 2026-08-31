@@ -2,6 +2,7 @@ import { Component, Fragment, Suspense, lazy, useEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
+  Archive,
   ArrowDownUp,
   BarChart3,
   BellRing,
@@ -37,6 +38,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  CLIENT_STATUS_OPTIONS,
   createDefaultLists,
   DETAIL_SECTIONS,
   EDITABLE_FIELDS,
@@ -101,6 +103,7 @@ import {
   inativarCliente as inativarClienteSupabase,
   listarClientes as listarClientesSupabase,
   listarClientesVinculadosResponsavel,
+  restaurarCliente as restaurarClienteSupabase,
 } from './services/clientes.service';
 import {
   listarSociosClientes as listarSociosClientesSupabase,
@@ -198,6 +201,7 @@ const NAV_GROUPS = [
 
 const DEFAULT_FILTERS = {
   search: '',
+  arquivamento: 'todos',
   tipo_cliente: '',
   regime_tributario: '',
   atividades: '',
@@ -222,6 +226,14 @@ const FILTER_FIELDS = [
   'situacao',
   'competencia_em_dia',
   'dificuldade',
+];
+
+const CLIENT_STATUS_FILTER_OPTIONS = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'inicio_contrato', label: 'Início de contrato', status: 'Início de contrato' },
+  { value: 'ativos', label: 'Ativos', status: 'Ativo' },
+  { value: 'em_distrato', label: 'Em distrato', status: 'Em distrato' },
+  { value: 'arquivados', label: 'Arquivados' },
 ];
 
 const PRESET_ONLY_FILTER_FIELDS = [
@@ -264,6 +276,10 @@ const CLIENT_FIELD_DEFAULTS = {
   data_envio_ecf: '',
   responsavel_ecd: '',
   pendencias_observacoes: '',
+  arquivado: false,
+  arquivado_em: '',
+  arquivado_por: '',
+  arquivado_motivo: '',
   _socios: [],
 };
 
@@ -2980,8 +2996,44 @@ function matchesAlert(client, alertKey) {
   return getClientAlertSignals(client).some((alert) => alert.key === alertKey);
 }
 
+function isClientArchived(client) {
+  return client?.arquivado === true || normalizeText(client?.status) === 'inativo';
+}
+
+function normalizeClientStatus(value) {
+  const normalized = normalizeText(value);
+  if (!normalized || normalized === 'inativo') return 'Ativo';
+  return CLIENT_STATUS_OPTIONS.find((option) => normalizeText(option) === normalized) ?? 'Ativo';
+}
+
+function getActiveClients(clients) {
+  return (clients ?? []).filter((client) => !isClientArchived(client));
+}
+
+function getClientStatusFilterOption(value) {
+  return CLIENT_STATUS_FILTER_OPTIONS.find((option) => option.value === value) ?? CLIENT_STATUS_FILTER_OPTIONS[0];
+}
+
+function matchesClientStatusFilter(client, filterValue) {
+  const selectedFilter = filterValue || DEFAULT_FILTERS.arquivamento;
+  const archived = isClientArchived(client);
+
+  if (selectedFilter === 'arquivados') {
+    return archived;
+  }
+
+  if (archived) return false;
+
+  const statusToMatch = getClientStatusFilterOption(selectedFilter)?.status;
+  if (!statusToMatch) return true;
+
+  return normalizeText(normalizeClientStatus(client?.status)) === normalizeText(statusToMatch);
+}
+
 function filterClients(clients, filters) {
   return clients.filter((client) => {
+    if (!matchesClientStatusFilter(client, filters.arquivamento)) return false;
+
     const search = normalizeText(filters.search);
     if (search) {
       const searchable = normalizeText(
@@ -3083,6 +3135,9 @@ function getFilterOptionsForField(listagens, field, currentValue = '', clientsFo
 }
 
 function getOptions(listagens, field) {
+  if (field.key === 'status') {
+    return CLIENT_STATUS_OPTIONS;
+  }
   if (field.type === 'yesno') return YES_NO_OPTIONS;
   if (field.key === 'envio_reinf' || field.key === 'distribuicao_lucros' || field.key === 'ecf') {
     return YES_NO_OPTIONS;
@@ -3780,6 +3835,13 @@ function SearchAndFilters({
 
   const activeFilterItems = [
     filters.search ? { key: 'search', label: 'Busca', value: filters.search } : null,
+    filters.arquivamento && filters.arquivamento !== DEFAULT_FILTERS.arquivamento
+      ? {
+        key: 'arquivamento',
+        label: 'Status do cliente',
+        value: getClientStatusFilterOption(filters.arquivamento)?.label || filters.arquivamento,
+      }
+      : null,
     filters.alerta
       ? {
         key: 'alerta',
@@ -3895,6 +3957,15 @@ function SearchAndFilters({
 
         <div className="mt-3 grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           <DropdownFilterSelect
+            label="Status do cliente"
+            value={filters.arquivamento}
+            options={CLIENT_STATUS_FILTER_OPTIONS}
+            onChange={(value) => updateFilter({ arquivamento: value || DEFAULT_FILTERS.arquivamento })}
+            includeBlank={false}
+            labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
+            buttonClassName="select-shell mt-2 normal-case"
+          />
+          <DropdownFilterSelect
             label="Alertas e acompanhamento"
             value={filters.alerta}
             options={alertOptions}
@@ -3931,8 +4002,10 @@ function ClientsTable({
   onView,
   onEdit,
   onInactivate,
+  onRestore,
   canEditRow,
   canInactivateRow,
+  canRestoreRow,
   renderClientCell,
   selectedClientIds = [],
   onToggleSelect,
@@ -4072,14 +4145,29 @@ function ClientsTable({
                     {canInactivateRow(client) ? (
                       <button
                         type="button"
-                        aria-label="Inativar cliente"
+                        aria-label="Arquivar cliente"
+                        title="Arquivar cliente"
                         onClick={(event) => {
                           event.stopPropagation();
                           onInactivate(client);
                         }}
-                        className="table-icon-action table-icon-action-danger"
+                        className="table-icon-action"
                       >
-                        <Trash2 size={16} aria-hidden="true" />
+                        <Archive size={16} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                    {canRestoreRow?.(client) ? (
+                      <button
+                        type="button"
+                        aria-label="Restaurar cliente"
+                        title="Restaurar cliente"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRestore?.(client);
+                        }}
+                        className="table-icon-action"
+                      >
+                        <RefreshCcw size={16} aria-hidden="true" />
                       </button>
                     ) : null}
                   </div>
@@ -4173,8 +4261,10 @@ function BaseClientesPage(props) {
         onView={props.onView}
         onEdit={props.onEdit}
         onInactivate={props.onInactivate}
+        onRestore={props.onRestore}
         canEditRow={props.canEditRow}
         canInactivateRow={props.canInactivateRow}
+        canRestoreRow={props.canRestoreRow}
         renderClientCell={props.renderClientCell}
         selectedClientIds={selectedClientIds}
         onToggleSelect={toggleClientSelection}
@@ -7839,6 +7929,7 @@ function ClientModal({ client, listagens, onClose, onSave, canEditFieldForClient
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
     ...client,
+    status: normalizeClientStatus(client?.status),
     _socios: normalizeSociosClienteInput(client?._socios ?? []),
     _sociosDirty: false,
     cnpj: client?.cnpj ? formatCnpj(client.cnpj) : '',
@@ -8242,6 +8333,7 @@ function FormField({
 
   if (field.type === 'select' || field.type === 'yesno') {
     const options = uniqueValues([...(getOptions(listagens, field) ?? []), value]);
+    const isClientStatusField = field.key === 'status';
     return (
       <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
         {label}
@@ -8250,8 +8342,8 @@ function FormField({
           value={value}
           options={options}
           onChange={onChange}
-          includeBlank
-          emptyLabel="Não informado"
+          includeBlank={!isClientStatusField}
+          emptyLabel={isClientStatusField ? undefined : 'Não informado'}
           disabled={computedDisabled}
           disabledReason={computedDisabledReason}
           labelClassName="block"
@@ -8292,6 +8384,21 @@ function FormField({
 }
 
 function Toast({ toast, onClose }) {
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      onCloseRef.current?.();
+    }, 6000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
   if (!toast) return null;
   return (
     <div className="fixed bottom-5 right-5 z-[60] max-w-md">
@@ -8488,10 +8595,17 @@ export default function App() {
     return allClients.filter((client) => canViewClient(currentUserFull, client));
   }, [clients, currentUserFull]);
 
+  const activeClients = useMemo(() => getActiveClients(enrichedClients), [enrichedClients]);
+
   const filteredClients = useMemo(() => {
     const filtered = filterClients(enrichedClients, filters);
     return sortByLocale(filtered, sort.key, sort.direction);
   }, [enrichedClients, filters, sort]);
+
+  const filteredActiveClients = useMemo(() => {
+    const filtered = filterClients(activeClients, { ...filters, arquivamento: 'todos' });
+    return sortByLocale(filtered, sort.key, sort.direction);
+  }, [activeClients, filters, sort]);
 
   const selectedClient = useMemo(
     () => enrichedClients.find((client) => client.id === selectedClientId),
@@ -8909,7 +9023,7 @@ export default function App() {
       const shouldLoadReinfRelatorios = can(currentUserFull, PERMISSIONS.REPORTS_VIEW);
 
       const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult, reinfRelatoriosResult] = await Promise.all([
-        listarClientesSupabase(),
+        listarClientesSupabase({ incluirArquivados: true }),
         listarListagensAgrupadas(),
         listarSociosClientesSupabase()
           .then((rows) => ({ ok: true, rows }))
@@ -9302,6 +9416,7 @@ export default function App() {
       nextClient = { ...nextClient, criado_em: mutationTimestamp };
     }
     nextClient = sanitizeResponsavelEcdByRegime(nextClient);
+    nextClient.status = normalizeClientStatus(nextClient.status);
 
     if (index >= 0) {
       let mergedClient = { ...previous, ...nextClient };
@@ -9780,10 +9895,19 @@ export default function App() {
       try {
         await inativarClienteSupabase(client.id);
         setSupabaseStatus({ connected: true, message: 'Cliente inativado no Supabase' });
+        const archivedAt = new Date().toISOString();
+        const retainedStatus = normalizeClientStatus(previousForHistory?.status ?? client.status);
         const historicoResult = await registrarHistoricoPersistente({
           clienteId: client.id,
           valoresAntigos: previousForHistory ?? client,
-          valoresNovos: { ...(previousForHistory ?? client), status: 'Inativo', situacao: 'Inativo' },
+          valoresNovos: {
+            ...(previousForHistory ?? client),
+            status: retainedStatus,
+            arquivado: true,
+            arquivado_em: archivedAt,
+            arquivado_por: currentUserFull?.auth_user_id ?? currentUserFull?.id ?? '',
+            arquivado_motivo: 'Inativado pelo portal',
+          },
           tipoAcao: 'inativacao',
           origem: 'Base de Clientes',
           notifyOnError: true,
@@ -9800,14 +9924,98 @@ export default function App() {
         return;
       }
     }
-    const nextClient = { ...client, situacao: 'Inativo', status: 'Inativo', atualizado_em: new Date().toISOString() };
-    updateClientsPersisted((current) => current.filter((item) => item.id !== client.id));
+    const retainedStatus = normalizeClientStatus(client.status);
+    const nextClient = {
+      ...client,
+      status: retainedStatus,
+      arquivado: true,
+      arquivado_em: new Date().toISOString(),
+      arquivado_por: currentUserFull?.auth_user_id ?? currentUserFull?.id ?? '',
+      arquivado_motivo: 'Inativado pelo portal',
+      atualizado_em: new Date().toISOString(),
+    };
+    updateClientsPersisted((current) => current.map((item) => (item.id === client.id ? nextClient : item)));
     setToast({
       title: 'Cliente inativado',
       message: client.nome_identificacao || client.razao_social,
     });
     if (isUuid(client.id)) {
       void resyncSupabaseAfterMutation('inativação de cliente');
+    }
+  }
+
+  async function restoreClient(client) {
+    if (!can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode restaurar clientes.' });
+      return;
+    }
+    if (!ensureSupabaseWriteReady('restaurar o cliente')) return;
+
+    const clientName = client.nome_identificacao || client.razao_social || 'este cliente';
+    if (!confirm(`Restaurar ${clientName} para a carteira ativa?`)) return;
+
+    let previousForHistory = client;
+    let restoredFromDb = null;
+    const restoredAt = new Date().toISOString();
+
+    if (isUuid(client.id)) {
+      try {
+        const previousFromDb = await buscarClientePorIdSupabase(client.id);
+        if (previousFromDb) previousForHistory = previousFromDb;
+      } catch (error) {
+        console.warn('[historico] Falha ao buscar cliente atual para restauração:', error);
+      }
+
+      try {
+        restoredFromDb = await restaurarClienteSupabase(client.id);
+        setSupabaseStatus({ connected: true, message: 'Cliente restaurado no Supabase' });
+      } catch (error) {
+        setSupabaseStatus({ connected: false, message: 'Falha ao restaurar no Supabase' });
+        setToast({
+          title: 'Falha ao restaurar no Supabase',
+          message: `${error.message}. O cliente arquivado foi mantido como está para evitar divergência.`,
+        });
+        return;
+      }
+    }
+
+    const nextClient = {
+      ...(previousForHistory ?? client),
+      ...(restoredFromDb ?? {}),
+      arquivado: false,
+      arquivado_em: '',
+      arquivado_por: '',
+      arquivado_motivo: '',
+      atualizado_em: restoredFromDb?.atualizado_em ?? restoredAt,
+    };
+
+    nextClient.status = normalizeClientStatus(nextClient.status);
+
+    if (normalizeText(nextClient.situacao) === 'inativo') {
+      nextClient.situacao = '';
+    }
+
+    if (isUuid(client.id)) {
+      const historicoResult = await registrarHistoricoPersistente({
+        clienteId: client.id,
+        valoresAntigos: previousForHistory ?? client,
+        valoresNovos: nextClient,
+        tipoAcao: 'restauracao',
+        origem: 'Base de Clientes',
+        notifyOnError: true,
+      });
+      if (historicoResult?.ok) {
+        await recarregarHistoricoClienteAtivo(client.id);
+      }
+    }
+
+    updateClientsPersisted((current) => current.map((item) => (item.id === client.id ? nextClient : item)));
+    setToast({
+      title: 'Cliente restaurado',
+      message: clientName,
+    });
+    if (isUuid(client.id)) {
+      void resyncSupabaseAfterMutation('restauração de cliente');
     }
   }
 
@@ -10279,7 +10487,7 @@ export default function App() {
     dashboard: can(currentUserFull, PERMISSIONS.DASHBOARDS_VIEW)
       ? (
         <DashboardPage
-          clients={enrichedClients}
+          clients={activeClients}
           onPreset={applyPreset}
           onNavigate={(nextPage, options = {}) => {
             if (options.clearFilters) {
@@ -10314,12 +10522,14 @@ export default function App() {
           setEditingClient(client);
         }}
         onInactivate={inactivateClient}
+        onRestore={restoreClient}
         canCreateClient={canCreateClient}
         canCreateClientEnabled={canCreateClient && canWritePortalData}
         createDisabledReason={writeBlockedReason}
         allClients={enrichedClients}
         canEditRow={(client) => canWritePortalData && canEditClient(currentUserFull, client)}
-        canInactivateRow={(client) => canWritePortalData && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
+        canInactivateRow={(client) => canWritePortalData && !isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
+        canRestoreRow={(client) => canWritePortalData && isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         canBatchUpdateResponsavel={(client) => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'responsavel')}
         responsavelOptions={getResponsaveisAtivosCatalogo(responsavelCatalogo)}
         onBatchUpdateResponsavel={batchUpdateResponsavel}
@@ -10366,7 +10576,7 @@ export default function App() {
     ),
     reinf: (
       <ReinfPage
-        clients={enrichedClients}
+        clients={activeClients}
         responsavelOptions={responsavelCatalogo}
         reinfRelatorios={reinfRelatorios}
         onView={openClient}
@@ -10384,7 +10594,7 @@ export default function App() {
     ),
     ecd: (
       <EcdEcfPage
-        clients={enrichedClients}
+        clients={activeClients}
         onView={openClient}
         canManageAttachments={canManageAttachment}
         canEditDeliveryDate={(client, fieldKey = 'data_entrega_ecd') => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
@@ -10405,8 +10615,8 @@ export default function App() {
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)
       ? (
         <ReportsPage
-          clients={enrichedClients}
-          filteredClients={filteredClients}
+          clients={activeClients}
+          filteredClients={filteredActiveClients}
           reinfRelatorios={reinfRelatorios}
           onExportXlsx={exportXlsx}
           onExportCsv={exportCsv}
@@ -10491,7 +10701,7 @@ export default function App() {
           importInputRef.current?.click();
         }}
         metadata={metadata}
-        totalClientes={enrichedClients.length}
+        totalClientes={activeClients.length}
         currentUser={currentUser}
         onLogout={() => logout()}
         canImport={can(currentUserFull, PERMISSIONS.IMPORT_EXCEL)}
