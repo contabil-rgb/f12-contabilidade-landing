@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Download, Eye, FileText, Upload } from 'lucide-react';
+import { ChevronDown, Download, Eye, FileText, Trash2, Upload } from 'lucide-react';
 import {
   gerarUrlContratoSocial,
   listarContratosSociaisCliente,
+  removerContratoSocialCliente,
   sortContratosSociaisPorVersao,
   uploadContratoSocialCliente,
 } from '../../services/contratos-sociais.service';
@@ -14,6 +15,7 @@ type Props = {
   disabled?: boolean;
   compact?: boolean;
   onSuccess?: (contrato: ContratoSocialCliente) => void | Promise<void>;
+  onRemove?: (contrato: ContratoSocialCliente, contratoAtual?: ContratoSocialCliente | null) => void | Promise<void>;
   onError?: (message: string) => void;
 };
 
@@ -31,15 +33,22 @@ function contratoLabel(contrato: ContratoSocialCliente) {
 function ContratoSocialActions({
   contrato,
   disabled,
+  canRemove = false,
+  onRemove,
   onError,
 }: {
   contrato: ContratoSocialCliente;
   disabled?: boolean;
+  canRemove?: boolean;
+  onRemove?: (contrato: ContratoSocialCliente) => void | Promise<void>;
   onError?: (message: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const neutralButtonClass =
     'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-100 dark:hover:border-blue-400 dark:hover:text-blue-200';
+  const dangerButtonClass =
+    'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10';
 
   async function openContrato() {
     try {
@@ -73,6 +82,24 @@ function ContratoSocialActions({
         <Download size={14} aria-hidden="true" />
         Baixar
       </button>
+      {canRemove ? (
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setRemoving(true);
+              await onRemove?.(contrato);
+            } finally {
+              setRemoving(false);
+            }
+          }}
+          disabled={disabled || removing}
+          className={dangerButtonClass}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          Remover
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -82,6 +109,7 @@ export function ContratosSociaisClienteSection({
   disabled = false,
   compact = false,
   onSuccess,
+  onRemove,
   onError,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -89,6 +117,7 @@ export function ContratosSociaisClienteSection({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [openingContratoId, setOpeningContratoId] = useState<string | null>(null);
+  const [removingContratoId, setRemovingContratoId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [localWarning, setLocalWarning] = useState('');
   const canUpload = Boolean(String(cliente?.id ?? cliente?.cnpj ?? '').trim()) && !disabled;
@@ -98,6 +127,8 @@ export function ContratosSociaisClienteSection({
   const hasContrato = Boolean(contratoAtual?.id || contratoAtual?.caminho_arquivo);
   const neutralButtonClass =
     'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-100 dark:hover:border-blue-400 dark:hover:text-blue-200';
+  const dangerButtonClass =
+    'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10';
 
   useEffect(() => {
     let active = true;
@@ -155,6 +186,26 @@ export function ContratosSociaisClienteSection({
       onError?.(error instanceof Error ? error.message : 'Não foi possível abrir o contrato social.');
     } finally {
       setOpeningContratoId(null);
+    }
+  }
+
+  async function handleRemoveContrato(contrato: ContratoSocialCliente) {
+    if (!canUpload) return;
+    if (!window.confirm(`Remover ${contratoLabel(contrato)}?`)) return;
+
+    try {
+      setRemovingContratoId(contrato.id);
+      const contratoRemovido = await removerContratoSocialCliente(contrato);
+      const contratosAtualizados = sortContratosSociaisPorVersao(
+        contratosOrdenados.filter((item) => item.id !== contratoRemovido.id),
+      );
+      setContratos(contratosAtualizados);
+      setHistoryOpen(false);
+      await onRemove?.(contratoRemovido, contratosAtualizados[0] ?? null);
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : 'Não foi possível remover contrato social.');
+    } finally {
+      setRemovingContratoId(null);
     }
   }
 
@@ -257,6 +308,16 @@ export function ContratosSociaisClienteSection({
               <Download size={14} aria-hidden="true" />
               Baixar
             </button>
+            <button
+              type="button"
+              onClick={() => handleRemoveContrato(contratoAtual)}
+              disabled={!canUpload || removingContratoId === contratoAtual.id}
+              title={canUpload ? undefined : 'Atualize ou restaure o cliente antes de remover contrato social.'}
+              className={dangerButtonClass}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              Remover
+            </button>
           </div>
         ) : null}
 
@@ -285,7 +346,12 @@ export function ContratosSociaisClienteSection({
                     {formatContratoDate(contrato.criado_em)}
                   </p>
                 </div>
-                <ContratoSocialActions contrato={contrato} onError={onError} />
+                <ContratoSocialActions
+                  contrato={contrato}
+                  canRemove={canUpload}
+                  onRemove={handleRemoveContrato}
+                  onError={onError}
+                />
               </div>
             ))}
           </div>
@@ -315,6 +381,7 @@ type TableCellProps = {
   contrato?: ContratoSocialCliente | null;
   disabled?: boolean;
   onSuccess?: (contrato: ContratoSocialCliente) => void | Promise<void>;
+  onRemove?: (contrato: ContratoSocialCliente, contratoAtual?: ContratoSocialCliente | null) => void | Promise<void>;
   onError?: (message: string) => void;
 };
 
@@ -323,6 +390,7 @@ export function ContratoSocialTableCell({
   contrato,
   disabled = false,
   onSuccess,
+  onRemove,
   onError,
 }: TableCellProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -332,6 +400,8 @@ export function ContratoSocialTableCell({
   const hasContrato = Boolean(contratoAtual?.id || contratoAtual?.caminho_arquivo);
   const neutralButtonClass =
     'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-100 dark:hover:border-blue-400 dark:hover:text-blue-200';
+  const dangerButtonClass =
+    'inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10';
 
   useEffect(() => {
     setContratoAtual(contrato ?? null);
@@ -363,6 +433,24 @@ export function ContratoSocialTableCell({
       await onSuccess?.(novoContrato);
     } catch (error) {
       onError?.(error instanceof Error ? error.message : 'Erro ao anexar contrato social.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removerContrato() {
+    if (!contratoAtual || !canUpload) return;
+    if (!window.confirm(`Remover ${contratoLabel(contratoAtual)}?`)) return;
+
+    try {
+      setLoading(true);
+      const contratoRemovido = await removerContratoSocialCliente(contratoAtual);
+      const contratosAtualizados = await listarContratosSociaisCliente(cliente);
+      const proximoContratoAtual = contratosAtualizados[0] ?? null;
+      setContratoAtual(proximoContratoAtual);
+      await onRemove?.(contratoRemovido, proximoContratoAtual);
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : 'Não foi possível remover contrato social.');
     } finally {
       setLoading(false);
     }
@@ -414,6 +502,16 @@ export function ContratoSocialTableCell({
             >
               <Download size={14} aria-hidden="true" />
               Baixar
+            </button>
+            <button
+              type="button"
+              onClick={removerContrato}
+              disabled={!canUpload || loading}
+              title={canUpload ? undefined : 'Atualize ou restaure o cliente antes de remover contrato social.'}
+              className={dangerButtonClass}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              Remover
             </button>
           </>
         ) : (

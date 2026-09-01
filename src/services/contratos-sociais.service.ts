@@ -250,6 +250,31 @@ export async function uploadContratoSocialCliente(params: {
   }
 }
 
+export async function removerContratoSocialCliente(contrato: ContratoSocialCliente) {
+  const contratoId = String(contrato?.id ?? '').trim();
+  if (!isUuid(contratoId)) {
+    throw new Error('Contrato social inválido para remoção.');
+  }
+
+  const { data, error } = await supabase.rpc('remover_contrato_social_cliente_portal', {
+    p_contrato_id: contratoId,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível remover contrato social: ${error.message}`);
+  }
+
+  const contratoRemovido = normalizeContratoSocialRow(data as Record<string, unknown>);
+
+  try {
+    await removerArquivoStorage(contratoRemovido.caminho_arquivo || contrato.caminho_arquivo);
+  } catch (cleanupError) {
+    console.warn('[contratos-sociais] Falha ao remover arquivo do Storage após limpar vínculo.', cleanupError);
+  }
+
+  return contratoRemovido;
+}
+
 export async function gerarUrlContratoSocial(caminhoArquivo: string, expires = 600) {
   if (!caminhoArquivo) {
     throw new Error('Caminho do contrato social não informado.');

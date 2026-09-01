@@ -4393,6 +4393,7 @@ function DetailPage({
   onAnexoRemove,
   onAnexoError,
   onContratoSocialSuccess,
+  onContratoSocialRemove,
   historicoRows = [],
   historicoLoading = false,
   reinfRelatorios = [],
@@ -4489,6 +4490,7 @@ function DetailPage({
         cliente={client}
         disabled={!canManageContratosSociais}
         onSuccess={(contrato) => onContratoSocialSuccess?.(contrato?.cliente_id || client.id, contrato, client.id)}
+        onRemove={(contrato, contratoAtual) => onContratoSocialRemove?.(contrato?.cliente_id || client.id, contrato, contratoAtual, client.id)}
         onError={onAnexoError}
       />
     </div>
@@ -7994,6 +7996,7 @@ function ClientModal({
   onAnexoRemove,
   onAnexoError,
   onContratoSocialSuccess,
+  onContratoSocialRemove,
 }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
@@ -8140,6 +8143,7 @@ function ClientModal({
                         compact
                         disabled={!canManageContratosSociais}
                         onSuccess={(contrato) => onContratoSocialSuccess?.(contrato?.cliente_id || form.id, contrato, form.id)}
+                        onRemove={(contrato, contratoAtual) => onContratoSocialRemove?.(contrato?.cliente_id || form.id, contrato, contratoAtual, form.id)}
                         onError={onAnexoError}
                       />
                     ) : null}
@@ -9915,6 +9919,46 @@ export default function App() {
     }
   }
 
+  async function handleContratoSocialRemove(clientId, contratoRemovido, contratoAtual = null, fallbackClientId = '') {
+    if (isUuid(clientId)) {
+      updateClientsPersisted((current) =>
+        current.map((client) =>
+          client.id === clientId || client.id === fallbackClientId
+            ? clearPersistedObrigacoes({
+              ...client,
+              _contrato_social_atual: contratoAtual ?? null,
+              atualizado_em: new Date().toISOString(),
+            })
+            : client,
+        ),
+      );
+    }
+
+    setToast({
+      title: 'Contrato social removido',
+      message: contratoRemovido?.nome_arquivo || 'Versão removida com sucesso.',
+    });
+
+    if (isUuid(clientId) && currentUserFull?.id) {
+      try {
+        await registrarEventoHistoricoSupabase({
+          clienteId,
+          usuarioLogado: currentUserFull,
+          campoAlterado: 'contrato_social',
+          valorAnterior: contratoRemovido?.nome_arquivo || null,
+          valorNovo: contratoAtual?.nome_arquivo || null,
+          tipoAcao: 'contrato_social_removido',
+          origem: page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes',
+        });
+        if (selectedClient?.id === clientId) {
+          await carregarHistoricoCliente(clientId);
+        }
+      } catch (error) {
+        console.warn('[historico] Falha ao registrar remoção de contrato social no histórico:', error);
+      }
+    }
+  }
+
   async function salvarRelatorioReinf(payload) {
     if (!ensureSupabaseWriteReady('salvar o relatório de distribuição de lucro')) return false;
     try {
@@ -10689,6 +10733,7 @@ export default function App() {
                 contrato={client._contrato_social_atual}
                 disabled={!canManageContratoSocial(client)}
                 onSuccess={(contrato) => handleContratoSocialSuccess(contrato?.cliente_id || client.id, contrato, client.id)}
+                onRemove={(contrato, contratoAtual) => handleContratoSocialRemove(contrato?.cliente_id || client.id, contrato, contratoAtual, client.id)}
                 onError={handleAnexoError}
               />
             );
@@ -10730,6 +10775,7 @@ export default function App() {
         onAnexoRemove={handleAnexoRemove}
         onAnexoError={handleAnexoError}
         onContratoSocialSuccess={handleContratoSocialSuccess}
+        onContratoSocialRemove={handleContratoSocialRemove}
         historicoRows={historicoCliente}
         historicoLoading={historicoClienteLoading}
         reinfRelatorios={reinfRelatorios}
@@ -10892,6 +10938,7 @@ export default function App() {
           onAnexoRemove={handleAnexoRemove}
           onAnexoError={handleAnexoError}
           onContratoSocialSuccess={handleContratoSocialSuccess}
+          onContratoSocialRemove={handleContratoSocialRemove}
         />
       ) : null}
       {editingUser ? (
