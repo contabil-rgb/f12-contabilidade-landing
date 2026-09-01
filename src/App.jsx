@@ -1903,7 +1903,7 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
   retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Média', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
 };
 
-function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onRemove, onError }) {
+function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, writeDisabled, writeDisabledReason, onSuccess, onRemove, onError }) {
   const anexo = fieldValueToAnexo(client[fieldKey], tipoAnexo, client);
 
   return (
@@ -1914,6 +1914,8 @@ function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, onSuccess, onRe
         tipoAnexo={tipoAnexo}
         anexo={anexo}
         disabled={disabled}
+        writeDisabled={writeDisabled}
+        writeDisabledReason={writeDisabledReason}
         onSuccess={(novoAnexo) => onSuccess?.(client.id, tipoAnexo, novoAnexo)}
         onRemove={(anexoRemovido) => onRemove?.(client.id, tipoAnexo, anexoRemovido ?? anexo)}
         onError={onError}
@@ -4476,6 +4478,8 @@ function DetailPage({
       <AnexosClienteSection
         cliente={client}
         disabled={!canManageAttachments}
+        writeDisabled={isClientArchived(client)}
+        writeDisabledReason="Restaure o cliente antes de anexar, substituir ou remover arquivos."
         onSuccess={(tipoAnexo, anexo) => onAnexoSuccess?.(client.id, tipoAnexo, anexo)}
         onRemove={(tipoAnexo, anexo) => onAnexoRemove?.(client.id, tipoAnexo, anexo)}
         onError={onAnexoError}
@@ -8337,6 +8341,8 @@ function FormField({
     const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[field.key];
     const anexo = tipoAnexo ? fieldValueToAnexo(value, tipoAnexo, cliente) : null;
     const canUpload = Boolean(tipoAnexo && isUuid(cliente?.id));
+    const attachmentWriteDisabled = isClientArchived(cliente);
+    const attachmentWriteDisabledReason = 'Restaure o cliente antes de anexar, substituir ou remover arquivos.';
 
     return (
       <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
@@ -8351,6 +8357,8 @@ function FormField({
                   tipoAnexo={tipoAnexo}
                   anexo={anexo}
                   disabled={disabled}
+                  writeDisabled={attachmentWriteDisabled}
+                  writeDisabledReason={attachmentWriteDisabledReason}
                   onSuccess={(novoAnexo) => {
                     onChange(anexoToFieldValue(novoAnexo));
                     onAttachmentSuccess?.(tipoAnexo, novoAnexo);
@@ -10693,6 +10701,8 @@ export default function App() {
               fieldKey={fieldKey}
               tipoAnexo={tipoAnexo}
               disabled={!canManageAttachment(client, fieldKey)}
+              writeDisabled={isClientArchived(client)}
+              writeDisabledReason="Restaure o cliente antes de anexar, substituir ou remover arquivos."
               onSuccess={handleAnexoSuccess}
               onRemove={handleAnexoRemove}
               onError={handleAnexoError}

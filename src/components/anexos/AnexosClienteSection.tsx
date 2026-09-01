@@ -14,6 +14,8 @@ type Props = {
   cliente: ClienteAnexoRef;
   anexosIniciais?: AnexoCliente[];
   disabled?: boolean;
+  writeDisabled?: boolean;
+  writeDisabledReason?: string;
   onSuccess?: (tipoAnexo: TipoAnexo, anexo: AnexoCliente) => void;
   onRemove?: (tipoAnexo: TipoAnexo, anexo: AnexoCliente | null) => void | Promise<void>;
   onError?: (message: string) => void;
@@ -115,6 +117,8 @@ export function AnexosClienteSection({
   cliente,
   anexosIniciais,
   disabled = false,
+  writeDisabled = false,
+  writeDisabledReason,
   onSuccess,
   onRemove,
   onError,
@@ -231,6 +235,8 @@ export function AnexosClienteSection({
                   tipoAnexo={tipo}
                   anexo={anexo}
                   disabled={disabled}
+                  writeDisabled={writeDisabled}
+                  writeDisabledReason={writeDisabledReason}
                   onSuccess={(novoAnexo) => handleSuccess(tipo, novoAnexo)}
                   onRemove={(anexoRemovido) => handleRemove(tipo, anexoRemovido ?? anexo ?? null)}
                   onError={onError}

@@ -131,6 +131,7 @@ export function ContratosSociaisClienteSection({
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (!canUpload) return;
 
     try {
       setUploading(true);
@@ -353,6 +354,7 @@ export function ContratoSocialTableCell({
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (!canUpload) return;
 
     try {
       setLoading(true);

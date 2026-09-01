@@ -14,6 +14,8 @@ type Props = {
   tipoAnexo: TipoAnexo;
   anexo?: AnexoCliente | null;
   disabled?: boolean;
+  writeDisabled?: boolean;
+  writeDisabledReason?: string;
   labelAnexar?: string;
   labelSubstituir?: string;
   onSuccess?: (anexo: AnexoCliente) => void;
@@ -26,6 +28,8 @@ export function UploadAnexoButton({
   tipoAnexo,
   anexo,
   disabled = false,
+  writeDisabled = false,
+  writeDisabledReason,
   labelAnexar = 'Anexar',
   labelSubstituir = 'Substituir',
   onSuccess,
@@ -40,6 +44,7 @@ export function UploadAnexoButton({
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (disabled || writeDisabled) return;
 
     try {
       setLoading(true);
@@ -82,6 +87,7 @@ export function UploadAnexoButton({
 
   async function remover() {
     if (!anexo || !hasAnexo) return;
+    if (disabled || writeDisabled) return;
 
     const nomeArquivo = anexo.nome_arquivo || 'este anexo';
     if (!window.confirm(`Remover ${nomeArquivo}?`)) return;
@@ -110,6 +116,8 @@ export function UploadAnexoButton({
       maxWidth: '100%',
     }
     : undefined;
+  const uploadDisabled = disabled || writeDisabled || loading;
+  const uploadTitle = writeDisabled ? writeDisabledReason : undefined;
 
   return (
     <div
@@ -130,7 +138,8 @@ export function UploadAnexoButton({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            disabled={disabled || loading}
+            disabled={uploadDisabled}
+            title={uploadTitle}
             className={neutralButtonClass}
           >
             <Upload size={14} aria-hidden="true" />
@@ -148,7 +157,8 @@ export function UploadAnexoButton({
           <button
             type="button"
             onClick={remover}
-            disabled={disabled || loading}
+            disabled={uploadDisabled}
+            title={uploadTitle}
             className={dangerButtonClass}
           >
             <Trash2 size={14} aria-hidden="true" />
@@ -159,7 +169,8 @@ export function UploadAnexoButton({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={disabled || loading}
+          disabled={uploadDisabled}
+          title={uploadTitle}
           className={neutralButtonClass}
         >
           <Upload size={14} aria-hidden="true" />
@@ -171,7 +182,7 @@ export function UploadAnexoButton({
         type="file"
         accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
         className="hidden"
-        disabled={disabled || loading}
+        disabled={uploadDisabled}
         onChange={handleFileChange}
       />
     </div>
