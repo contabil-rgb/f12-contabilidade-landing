@@ -20,8 +20,14 @@ export default function UsersPage({
   onUploadResponsavelSignature,
   onRemoveResponsavelSignature,
   getResponsavelSignatureUrl,
+  responsavelEcfOptions = [],
+  responsavelEcfBusy = false,
+  onCreateResponsavelEcf,
+  onToggleResponsavelEcf,
+  onDeleteResponsavelEcf,
 }) {
   const [novoResponsavel, setNovoResponsavel] = useState('');
+  const [novoResponsavelEcf, setNovoResponsavelEcf] = useState('');
   const [signatureTarget, setSignatureTarget] = useState(null);
   const [signatureBusyId, setSignatureBusyId] = useState('');
   const signatureInputRef = useRef(null);
@@ -31,6 +37,11 @@ export default function UsersPage({
     [responsavelOptions],
   );
   const totalResponsaveisAtivos = responsaveisOrdenados.filter((item) => item.ativo !== false).length;
+  const responsaveisEcfOrdenados = useMemo(
+    () => [...responsavelEcfOptions].sort((a, b) => String(a.valor ?? '').localeCompare(String(b.valor ?? ''), 'pt-BR')),
+    [responsavelEcfOptions],
+  );
+  const totalResponsaveisEcfAtivos = responsaveisEcfOrdenados.filter((item) => item.ativo !== false).length;
 
   async function handleCreateResponsavel(event) {
     event.preventDefault();
@@ -38,6 +49,15 @@ export default function UsersPage({
     const created = await onCreateResponsavel(novoResponsavel);
     if (created !== false) {
       setNovoResponsavel('');
+    }
+  }
+
+  async function handleCreateResponsavelEcf(event) {
+    event.preventDefault();
+    if (!onCreateResponsavelEcf) return;
+    const created = await onCreateResponsavelEcf(novoResponsavelEcf);
+    if (created !== false) {
+      setNovoResponsavelEcf('');
     }
   }
 
@@ -258,6 +278,79 @@ export default function UsersPage({
           className="hidden"
           onChange={handleSignatureFileChange}
         />
+      </SurfacePanel>
+
+      <SurfacePanel
+        title="Responsáveis pela ECF"
+        description="Cadastre responsáveis internos ou externos que aparecem no dropdown Responsável pela ECF."
+        right={<span className="pill-shell">{totalResponsaveisEcfAtivos} ativo(s) de {responsavelEcfOptions.length}</span>}
+      >
+        <form className="mb-4 flex flex-col gap-3 md:flex-row" onSubmit={handleCreateResponsavelEcf}>
+          <input
+            type="text"
+            value={novoResponsavelEcf}
+            onChange={(event) => setNovoResponsavelEcf(event.target.value)}
+            placeholder="Novo responsável pela ECF"
+            disabled={responsavelEcfBusy}
+            className="input-shell h-11 flex-1 scroll-mt-[35rem] px-4 lg:scroll-mt-28"
+          />
+          <ActionButton
+            type="submit"
+            variant="primary"
+            disabled={responsavelEcfBusy || !novoResponsavelEcf.trim()}
+            className="h-11 scroll-mt-[35rem] px-4 lg:scroll-mt-28"
+          >
+            <Plus size={16} aria-hidden="true" />
+            {responsavelEcfBusy ? 'Salvando...' : 'Cadastrar'}
+          </ActionButton>
+        </form>
+
+        <DataTableShell
+          headers={['Responsável pela ECF', 'Status', 'Ações']}
+          minWidth="min-w-[720px]"
+          hasRows={responsaveisEcfOrdenados.length > 0}
+          emptyTitle="Nenhum responsável pela ECF cadastrado."
+          emptyDescription="Cadastre nomes internos ou externos para liberar opções no dropdown da ECF."
+        >
+          <tbody>
+            {responsaveisEcfOrdenados.map((item) => (
+              <tr key={item.id ?? item.valor} className="table-row">
+                <td className="table-cell table-cell-strong">
+                  {item.valor}
+                </td>
+                <td className="table-cell">
+                  <StatusBadge toneClass={chipClass(item.ativo ? 'success' : 'muted')}>
+                    {item.ativo ? 'Ativo' : 'Inativo'}
+                  </StatusBadge>
+                </td>
+                <td className="table-cell">
+                  <div className="flex flex-wrap gap-2">
+                    <ActionButton
+                      type="button"
+                      variant={item.ativo ? 'danger' : 'secondary'}
+                      onClick={() => onToggleResponsavelEcf?.(item)}
+                      disabled={responsavelEcfBusy}
+                    >
+                      <RefreshCcw size={16} aria-hidden="true" />
+                      {item.ativo ? 'Inativar' : 'Reativar'}
+                    </ActionButton>
+                    {!item.ativo ? (
+                      <ActionButton
+                        type="button"
+                        variant="danger"
+                        onClick={() => onDeleteResponsavelEcf?.(item)}
+                        disabled={responsavelEcfBusy}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                        Excluir
+                      </ActionButton>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </DataTableShell>
       </SurfacePanel>
     </div>
   );

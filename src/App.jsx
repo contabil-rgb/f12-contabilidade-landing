@@ -280,6 +280,7 @@ const CLIENT_FIELD_DEFAULTS = {
   data_entrega_ecf: '',
   data_envio_ecf: '',
   responsavel_ecd: '',
+  responsavel_ecf: '',
   pendencias_observacoes: '',
   arquivado: false,
   arquivado_em: '',
@@ -4658,6 +4659,215 @@ function DropdownFilterSelect({
   );
 }
 
+function ResponsavelEcfDropdownSelect({
+  value,
+  listagens,
+  responsavelOptions = [],
+  responsavelEcfOptions = [],
+  onChange,
+  onCreateResponsavelEcf,
+  onDeleteResponsavelEcf,
+  busy = false,
+  disabled = false,
+  disabledReason,
+  buttonClassName = 'form-control-shell mt-1',
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [localBusy, setLocalBusy] = useState(false);
+  const containerRef = useRef(null);
+  const { menuRef, menuStyle } = useFloatingDropdown(open, containerRef);
+  const isBusy = busy || localBusy;
+  const responsaveisPortal = getResponsaveisAtivosCatalogo(responsavelOptions);
+  const responsaveisEcfAtivos = (responsavelEcfOptions ?? []).filter((item) => item?.ativo !== false);
+  const responsaveisEcf = getResponsaveisAtivosCatalogo(responsaveisEcfAtivos);
+  const ecfItemByValue = new Map(
+    responsaveisEcfAtivos.map((item) => [normalizeText(item.valor), item]),
+  );
+  const options = uniqueValues([
+    ...responsaveisPortal,
+    ...responsaveisEcf,
+    value,
+  ]).filter(Boolean);
+  const selectedLabel = value || 'Não informado';
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event) {
+      if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  function handleSelect(nextValue) {
+    if (disabled || isBusy) return;
+    onChange(nextValue);
+    setOpen(false);
+  }
+
+  async function handleCreate() {
+    if (disabled || isBusy) return;
+    const valor = draft.trim();
+    if (!valor) return;
+    const existing = options.find((option) => normalizeText(option) === normalizeText(valor));
+    if (existing) {
+      onChange(existing);
+      setDraft('');
+      setOpen(false);
+      return;
+    }
+
+    setLocalBusy(true);
+    try {
+      const created = await onCreateResponsavelEcf?.(valor);
+      if (created !== false) {
+        onChange(valor);
+        setDraft('');
+        setOpen(false);
+      }
+    } finally {
+      setLocalBusy(false);
+    }
+  }
+
+  async function handleRemove(event, item) {
+    event.stopPropagation();
+    if (disabled || isBusy || !item?.id) return;
+    setLocalBusy(true);
+    try {
+      const deleted = await onDeleteResponsavelEcf?.(item, { allowActive: true });
+      if (deleted !== false && normalizeText(value) === normalizeText(item.valor)) {
+        onChange('');
+      }
+    } finally {
+      setLocalBusy(false);
+    }
+  }
+
+  const dropdownMenu = open && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        role="listbox"
+        style={menuStyle ?? { visibility: 'hidden' }}
+        className="dropdown-menu-shell overflow-soft normal-case ring-1 ring-slate-900/5 dark:ring-white/5"
+      >
+        <button
+          type="button"
+          role="option"
+          aria-selected={!value}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleSelect('');
+          }}
+          className={`dropdown-option ${!value ? 'dropdown-option-selected' : ''}`}
+        >
+          <span className="truncate">Não informado</span>
+          {!value ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+        </button>
+
+        {options.map((option) => {
+          const selected = normalizeText(option) === normalizeText(value);
+          const manageableItem = ecfItemByValue.get(normalizeText(option));
+          return (
+            <div key={option} className={`flex items-center gap-1 ${selected ? 'bg-brand-blue text-white' : ''}`}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelect(option);
+                }}
+                className={`dropdown-option flex-1 ${selected ? 'dropdown-option-selected' : ''}`}
+              >
+                <span className="truncate">{option}</span>
+                {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+              </button>
+              {manageableItem?.id ? (
+                <button
+                  type="button"
+                  onClick={(event) => handleRemove(event, manageableItem)}
+                  disabled={isBusy}
+                  className="mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300"
+                  aria-label={`Remover ${option}`}
+                  title="Remover da lista da ECF"
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+
+        <div className="mt-2 border-t border-slate-200 p-2 dark:border-gray-700">
+          <div className="flex gap-2">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleCreate();
+                }
+              }}
+              disabled={disabled || isBusy}
+              placeholder="Novo responsável"
+              className="input-shell h-9 min-w-0 flex-1 px-3 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={disabled || isBusy || !draft.trim()}
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-brand-blue px-3 text-xs font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus size={14} aria-hidden="true" />
+              {isBusy ? 'Salvando...' : 'Cadastrar'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
+
+  return (
+    <div ref={containerRef} className="relative block">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!disabled) setOpen((current) => !current);
+        }}
+        disabled={disabled}
+        title={disabled ? disabledReason : undefined}
+        className={`${buttonClassName} flex items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {dropdownMenu}
+    </div>
+  );
+}
+
 function DropdownMultiSelect({
   label,
   values = [],
@@ -7997,6 +8207,11 @@ function ClientModal({
   onAnexoError,
   onContratoSocialSuccess,
   onContratoSocialRemove,
+  responsavelOptions = [],
+  responsavelEcfOptions = [],
+  responsavelEcfBusy = false,
+  onCreateResponsavelEcf,
+  onDeleteResponsavelEcf,
 }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
@@ -8126,6 +8341,11 @@ function ClientModal({
                           onAnexoRemove?.(form.id, tipoAnexo, anexo);
                         }}
                         onAttachmentError={onAnexoError}
+                        responsavelOptions={responsavelOptions}
+                        responsavelEcfOptions={responsavelEcfOptions}
+                        responsavelEcfBusy={responsavelEcfBusy}
+                        onCreateResponsavelEcf={onCreateResponsavelEcf}
+                        onDeleteResponsavelEcf={onDeleteResponsavelEcf}
                       />
                     ))}
                   </div>
@@ -8324,6 +8544,11 @@ function FormField({
   onAttachmentSuccess,
   onAttachmentRemove,
   onAttachmentError,
+  responsavelOptions = [],
+  responsavelEcfOptions = [],
+  responsavelEcfBusy = false,
+  onCreateResponsavelEcf,
+  onDeleteResponsavelEcf,
 }) {
   const baseClass =
     'form-control-shell mt-1';
@@ -8422,6 +8647,29 @@ function FormField({
   if (field.type === 'select' || field.type === 'yesno') {
     const options = uniqueValues([...(getOptions(listagens, field) ?? []), value]);
     const isClientStatusField = field.key === 'status';
+    if (field.key === 'responsavel_ecf') {
+      return (
+        <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+          {label}
+          <ResponsavelEcfDropdownSelect
+            value={value}
+            listagens={listagens}
+            responsavelOptions={responsavelOptions}
+            responsavelEcfOptions={responsavelEcfOptions}
+            onChange={onChange}
+            onCreateResponsavelEcf={onCreateResponsavelEcf}
+            onDeleteResponsavelEcf={onDeleteResponsavelEcf}
+            busy={responsavelEcfBusy}
+            disabled={computedDisabled}
+            disabledReason={computedDisabledReason}
+            buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+          />
+          {computedDisabledReason ? (
+            <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
+          ) : null}
+        </label>
+      );
+    }
     return (
       <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
         {label}
@@ -8578,6 +8826,8 @@ export default function App() {
   const [listagens, setListagens] = useState(initialState.listagens);
   const [responsavelCatalogo, setResponsavelCatalogo] = useState([]);
   const [responsavelCatalogoBusy, setResponsavelCatalogoBusy] = useState(false);
+  const [responsavelEcfCatalogo, setResponsavelEcfCatalogo] = useState([]);
+  const [responsavelEcfCatalogoBusy, setResponsavelEcfCatalogoBusy] = useState(false);
   const [metadata, setMetadata] = useState(initialState.metadata ?? { ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(initialSessionState.session);
@@ -9013,6 +9263,21 @@ export default function App() {
     });
   }
 
+  function atualizarResponsavelEcfCatalogoLocal(item) {
+    if (!item?.id) return;
+    setResponsavelEcfCatalogo((current) => {
+      const exists = current.some((row) => row.id === item.id);
+      const nextCatalogo = exists
+        ? current.map((row) => (row.id === item.id ? item : row))
+        : [...current, item];
+      setListagens((currentListagens) => ({
+        ...currentListagens,
+        responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
+      }));
+      return nextCatalogo;
+    });
+  }
+
   function sincronizarPerfilUsuario(perfil) {
     if (!perfil?.id) return;
     setSessionProfile((current) => ({
@@ -9110,13 +9375,16 @@ export default function App() {
       const shouldLoadHistoricoPortal = can(currentUserFull, PERMISSIONS.HISTORY_VIEW);
       const shouldLoadReinfRelatorios = can(currentUserFull, PERMISSIONS.REPORTS_VIEW);
 
-      const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult, reinfRelatoriosResult] = await Promise.all([
+      const [clientesSupabase, listagensSupabase, sociosResult, responsaveisResult, responsaveisEcfResult, obrigacoesResult, riscoResult, acompanhamentoResult, usuariosResult, historicoResult, reinfRelatoriosResult] = await Promise.all([
         listarClientesSupabase({ incluirArquivados: true }),
         listarListagensAgrupadas(),
         listarSociosClientesSupabase()
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarValoresListagemPorCategoria('responsavel', { incluirInativos: true })
+          .then((rows) => ({ ok: true, rows }))
+          .catch((error) => ({ ok: false, error })),
+        listarValoresListagemPorCategoria('responsavel_ecf', { incluirInativos: true })
           .then((rows) => ({ ok: true, rows }))
           .catch((error) => ({ ok: false, error })),
         listarStatusObrigacoesClientes()
@@ -9168,6 +9436,15 @@ export default function App() {
         }
       } else {
         console.warn('[listagens] Falha ao carregar responsaveis do Supabase:', responsaveisResult.error);
+      }
+      if (responsaveisEcfResult.ok) {
+        setResponsavelEcfCatalogo(responsaveisEcfResult.rows);
+        const responsaveisEcfAtivos = getResponsaveisAtivosCatalogo(responsaveisEcfResult.rows);
+        if (responsaveisEcfResult.rows.length) {
+          nextListagens.responsavel_ecf = responsaveisEcfAtivos;
+        }
+      } else {
+        console.warn('[listagens] Falha ao carregar responsaveis da ECF do Supabase:', responsaveisEcfResult.error);
       }
       persist(clientesComSocios, nextListagens, {
         ...metadata,
@@ -10494,6 +10771,141 @@ export default function App() {
     }
   }
 
+  async function createResponsavelEcfCatalogo(valorInput) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis pela ECF.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('cadastrar o responsável pela ECF')) return false;
+
+    const valor = String(valorInput ?? '').trim();
+    if (!valor) {
+      setToast({ title: 'Responsável pela ECF obrigatório', message: 'Informe um nome antes de cadastrar.' });
+      return false;
+    }
+
+    const existente = responsavelEcfCatalogo.find((item) => normalizeText(item.valor) === normalizeText(valor));
+    if (existente?.ativo) {
+      setToast({ title: 'Responsável pela ECF já cadastrado', message: existente.valor });
+      return false;
+    }
+    if (existente && !existente.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar este responsável pela ECF.' });
+      return false;
+    }
+
+    setResponsavelEcfCatalogoBusy(true);
+    try {
+      const saved = existente
+        ? await reativarValorListagem(existente.id)
+        : await criarValorListagem('responsavel_ecf', valor);
+      atualizarResponsavelEcfCatalogoLocal(saved);
+      setToast({
+        title: existente ? 'Responsável pela ECF reativado' : 'Responsável pela ECF cadastrado',
+        message: saved.valor,
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao cadastrar responsável pela ECF',
+        message: error.message || 'Não foi possível salvar o responsável pela ECF no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelEcfCatalogoBusy(false);
+    }
+  }
+
+  async function toggleResponsavelEcfCatalogo(item) {
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis pela ECF.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('alterar o responsável pela ECF')) return false;
+    if (!item?.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar este responsável pela ECF.' });
+      return false;
+    }
+
+    setResponsavelEcfCatalogoBusy(true);
+    try {
+      const saved = item.ativo
+        ? await inativarValorListagem(item.id)
+        : await reativarValorListagem(item.id);
+      atualizarResponsavelEcfCatalogoLocal(saved);
+      setToast({
+        title: saved.ativo ? 'Responsável pela ECF reativado' : 'Responsável pela ECF inativado',
+        message: saved.valor,
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao atualizar responsável pela ECF',
+        message: error.message || 'Não foi possível atualizar o responsável pela ECF no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelEcfCatalogoBusy(false);
+    }
+  }
+
+  async function deleteResponsavelEcfCatalogo(item, options = {}) {
+    const { allowActive = false } = options;
+    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis pela ECF.' });
+      return false;
+    }
+    if (!ensureSupabaseWriteReady('excluir o responsável pela ECF')) return false;
+    if (!item?.id) {
+      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de excluir este responsável pela ECF.' });
+      return false;
+    }
+    if (item.ativo && !allowActive) {
+      setToast({ title: 'Inative antes de excluir', message: 'A exclusão definitiva só fica disponível para responsáveis pela ECF inativos.' });
+      return false;
+    }
+
+    setResponsavelEcfCatalogoBusy(true);
+    try {
+      const vinculados = await listarClientesVinculadosResponsavel(item.valor, { campos: ['responsavel_ecf'] });
+      if (vinculados.length) {
+        const exemplo = vinculados[0]?.nome_identificacao || vinculados[0]?.razao_social || 'cliente vinculado';
+        setToast({
+          title: 'Exclusão bloqueada',
+          message: `${item.valor} ainda está vinculado como responsável pela ECF em ${formatNumber(vinculados.length)} cliente(s) ativo(s), incluindo ${exemplo}. Limpe esses vínculos antes de excluir.`,
+        });
+        return false;
+      }
+
+      if (!confirm(`Excluir definitivamente o responsável pela ECF ${item.valor}? Essa ação não poderá ser desfeita.`)) {
+        return false;
+      }
+
+      const deleted = await excluirValorListagem(item.id, 'responsavel_ecf');
+      setResponsavelEcfCatalogo((current) => {
+        const nextCatalogo = current.filter((row) => row.id !== item.id);
+        setListagens((currentListagens) => ({
+          ...currentListagens,
+          responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
+        }));
+        return nextCatalogo;
+      });
+      setToast({
+        title: 'Responsável pela ECF excluído',
+        message: deleted.valor || item.valor,
+      });
+      return true;
+    } catch (error) {
+      setToast({
+        title: 'Falha ao excluir responsável pela ECF',
+        message: error.message || 'Não foi possível excluir o responsável pela ECF no Supabase.',
+      });
+      return false;
+    } finally {
+      setResponsavelEcfCatalogoBusy(false);
+    }
+  }
+
   async function uploadResponsavelSignature(item, file) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar assinaturas.' });
@@ -10864,6 +11276,11 @@ export default function App() {
             onUploadResponsavelSignature={uploadResponsavelSignature}
             onRemoveResponsavelSignature={removeResponsavelSignature}
             getResponsavelSignatureUrl={gerarUrlPublicaAssinaturaResponsavel}
+            responsavelEcfOptions={responsavelEcfCatalogo}
+            responsavelEcfBusy={responsavelEcfCatalogoBusy}
+            onCreateResponsavelEcf={createResponsavelEcfCatalogo}
+            onToggleResponsavelEcf={toggleResponsavelEcfCatalogo}
+            onDeleteResponsavelEcf={deleteResponsavelEcfCatalogo}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
             )}
@@ -10939,6 +11356,11 @@ export default function App() {
           onAnexoError={handleAnexoError}
           onContratoSocialSuccess={handleContratoSocialSuccess}
           onContratoSocialRemove={handleContratoSocialRemove}
+          responsavelOptions={responsavelCatalogo}
+          responsavelEcfOptions={responsavelEcfCatalogo}
+          responsavelEcfBusy={responsavelEcfCatalogoBusy}
+          onCreateResponsavelEcf={createResponsavelEcfCatalogo}
+          onDeleteResponsavelEcf={deleteResponsavelEcfCatalogo}
         />
       ) : null}
       {editingUser ? (

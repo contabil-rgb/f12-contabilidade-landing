@@ -10,10 +10,15 @@ alter table public.clientes
   add column if not exists pendencias_observacoes text;
 
 alter table public.clientes
+  add column if not exists responsavel_ecf text;
+
+alter table public.clientes
   add column if not exists arquivado boolean not null default false,
   add column if not exists arquivado_em timestamptz,
   add column if not exists arquivado_por uuid,
   add column if not exists arquivado_motivo text;
+
+create index if not exists idx_clientes_responsavel_ecf on public.clientes(responsavel_ecf);
 
 create or replace function public.criar_cliente_portal(p_cliente jsonb)
 returns public.clientes
@@ -82,6 +87,7 @@ begin
     ultima_ecf_entregue,
     data_entrega_ecf,
     data_envio_ecf,
+    responsavel_ecf,
     enviam_documentos,
     modo_entrega,
     curva_envio,
@@ -136,6 +142,7 @@ begin
     nullif(btrim(coalesce(p_cliente->>'ultima_ecf_entregue', '')), ''),
     nullif(btrim(coalesce(p_cliente->>'data_entrega_ecf', '')), '')::date,
     nullif(btrim(coalesce(p_cliente->>'data_envio_ecf', '')), '')::date,
+    nullif(btrim(coalesce(p_cliente->>'responsavel_ecf', '')), ''),
     nullif(btrim(coalesce(p_cliente->>'enviam_documentos', '')), ''),
     nullif(btrim(coalesce(p_cliente->>'modo_entrega', '')), ''),
     nullif(btrim(coalesce(p_cliente->>'curva_envio', '')), ''),
@@ -240,6 +247,7 @@ begin
     ultima_ecf_entregue = case when p_cliente ? 'ultima_ecf_entregue' then nullif(btrim(coalesce(p_cliente->>'ultima_ecf_entregue', '')), '') else ultima_ecf_entregue end,
     data_entrega_ecf = case when p_cliente ? 'data_entrega_ecf' then nullif(btrim(coalesce(p_cliente->>'data_entrega_ecf', '')), '')::date else data_entrega_ecf end,
     data_envio_ecf = case when p_cliente ? 'data_envio_ecf' then nullif(btrim(coalesce(p_cliente->>'data_envio_ecf', '')), '')::date else data_envio_ecf end,
+    responsavel_ecf = case when p_cliente ? 'responsavel_ecf' then nullif(btrim(coalesce(p_cliente->>'responsavel_ecf', '')), '') else responsavel_ecf end,
     enviam_documentos = case when p_cliente ? 'enviam_documentos' then nullif(btrim(coalesce(p_cliente->>'enviam_documentos', '')), '') else enviam_documentos end,
     modo_entrega = case when p_cliente ? 'modo_entrega' then nullif(btrim(coalesce(p_cliente->>'modo_entrega', '')), '') else modo_entrega end,
     curva_envio = case when p_cliente ? 'curva_envio' then nullif(btrim(coalesce(p_cliente->>'curva_envio', '')), '') else curva_envio end,

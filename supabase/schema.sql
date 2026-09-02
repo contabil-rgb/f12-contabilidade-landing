@@ -40,6 +40,7 @@ create table if not exists public.clientes (
   ultima_ecf_entregue text,
   data_entrega_ecf date,
   data_envio_ecf date,
+  responsavel_ecf text,
   enviam_documentos text,
   modo_entrega text,
   curva_envio text,
@@ -78,6 +79,7 @@ create index if not exists idx_clientes_razao_social on public.clientes(razao_so
 create index if not exists idx_clientes_regime_tributario on public.clientes(regime_tributario);
 create index if not exists idx_clientes_tipo_cliente on public.clientes(tipo_cliente);
 create index if not exists idx_clientes_responsavel on public.clientes(responsavel);
+create index if not exists idx_clientes_responsavel_ecf on public.clientes(responsavel_ecf);
 create index if not exists idx_clientes_revisor on public.clientes(revisor);
 create index if not exists idx_clientes_situacao on public.clientes(situacao);
 create index if not exists idx_clientes_competencia_em_dia on public.clientes(competencia_em_dia);

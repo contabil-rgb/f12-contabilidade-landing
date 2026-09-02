@@ -48,6 +48,7 @@ const EXTRA_BASE_HEADER_MAP = {
   'ultima ecf entregue': 'ultima_ecf_entregue',
   'data de entrega da ecf': 'data_entrega_ecf',
   'data enviada da ecf': 'data_envio_ecf',
+  'responsavel pela ecf': 'responsavel_ecf',
   responsavel: 'responsavel',
   revisor: 'revisor',
   'primeira competencia': 'primeira_competencia',

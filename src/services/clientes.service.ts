@@ -52,6 +52,7 @@ const CLIENTE_FIELDS = new Set([
   'ultima_ecf_entregue',
   'data_entrega_ecf',
   'data_envio_ecf',
+  'responsavel_ecf',
   'enviam_documentos',
   'modo_entrega',
   'curva_envio',
@@ -232,13 +233,16 @@ export async function buscarClientePorCnpj(cnpj: string) {
   return null;
 }
 
-export async function listarClientesVinculadosResponsavel(valor: string, { incluirInativos = false } = {}) {
+export async function listarClientesVinculadosResponsavel(valor: string, { incluirInativos = false, campos = ['responsavel', 'responsavel_ecd', 'responsavel_ecf'] } = {}) {
   const alvo = normalizeText(String(valor ?? ''));
   if (!alvo) return [];
+  const camposBusca = Array.isArray(campos) && campos.length
+    ? campos
+    : ['responsavel', 'responsavel_ecd', 'responsavel_ecf'];
 
   let query = supabase
     .from('clientes')
-    .select('id, cnpj, nome_identificacao, razao_social, responsavel, responsavel_ecd, status, situacao, arquivado');
+    .select('id, cnpj, nome_identificacao, razao_social, responsavel, responsavel_ecd, responsavel_ecf, status, situacao, arquivado');
 
   if (!incluirInativos) {
     query = query
@@ -255,8 +259,7 @@ export async function listarClientesVinculadosResponsavel(valor: string, { inclu
   return (data ?? [])
     .map((row) => normalizeRow(row as Record<string, unknown>))
     .filter((row) =>
-      normalizeText(String(row.responsavel ?? '')) === alvo
-      || normalizeText(String(row.responsavel_ecd ?? '')) === alvo,
+      camposBusca.some((campo) => normalizeText(String(row[campo] ?? '')) === alvo),
     );
 }
 

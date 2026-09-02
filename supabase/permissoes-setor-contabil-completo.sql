@@ -164,7 +164,7 @@ for insert
 to authenticated
 with check (
   public.is_portal_acesso_total()
-  and categoria = 'responsavel'
+  and categoria in ('responsavel', 'responsavel_ecf')
 );
 
 drop policy if exists "listagens_update_responsavel_coordenador" on public.listagens;
@@ -174,11 +174,11 @@ for update
 to authenticated
 using (
   public.is_portal_acesso_total()
-  and categoria = 'responsavel'
+  and categoria in ('responsavel', 'responsavel_ecf')
 )
 with check (
   public.is_portal_acesso_total()
-  and categoria = 'responsavel'
+  and categoria in ('responsavel', 'responsavel_ecf')
 );
 
 drop policy if exists "listagens_delete_responsavel_coordenador" on public.listagens;
@@ -188,7 +188,7 @@ for delete
 to authenticated
 using (
   public.is_portal_acesso_total()
-  and categoria = 'responsavel'
+  and categoria in ('responsavel', 'responsavel_ecf')
 );
 
 -- 5) Exclusao controlada do historico para os dois perfis.
