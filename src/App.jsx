@@ -3908,6 +3908,9 @@ function SearchAndFilters({
       };
     }),
   ].filter(Boolean);
+  const activeFiltersLabel = activeFilterItems.length === 1
+    ? '1 filtro ativo'
+    : `${formatNumber(activeFilterItems.length)} filtros ativos`;
 
   return (
     <SurfacePanel className="min-w-0 overflow-hidden p-0">
@@ -3968,7 +3971,7 @@ function SearchAndFilters({
             ) : <span />}
 
             <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-              {activeFilterItems.length ? `${formatNumber(activeFilterItems.length)} ativo(s)` : 'Sem filtros'}
+              {activeFilterItems.length ? activeFiltersLabel : 'Sem filtros'}
             </span>
           </div>
 
@@ -3999,7 +4002,7 @@ function SearchAndFilters({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Filtros da carteira</p>
           </div>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            {activeFilterItems.length ? `${formatNumber(activeFilterItems.length)} ativo(s)` : 'Sem filtros'}
+            {activeFilterItems.length ? activeFiltersLabel : 'Sem filtros'}
           </span>
         </div>
 
