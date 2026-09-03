@@ -3,6 +3,7 @@ export function normalizeText(value) {
     .trim()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+    .replace(/\s+/g, ' ')
     .toLowerCase();
 }
 
