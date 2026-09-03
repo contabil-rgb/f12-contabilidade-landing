@@ -4250,6 +4250,10 @@ function BaseClientesPage(props) {
     [props.allClients, props.clients, selectedClientIdSet],
   );
   const activeResponsavelOptions = props.responsavelOptions ?? [];
+  const baseClients = props.allClients ?? props.clients;
+  const totalClientesCadastrados = baseClients.length;
+  const totalClientesArquivados = countWhere(baseClients, isClientArchived);
+  const totalClientesAtivos = totalClientesCadastrados - totalClientesArquivados;
 
   useEffect(() => {
     setSelectedClientIds((current) => current.filter((id) => props.clients.some((client) => client.id === id && canSelectClientForBatch(client))));
@@ -4294,11 +4298,25 @@ function BaseClientesPage(props) {
     <div className="min-w-0 space-y-5">
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <MetricCard
-          title="Carteira exibida"
-          value={props.clients.length}
-          detail={`${formatNumber(props.allClients?.length ?? props.clients.length)} cliente(s) disponível(is) na base`}
+          title="Clientes ativos"
+          value={totalClientesAtivos}
+          detail="Carteira ativa em acompanhamento."
           icon={Users}
           tone="success"
+        />
+        <MetricCard
+          title="Clientes arquivados"
+          value={totalClientesArquivados}
+          detail="Mantidos fora da base ativa para consulta."
+          icon={Archive}
+          tone="warning"
+        />
+        <MetricCard
+          title="Total cadastrados"
+          value={totalClientesCadastrados}
+          detail={`${formatNumber(props.clients.length)} cliente(s) visível(is) nesta consulta.`}
+          icon={ClipboardList}
+          tone="info"
         />
       </section>
       <SearchAndFilters {...props} clientsForOptions={props.allClients ?? props.clients} />
