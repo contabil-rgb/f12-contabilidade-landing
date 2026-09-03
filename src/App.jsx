@@ -10816,39 +10816,6 @@ export default function App() {
     }
   }
 
-  async function toggleResponsavelEcfCatalogo(item) {
-    if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
-      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis pela ECF.' });
-      return false;
-    }
-    if (!ensureSupabaseWriteReady('alterar o responsável pela ECF')) return false;
-    if (!item?.id) {
-      setToast({ title: 'Sincronização pendente', message: 'Atualize os dados do Supabase antes de alterar este responsável pela ECF.' });
-      return false;
-    }
-
-    setResponsavelEcfCatalogoBusy(true);
-    try {
-      const saved = item.ativo
-        ? await inativarValorListagem(item.id)
-        : await reativarValorListagem(item.id);
-      atualizarResponsavelEcfCatalogoLocal(saved);
-      setToast({
-        title: saved.ativo ? 'Responsável pela ECF reativado' : 'Responsável pela ECF inativado',
-        message: saved.valor,
-      });
-      return true;
-    } catch (error) {
-      setToast({
-        title: 'Falha ao atualizar responsável pela ECF',
-        message: error.message || 'Não foi possível atualizar o responsável pela ECF no Supabase.',
-      });
-      return false;
-    } finally {
-      setResponsavelEcfCatalogoBusy(false);
-    }
-  }
-
   async function deleteResponsavelEcfCatalogo(item, options = {}) {
     const { allowActive = false } = options;
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
@@ -11276,11 +11243,6 @@ export default function App() {
             onUploadResponsavelSignature={uploadResponsavelSignature}
             onRemoveResponsavelSignature={removeResponsavelSignature}
             getResponsavelSignatureUrl={gerarUrlPublicaAssinaturaResponsavel}
-            responsavelEcfOptions={responsavelEcfCatalogo}
-            responsavelEcfBusy={responsavelEcfCatalogoBusy}
-            onCreateResponsavelEcf={createResponsavelEcfCatalogo}
-            onToggleResponsavelEcf={toggleResponsavelEcfCatalogo}
-            onDeleteResponsavelEcf={deleteResponsavelEcfCatalogo}
             profileLabelByKey={Object.fromEntries(
               Object.entries(ACCESS_PROFILES).map(([key, profile]) => [key, profile.label]),
             )}
