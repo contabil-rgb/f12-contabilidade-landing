@@ -93,6 +93,14 @@ const NORMALIZED_HEADER_MAP = (() => {
   return map;
 })();
 
+const NORMALIZED_LIST_HEADER_MAP = (() => {
+  const map = new Map();
+  Object.entries(LIST_HEADER_MAP).forEach(([header, listKey]) => {
+    map.set(normalizeHeader(header), listKey);
+  });
+  return map;
+})();
+
 function cellValue(cell, fieldKey) {
   if (!cell || cell.t === 'z') return '';
 
@@ -132,6 +140,12 @@ function resolveBaseHeaderField(header) {
   if (!header) return '';
   if (EXCEL_HEADER_MAP[header]) return EXCEL_HEADER_MAP[header];
   return NORMALIZED_HEADER_MAP.get(normalizeHeader(header)) || '';
+}
+
+function resolveListHeaderField(header) {
+  if (!header) return '';
+  if (LIST_HEADER_MAP[header]) return LIST_HEADER_MAP[header];
+  return NORMALIZED_LIST_HEADER_MAP.get(normalizeHeader(header)) || '';
 }
 
 function resolveBaseHeaders(sheet, baseRange) {
@@ -237,7 +251,7 @@ export function parseListagens(sheet) {
   const headers = readHeaders(sheet, LIST_HEADER_ROW);
 
   headers.forEach((header, col) => {
-    const listKey = LIST_HEADER_MAP[header];
+    const listKey = resolveListHeaderField(header);
     if (!listKey) return;
 
     const values = [];

@@ -5,7 +5,8 @@ function normalizeText(value: unknown) {
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 const CATEGORY_ALIASES: Record<string, string> = {
@@ -60,6 +61,37 @@ function normalizeOptionValue(value: unknown) {
   return raw;
 }
 
+export function getListagemComparableKey(categoria: unknown, valor: unknown) {
+  const categoriaNormalizada = normalizeCategory(categoria);
+  const valorNormalizado = normalizeText(normalizeOptionValue(valor));
+  return valorNormalizado ? `${categoriaNormalizada}:${valorNormalizado}` : '';
+}
+
+export function isSameListagemValue(
+  leftCategoria: unknown,
+  leftValor: unknown,
+  rightCategoria: unknown,
+  rightValor: unknown,
+) {
+  const leftKey = getListagemComparableKey(leftCategoria, leftValor);
+  return Boolean(leftKey && leftKey === getListagemComparableKey(rightCategoria, rightValor));
+}
+
+export function findMatchingListagemValue(
+  rows: Record<string, unknown>[] = [],
+  categoria: unknown,
+  valor: unknown,
+  { ignoreId = '' } = {},
+) {
+  const targetKey = getListagemComparableKey(categoria, valor);
+  if (!targetKey) return null;
+
+  return rows.find((row) => {
+    if (ignoreId && String(row.id ?? '') === String(ignoreId)) return false;
+    return getListagemComparableKey(row.categoria, row.valor) === targetKey;
+  }) ?? null;
+}
+
 function normalizeNullableText(value: unknown) {
   const normalized = String(value ?? '').trim();
   return normalized || '';
@@ -82,6 +114,40 @@ export function normalizeListagemRow(row: Record<string, unknown>) {
 }
 
 const LISTAGENS_SELECT = 'id, categoria, valor, ordem, ativo, assinatura_email_path, assinatura_email_nome_arquivo, assinatura_email_atualizada_em';
+
+async function listarListagensPorCategoriaNormalizada(categoriaNormalizada: string) {
+  const { data, error } = await supabase
+    .from('listagens')
+    .select(LISTAGENS_SELECT)
+    .eq('categoria', categoriaNormalizada)
+    .order('ordem', { ascending: true })
+    .order('valor', { ascending: true });
+
+  if (error) {
+    throw new Error(`Não foi possível validar a listagem no Supabase: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => normalizeListagemRow(row));
+}
+
+async function findExistingListagemValue(categoriaNormalizada: string, valor: unknown, { ignoreId = '' } = {}) {
+  const rows = await listarListagensPorCategoriaNormalizada(categoriaNormalizada);
+  return findMatchingListagemValue(rows, categoriaNormalizada, valor, { ignoreId });
+}
+
+export const DUPLICATE_LISTAGEM_ERROR_NAME = 'DuplicateListagemError';
+
+export function isDuplicateListagemError(error: unknown) {
+  return error instanceof Error && error.name === DUPLICATE_LISTAGEM_ERROR_NAME;
+}
+
+function createDuplicateListagemError(match: Record<string, unknown>) {
+  const valor = normalizeOptionValue(match?.valor);
+  const status = match?.ativo === false ? 'inativa' : 'ativa';
+  const error = new Error(`Já existe uma opção ${status} cadastrada com esse nome: ${valor}.`);
+  error.name = DUPLICATE_LISTAGEM_ERROR_NAME;
+  return error;
+}
 
 export async function listarTodasListagens({ incluirInativos = false } = {}) {
   let query = supabase
@@ -110,7 +176,7 @@ export async function listarListagensAgrupadas() {
     const valor = normalizeOptionValue(item.valor);
     if (!valor) return acc;
     if (!acc[categoria]) acc[categoria] = [];
-    if (!acc[categoria].includes(valor)) {
+    if (!acc[categoria].some((currentValue) => isSameListagemValue(categoria, currentValue, categoria, valor))) {
       acc[categoria].push(valor);
     }
     return acc;
@@ -130,6 +196,11 @@ export async function criarValorListagem(categoria: unknown, valor: unknown, { o
 
   if (!valorNormalizado) {
     throw new Error('Informe um valor válido para a listagem.');
+  }
+
+  const duplicate = await findExistingListagemValue(categoriaNormalizada, valorNormalizado);
+  if (duplicate) {
+    throw createDuplicateListagemError(duplicate);
   }
 
   const payload: Record<string, unknown> = {
@@ -160,11 +231,38 @@ export async function atualizarValorListagem(id: string, patch: Record<string, u
   }
 
   const nextPatch = { ...patch };
+  const changesCategory = 'categoria' in nextPatch;
+  const changesValue = 'valor' in nextPatch;
+  let currentRow = null;
+
+  if (changesCategory || changesValue) {
+    const { data: current, error: currentError } = await supabase
+      .from('listagens')
+      .select(LISTAGENS_SELECT)
+      .eq('id', id)
+      .single();
+
+    if (currentError) {
+      throw new Error(`Não foi possível validar o valor da listagem: ${currentError.message}`);
+    }
+
+    currentRow = normalizeListagemRow(current);
+  }
+
   if ('categoria' in nextPatch) {
     nextPatch.categoria = normalizeCategory(nextPatch.categoria);
   }
   if ('valor' in nextPatch) {
     nextPatch.valor = normalizeOptionValue(nextPatch.valor);
+  }
+
+  if (currentRow && (changesCategory || changesValue)) {
+    const nextCategoria = changesCategory ? nextPatch.categoria : currentRow.categoria;
+    const nextValor = changesValue ? nextPatch.valor : currentRow.valor;
+    const duplicate = await findExistingListagemValue(String(nextCategoria ?? ''), nextValor, { ignoreId: id });
+    if (duplicate) {
+      throw createDuplicateListagemError(duplicate);
+    }
   }
 
   const { data, error } = await supabase

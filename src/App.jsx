@@ -128,7 +128,9 @@ import {
 import {
   criarValorListagem,
   excluirValorListagem,
+  findMatchingListagemValue,
   inativarValorListagem,
+  isDuplicateListagemError,
   listarListagensAgrupadas,
   listarValoresListagemPorCategoria,
   reativarValorListagem,
@@ -10759,9 +10761,12 @@ export default function App() {
       return false;
     }
 
-    const existente = responsavelCatalogo.find((item) => normalizeText(item.valor) === normalizeText(valor));
+    const existente = findMatchingListagemValue(responsavelCatalogo, 'responsavel', valor);
     if (existente?.ativo) {
-      setToast({ title: 'Responsável já cadastrado', message: existente.valor });
+      setToast({
+        title: 'Cadastro duplicado',
+        message: `Já existe uma opção ativa cadastrada com esse nome: ${existente.valor}.`,
+      });
       return false;
     }
     if (existente && !existente.id) {
@@ -10781,8 +10786,9 @@ export default function App() {
       });
       return true;
     } catch (error) {
+      const duplicate = isDuplicateListagemError(error);
       setToast({
-        title: 'Falha ao cadastrar responsável',
+        title: duplicate ? 'Cadastro duplicado' : 'Falha ao cadastrar responsável',
         message: error.message || 'Não foi possível salvar o responsável no Supabase.',
       });
       return false;
@@ -10893,9 +10899,12 @@ export default function App() {
       return false;
     }
 
-    const existente = responsavelEcfCatalogo.find((item) => normalizeText(item.valor) === normalizeText(valor));
+    const existente = findMatchingListagemValue(responsavelEcfCatalogo, 'responsavel_ecf', valor);
     if (existente?.ativo) {
-      setToast({ title: 'Responsável pela ECF já cadastrado', message: existente.valor });
+      setToast({
+        title: 'Cadastro duplicado',
+        message: `Já existe uma opção ativa cadastrada com esse nome: ${existente.valor}.`,
+      });
       return false;
     }
     if (existente && !existente.id) {
@@ -10915,8 +10924,9 @@ export default function App() {
       });
       return true;
     } catch (error) {
+      const duplicate = isDuplicateListagemError(error);
       setToast({
-        title: 'Falha ao cadastrar responsável pela ECF',
+        title: duplicate ? 'Cadastro duplicado' : 'Falha ao cadastrar responsável pela ECF',
         message: error.message || 'Não foi possível salvar o responsável pela ECF no Supabase.',
       });
       return false;
