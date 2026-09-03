@@ -250,6 +250,15 @@ const PRESET_ONLY_FILTER_FIELDS = [
   'distribuicao_lucros',
 ];
 
+const LOCKED_CLIENT_SELECT_FIELDS = new Set([
+  'tipo_cliente',
+  'regime_tributario',
+  'atividades',
+  'dificuldade',
+  'responsavel',
+  'revisor',
+]);
+
 const ALERT_FILTER_LABELS = {
   atraso: 'Clientes em atraso',
   critico: 'Situação crítica',
@@ -3193,6 +3202,47 @@ function getOptions(listagens, field) {
     return YES_NO_OPTIONS;
   }
   return listagens[field.listKey] ?? [];
+}
+
+function isLockedClientSelectField(field) {
+  return Boolean(field?.key && LOCKED_CLIENT_SELECT_FIELDS.has(field.key));
+}
+
+function getOfficialSelectOptions(listagens, field) {
+  if (!isLockedClientSelectField(field)) return [];
+  const sourceListKey = field.key === 'revisor' ? 'responsavel' : field.listKey;
+  return uniqueValues(
+    ((sourceListKey ? listagens?.[sourceListKey] : getOptions(listagens, field)) ?? [])
+      .map((option) => normalizeFieldDisplayValue(field.key, option))
+      .filter(Boolean),
+  );
+}
+
+function resolveOfficialSelectValue(listagens, field, value) {
+  const rawValue = String(value ?? '').trim();
+  if (!rawValue || normalizeText(rawValue) === normalizeText('Não informado')) {
+    return { ok: true, value: '', status: 'blank' };
+  }
+
+  if (!isLockedClientSelectField(field)) {
+    return { ok: true, value: rawValue, status: 'unlocked' };
+  }
+
+  const normalizedValue = normalizeText(normalizeFieldDisplayValue(field.key, rawValue));
+  const match = getOfficialSelectOptions(listagens, field).find((option) =>
+    normalizeText(normalizeFieldDisplayValue(field.key, option)) === normalizedValue,
+  );
+
+  if (match) {
+    const canonicalValue = normalizeFieldDisplayValue(field.key, match);
+    return {
+      ok: true,
+      value: canonicalValue,
+      status: canonicalValue === rawValue ? 'valid' : 'canonicalized',
+    };
+  }
+
+  return { ok: false, value: rawValue, status: 'invalid' };
 }
 
 function AppShell({
@@ -8309,6 +8359,7 @@ function FullscreenStatusState({ label }) {
 function ClientModal({
   client,
   listagens,
+  officialListagens = listagens,
   onClose,
   onSave,
   canEditFieldForClient,
@@ -8358,15 +8409,19 @@ function ClientModal({
   function submit(event) {
     event.preventDefault();
     const nextErrors = [];
+    const canonicalForm = { ...form };
     modalFields.forEach((field) => {
       const fieldAllowed = canEditFieldForClient(field.key);
       if (field.required && fieldAllowed && isBlank(form[field.key])) {
         nextErrors.push(`${field.label} é obrigatório.`);
       }
-      if (fieldAllowed && (field.type === 'select' || field.type === 'yesno') && !isBlank(form[field.key])) {
-        const allowed = uniqueValues([...(getOptions(listagens, field) ?? []), form[field.key]]);
-        const isAllowed = allowed.some((option) => normalizeText(option) === normalizeText(form[field.key]));
-        if (!isAllowed) nextErrors.push(`${field.label} deve vir da lista cadastrada.`);
+      if (fieldAllowed && isLockedClientSelectField(field)) {
+        const resolved = resolveOfficialSelectValue(officialListagens, field, form[field.key]);
+        if (!resolved.ok) {
+          nextErrors.push(`${field.label}: "${form[field.key]}" não está na lista cadastrada. Selecione uma opção oficial ou limpe o campo.`);
+        } else {
+          canonicalForm[field.key] = resolved.value;
+        }
       }
     });
 
@@ -8380,7 +8435,7 @@ function ClientModal({
     }
 
     const digits = normalizeCnpj(form.cnpj);
-    const { _analysis, ...cleanForm } = form;
+    const { _analysis, ...cleanForm } = canonicalForm;
     const protectedForm = { ...cleanForm };
     modalFields.forEach((field) => {
       if (client?.id && !canEditFieldForClient(field.key)) {
@@ -8438,6 +8493,7 @@ function ClientModal({
                         value={form[field.key] ?? ''}
                         cliente={form}
                         listagens={listagens}
+                        officialListagens={officialListagens}
                         disabled={!canEditFieldForClient(field.key)}
                         disabledReason={deniedReasonForField(null, field.key)}
                         onChange={(value) => updateField(field.key, value)}
@@ -8648,6 +8704,7 @@ function FormField({
   field,
   value,
   listagens,
+  officialListagens = listagens,
   onChange,
   disabled = false,
   disabledReason = 'Sem permissão para alterar este campo.',
@@ -8756,7 +8813,21 @@ function FormField({
   }
 
   if (field.type === 'select' || field.type === 'yesno') {
-    const options = uniqueValues([...(getOptions(listagens, field) ?? []), value]);
+    const lockedSelect = isLockedClientSelectField(field);
+    const officialOptions = getOfficialSelectOptions(officialListagens, field);
+    const resolvedOfficialValue = resolveOfficialSelectValue(officialListagens, field, value);
+    const hasOutsideListValue = lockedSelect && !resolvedOfficialValue.ok && !isBlank(value);
+    const options = lockedSelect
+      ? [
+        ...officialOptions,
+        hasOutsideListValue
+          ? { value, label: `${value} (fora da lista)` }
+          : '',
+      ].filter(Boolean)
+      : uniqueValues([...(getOptions(listagens, field) ?? []), value]);
+    const dropdownValue = lockedSelect && resolvedOfficialValue.ok
+      ? resolvedOfficialValue.value
+      : value;
     const isClientStatusField = field.key === 'status';
     if (field.key === 'responsavel_ecf') {
       return (
@@ -8786,7 +8857,7 @@ function FormField({
         {label}
         <DropdownFilterSelect
           label=""
-          value={value}
+          value={dropdownValue}
           options={options}
           onChange={onChange}
           includeBlank={!isClientStatusField}
@@ -8796,6 +8867,11 @@ function FormField({
           labelClassName="block"
           buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
         />
+        {hasOutsideListValue ? (
+          <span className="mt-1 block text-[11px] font-semibold normal-case text-amber-600 dark:text-amber-300">
+            Valor atual fora da lista cadastrada. Troque por uma opção oficial antes de salvar.
+          </span>
+        ) : null}
         {computedDisabledReason ? (
           <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
         ) : null}
@@ -8935,6 +9011,7 @@ export default function App() {
   const initialSessionState = useMemo(loadInitialSessionState, []);
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
+  const [officialListagens, setOfficialListagens] = useState(initialState.listagens);
   const [responsavelCatalogo, setResponsavelCatalogo] = useState([]);
   const [responsavelCatalogoBusy, setResponsavelCatalogoBusy] = useState(false);
   const [responsavelEcfCatalogo, setResponsavelEcfCatalogo] = useState([]);
@@ -9370,6 +9447,10 @@ export default function App() {
         ...currentListagens,
         responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
       }));
+      setOfficialListagens((currentListagens) => ({
+        ...currentListagens,
+        responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
+      }));
       return nextCatalogo;
     });
   }
@@ -9382,6 +9463,10 @@ export default function App() {
         ? current.map((row) => (row.id === item.id ? item : row))
         : [...current, item];
       setListagens((currentListagens) => ({
+        ...currentListagens,
+        responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
+      }));
+      setOfficialListagens((currentListagens) => ({
         ...currentListagens,
         responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
       }));
@@ -9535,14 +9620,13 @@ export default function App() {
       const clientesComSocios = hydrateClientesComSocios(clientesComAcompanhamento, sociosIndex);
       const latestUpdatedAt = getLatestClienteAtualizadoEm(clientesComSocios);
 
-      const nextListagens = mergeListagensFromClients(
-        mergeListagensFromSupabase(createRuntimeListBase(), listagensSupabase),
-        clientesComSocios,
-      );
+      const nextOfficialListagens = mergeListagensFromSupabase(createRuntimeListBase(), listagensSupabase);
+      const nextListagens = mergeListagensFromClients(nextOfficialListagens, clientesComSocios);
       if (responsaveisResult.ok) {
         setResponsavelCatalogo(responsaveisResult.rows);
         const responsaveisAtivos = getResponsaveisAtivosCatalogo(responsaveisResult.rows);
         if (responsaveisResult.rows.length) {
+          nextOfficialListagens.responsavel = responsaveisAtivos;
           nextListagens.responsavel = responsaveisAtivos;
         }
       } else {
@@ -9552,11 +9636,13 @@ export default function App() {
         setResponsavelEcfCatalogo(responsaveisEcfResult.rows);
         const responsaveisEcfAtivos = getResponsaveisAtivosCatalogo(responsaveisEcfResult.rows);
         if (responsaveisEcfResult.rows.length) {
+          nextOfficialListagens.responsavel_ecf = responsaveisEcfAtivos;
           nextListagens.responsavel_ecf = responsaveisEcfAtivos;
         }
       } else {
         console.warn('[listagens] Falha ao carregar responsaveis da ECF do Supabase:', responsaveisEcfResult.error);
       }
+      setOfficialListagens(nextOfficialListagens);
       persist(clientesComSocios, nextListagens, {
         ...metadata,
         source: 'Supabase',
@@ -10868,6 +10954,10 @@ export default function App() {
           ...currentListagens,
           responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
         }));
+        setOfficialListagens((currentListagens) => ({
+          ...currentListagens,
+          responsavel: getResponsaveisAtivosCatalogo(nextCatalogo),
+        }));
         return nextCatalogo;
       });
       setToast({
@@ -10971,6 +11061,10 @@ export default function App() {
       setResponsavelEcfCatalogo((current) => {
         const nextCatalogo = current.filter((row) => row.id !== item.id);
         setListagens((currentListagens) => ({
+          ...currentListagens,
+          responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
+        }));
+        setOfficialListagens((currentListagens) => ({
           ...currentListagens,
           responsavel_ecf: getResponsaveisAtivosCatalogo(nextCatalogo),
         }));
@@ -11430,6 +11524,7 @@ export default function App() {
         <ClientModal
           client={editingClient}
           listagens={listagens}
+          officialListagens={officialListagens}
           onClose={() => setEditingClient(null)}
           onSave={saveClient}
           canEditFieldForClient={(fieldKey) => !editingClient.id || canEditClientField(currentUserFull, fieldKey)}
