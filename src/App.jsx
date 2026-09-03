@@ -6375,7 +6375,7 @@ function ReinfPage({
   );
 }
 
-function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate, onQuickUpdate, onAnexoSuccess, onAnexoRemove, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
+function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = [], onView, canManageAttachments, canEditDeliveryDate, onQuickUpdate, onAnexoSuccess, onAnexoRemove, onAnexoError, supabaseStatus, metadata, statusLabel, statusTone = 'neutral', onRefresh, loading = false, searchContext, onClearSearchContext }) {
   const emptyFilters = {
     search: '',
     cnpj: '',
@@ -6417,6 +6417,20 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const activeAttachmentFilterKey = statusTipo === 'ecf' ? 'anexo_recibo_ecf' : 'anexo_recibo_ecd';
   const activeAttachmentFlagKey = statusTipo === 'ecf' ? 'ecf_comprovante_anexado' : 'ecd_comprovante_anexado';
   const activeAttachmentFilterLabel = statusTipo === 'ecf' ? 'Anexo recibo ECF' : 'Anexo recibo ECD';
+  const activeResponsavelColumn = statusTipo === 'ecf' ? 'responsavel_ecf' : 'responsavel_ecd';
+  const activeResponsavelFilterLabel = statusTipo === 'ecf' ? 'Responsável pela ECF' : 'Responsável';
+  const getActiveResponsavel = (client) => (
+    statusTipo === 'ecf'
+      ? normalizeTeamMemberDisplayName(client?.responsavel_ecf)
+      : getObrigacaoResponsavel(client)
+  );
+  const activeResponsavelOptions = statusTipo === 'ecf'
+    ? uniqueValues([
+        ...getResponsaveisAtivosCatalogo(responsavelOptions),
+        ...getResponsaveisAtivosCatalogo(responsavelEcfOptions),
+        ...scopedClients.map((client) => getActiveResponsavel(client)),
+      ])
+    : uniqueValues(scopedClients.map((client) => getActiveResponsavel(client)));
 
   useEffect(() => {
     const validModes = new Set(modeOptions.map((option) => option.value));
@@ -6436,7 +6450,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
   const rows = scopedClients.filter((client) => {
     if (focusedClientId && String(client.id ?? '') !== focusedClientId) return false;
     const search = normalizeText(filters.search);
-    const responsavelAtual = getObrigacaoResponsavel(client);
+    const responsavelAtual = getActiveResponsavel(client);
     const attachmentFilter = filters[activeAttachmentFilterKey];
     const reciboAnexado = hasObrigacaoComprovante(client, activeAttachmentFlagKey, activeAttachmentFilterKey);
     const modeMatches = matchesEcdEcfStatusMode(client, mode, statusTipo);
@@ -6487,7 +6501,7 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <FilterSelect label="Responsável" value={filters.responsavel_ecd} options={uniqueValues(scopedClients.map((client) => getObrigacaoResponsavel(client)))} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
+          <FilterSelect label={activeResponsavelFilterLabel} value={filters.responsavel_ecd} options={activeResponsavelOptions} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
           <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
           <FilterSelect label={activeAttachmentFilterLabel} value={filters[activeAttachmentFilterKey]} options={attachmentOptions} onChange={(value) => updateFilter({ [activeAttachmentFilterKey]: value })} includeBlank={false} />
@@ -6502,13 +6516,14 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
             'nome_identificacao',
             'cnpj',
             'regime_tributario',
-            'responsavel_ecd',
+            activeResponsavelColumn,
             ...dateColumns,
           ]}
           columnLabels={{
             nome_identificacao: 'Nome / Identificação',
             regime_tributario: 'Regime tributário',
             responsavel_ecd: 'Responsável',
+            responsavel_ecf: 'Responsável pela ECF',
             ultima_ecd_entregue: 'Última ECD entregue',
             ultima_ecf_entregue: 'Última ECF entregue',
             data_entrega_ecd: 'Data de entrega ECD',
@@ -6522,6 +6537,9 @@ function EcdEcfPage({ clients, onView, canManageAttachments, canEditDeliveryDate
           renderCell={(client, column) => {
             if (column === 'responsavel_ecd') {
               return renderFieldValue(getObrigacaoResponsavel(client));
+            }
+            if (column === 'responsavel_ecf') {
+              return renderFieldValue(client.responsavel_ecf);
             }
             if (column === 'data_entrega_ecd' || column === 'data_entrega_ecf') {
               const tipo = column === 'data_entrega_ecf' ? 'ecf' : 'ecd';
@@ -11181,6 +11199,8 @@ export default function App() {
     ecd: (
       <EcdEcfPage
         clients={activeClients}
+        responsavelOptions={responsavelCatalogo}
+        responsavelEcfOptions={responsavelEcfCatalogo}
         onView={openClient}
         canManageAttachments={canManageAttachment}
         canEditDeliveryDate={(client, fieldKey = 'data_entrega_ecd') => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, fieldKey)}
