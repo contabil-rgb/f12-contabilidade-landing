@@ -4013,6 +4013,7 @@ function SearchAndFilters({
             options={CLIENT_STATUS_FILTER_OPTIONS}
             onChange={(value) => updateFilter({ arquivamento: value || DEFAULT_FILTERS.arquivamento })}
             includeBlank={false}
+            searchable
             labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
             buttonClassName="select-shell mt-2 normal-case"
           />
@@ -4021,6 +4022,7 @@ function SearchAndFilters({
             value={filters.alerta}
             options={alertOptions}
             onChange={(value) => updateFilter({ alerta: value })}
+            searchable
             labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
             buttonClassName="select-shell mt-2 normal-case"
           />
@@ -4034,6 +4036,7 @@ function SearchAndFilters({
                 value={filters[fieldKey]}
                 options={options}
                 onChange={(value) => updateFilter({ [fieldKey]: value })}
+                searchable
                 labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
                 buttonClassName="select-shell mt-2 normal-case"
               />
@@ -4582,19 +4585,36 @@ function DropdownFilterSelect({
   emptyLabel,
   disabled = false,
   disabledReason,
+  searchable = false,
+  searchPlaceholder = 'Pesquisar opção',
   labelClassName = 'text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400',
   buttonClassName = 'select-shell mt-1 normal-case',
 }) {
   const [open, setOpen] = useState(false);
+  const [optionSearch, setOptionSearch] = useState('');
   const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
   const { menuRef, menuStyle } = useFloatingDropdown(open, containerRef);
   const blankLabel = emptyLabel ?? (includeBlank ? 'Todos' : 'Não informado');
+  const mappedOptions = options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
   const normalizedOptions = [
     ...(includeBlank ? [{ value: '', label: blankLabel }] : []),
-    ...options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option)),
+    ...mappedOptions,
   ];
+  const normalizedSearch = normalizeText(optionSearch);
+  const filteredOptions = normalizedSearch
+    ? mappedOptions.filter((option) => normalizeText(`${option.label} ${option.value}`).includes(normalizedSearch))
+    : mappedOptions;
+  const visibleOptions = normalizedSearch
+    ? [
+      ...(includeBlank ? [{ value: '', label: blankLabel }] : []),
+      ...filteredOptions,
+    ]
+    : normalizedOptions;
+  const firstFilteredOption = normalizedSearch ? filteredOptions[0] : null;
   const selectedOption = normalizedOptions.find((option) => option.value === value);
   const selectedLabel = selectedOption?.label ?? blankLabel;
+  const showSearch = searchable && mappedOptions.length > 0;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -4619,9 +4639,25 @@ function DropdownFilterSelect({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      setOptionSearch('');
+      return undefined;
+    }
+
+    if (!showSearch) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, showSearch]);
+
   function handleSelect(nextValue) {
     if (disabled) return;
     onChange(nextValue);
+    setOptionSearch('');
     setOpen(false);
   }
 
@@ -4633,7 +4669,35 @@ function DropdownFilterSelect({
         style={menuStyle ?? { visibility: 'hidden' }}
         className="dropdown-menu-shell overflow-soft normal-case ring-1 ring-slate-900/5 dark:ring-white/5"
       >
-        {normalizedOptions.map((option) => {
+        {showSearch ? (
+          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
+              <Search size={14} className="shrink-0" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                value={optionSearch}
+                onChange={(event) => setOptionSearch(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    setOpen(false);
+                    return;
+                  }
+
+                  if (event.key === 'Enter' && firstFilteredOption) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleSelect(firstFilteredOption.value);
+                  }
+                }}
+                placeholder={searchPlaceholder}
+                className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold normal-case text-slate-800 outline-none placeholder:text-slate-400 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+            </div>
+          </div>
+        ) : null}
+        {visibleOptions.map((option) => {
           const selected = option.value === value;
           return (
             <button
@@ -4652,6 +4716,11 @@ function DropdownFilterSelect({
             </button>
           );
         })}
+        {normalizedSearch && visibleOptions.length === (includeBlank ? 1 : 0) ? (
+          <div className="px-3 py-3 text-sm font-semibold text-slate-500 dark:text-gray-400">
+            Nenhuma opção encontrada
+          </div>
+        ) : null}
       </div>,
       document.body,
     )
@@ -5003,7 +5072,7 @@ function DropdownMultiSelect({
   );
 }
 
-function FilterSelect({ label, value, options, onChange, includeBlank = true }) {
+function FilterSelect({ label, value, options, onChange, includeBlank = true, searchable = true }) {
   return (
     <DropdownFilterSelect
       label={label}
@@ -5011,6 +5080,7 @@ function FilterSelect({ label, value, options, onChange, includeBlank = true }) 
       options={options}
       onChange={onChange}
       includeBlank={includeBlank}
+      searchable={searchable}
     />
   );
 }
@@ -7489,9 +7559,9 @@ function ReportsPage({
     if (selectedReportType === 'lucros') {
       return (
         <>
-          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
-          <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} />
-          <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} />
+          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+          <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} searchable />
+          <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} searchable />
           <div className="sm:col-span-2 xl:col-span-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
@@ -7530,20 +7600,20 @@ function ReportsPage({
     if (selectedReportType === 'ecd_ecf') {
       return (
         <>
-          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
-          <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
-          <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} />
-          <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} />
+          <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+          <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
+          <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} searchable />
+          <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
         </>
       );
     }
 
     return (
       <>
-        <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} />
-        <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} />
+        <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+        <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
         {selectedReportType === 'clientes' ? (
-          <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} />
+          <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} searchable />
         ) : null}
       </>
     );
