@@ -8,9 +8,9 @@ export const FIELD_DEFINITIONS = [
   { key: 'nome_identificacao', label: 'Nome / Identificação', group: 'Identificação', type: 'text', required: true },
   { key: 'status', label: 'Status do cliente', group: 'Identificação', type: 'select', listKey: 'status_cliente' },
   { key: 'tipo_cliente', label: 'Tipo de Cliente', group: 'Identificação', type: 'select', listKey: 'tipo_cliente' },
-  { key: 'regime_tributario', label: 'Regime Tributário', group: 'Identificação', type: 'select', listKey: 'regime_tributario' },
-  { key: 'atividades', label: 'Atividades', group: 'Identificação', type: 'select', listKey: 'atividades' },
-  { key: 'dificuldade', label: 'Dificuldade', group: 'Identificação', type: 'select', listKey: 'dificuldade' },
+  { key: 'regime_tributario', label: 'Regime Tributário', group: 'Identificação', type: 'select', listKey: 'regime_tributario', required: true },
+  { key: 'atividades', label: 'Atividades', group: 'Identificação', type: 'select', listKey: 'atividades', required: true },
+  { key: 'dificuldade', label: 'Dificuldade', group: 'Identificação', type: 'select', listKey: 'dificuldade', required: true },
 
   { key: 'distribuicao_lucros', label: 'Distribuição de Lucros', group: 'REINF e Lucros', type: 'yesno' },
   { key: 'lucro', label: 'Lucro?', group: 'REINF e Lucros', type: 'yesno' },
@@ -36,7 +36,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'responsavel_ecf', label: 'Responsável pela ECF', group: 'ECD / ECF', type: 'select', listKey: 'responsavel_ecf' },
   { key: 'anexo_recibo_ecf', label: 'Anexo do recibo da ECF', group: 'ECD / ECF', type: 'attachment' },
 
-  { key: 'responsavel', label: 'Responsável', group: 'Responsáveis', type: 'select', listKey: 'responsavel' },
+  { key: 'responsavel', label: 'Responsável', group: 'Responsáveis', type: 'select', listKey: 'responsavel', required: true },
   { key: 'revisor', label: 'Revisor', group: 'Responsáveis', type: 'select', listKey: 'revisor' },
 
   { key: 'primeira_competencia', label: 'Primeira Competência', group: 'Status Contábil', type: 'text' },

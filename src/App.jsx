@@ -3245,6 +3245,11 @@ function resolveOfficialSelectValue(listagens, field, value) {
   return { ok: false, value: rawValue, status: 'invalid' };
 }
 
+function isRequiredClientFieldBlank(field, value) {
+  if (isBlank(value)) return true;
+  return isLockedClientSelectField(field) && normalizeText(value) === normalizeText('Não informado');
+}
+
 function AppShell({
   page,
   setPage,
@@ -8412,7 +8417,7 @@ function ClientModal({
     const canonicalForm = { ...form };
     modalFields.forEach((field) => {
       const fieldAllowed = canEditFieldForClient(field.key);
-      if (field.required && fieldAllowed && isBlank(form[field.key])) {
+      if (field.required && fieldAllowed && isRequiredClientFieldBlank(field, form[field.key])) {
         nextErrors.push(`${field.label} é obrigatório.`);
       }
       if (fieldAllowed && isLockedClientSelectField(field)) {
