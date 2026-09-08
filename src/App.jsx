@@ -3250,6 +3250,10 @@ function isRequiredClientFieldBlank(field, value) {
   return isLockedClientSelectField(field) && normalizeText(value) === normalizeText('Não informado');
 }
 
+function isRevisorRequiredByDifficulty(dificuldade) {
+  return ['alta', 'altissima'].includes(normalizeText(dificuldade));
+}
+
 function AppShell({
   page,
   setPage,
@@ -8395,6 +8399,7 @@ function ClientModal({
       && !EDIT_MODAL_HIDDEN_GROUPS.has(field.group),
   );
   const showEcdEcfGroup = isRegimeEcdEcfAplicavel(form.regime_tributario);
+  const revisorRequired = isRevisorRequiredByDifficulty(form.dificuldade);
 
   function updateField(key, value) {
     setForm((current) => {
@@ -8417,7 +8422,8 @@ function ClientModal({
     const canonicalForm = { ...form };
     modalFields.forEach((field) => {
       const fieldAllowed = canEditFieldForClient(field.key);
-      if (field.required && fieldAllowed && isRequiredClientFieldBlank(field, form[field.key])) {
+      const fieldRequired = field.required || (field.key === 'revisor' && revisorRequired);
+      if (fieldRequired && fieldAllowed && isRequiredClientFieldBlank(field, form[field.key])) {
         nextErrors.push(`${field.label} é obrigatório.`);
       }
       if (fieldAllowed && isLockedClientSelectField(field)) {
@@ -8494,7 +8500,11 @@ function ClientModal({
                     {visibleFields.map((field) => (
                       <FormField
                         key={field.key}
-                        field={{ ...field, label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label }}
+                        field={{
+                          ...field,
+                          label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label,
+                          required: field.required || (field.key === 'revisor' && revisorRequired),
+                        }}
                         value={form[field.key] ?? ''}
                         cliente={form}
                         listagens={listagens}
