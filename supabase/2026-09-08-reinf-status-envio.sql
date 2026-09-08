@@ -1,43 +1,6 @@
--- Portal de Gestao Contabil - Historico de relatorios REINF gerados
--- Execute no SQL Editor do Supabase antes de usar o botao "Salvar relatorio" no modal da REINF.
-
-create extension if not exists pgcrypto;
-
-create table if not exists public.reinf_relatorios (
-  id uuid primary key default gen_random_uuid(),
-  cliente_id uuid references public.clientes(id) on delete set null,
-  cnpj text not null,
-  razao_social text not null,
-  nome_identificacao text,
-  responsavel text,
-  revisor text,
-  modelo_tabela text not null default 'valores_por_mes',
-  modelo_tabela_label text not null default 'Tabela por meses',
-  status_envio text not null default 'salvo',
-  enviado_em timestamp with time zone,
-  email_resend_id text,
-  periodicidade text not null,
-  ano_referencia text,
-  meses jsonb not null default '[]'::jsonb,
-  assunto text not null,
-  corpo_mensagem text not null,
-  socios jsonb not null default '[]'::jsonb,
-  criado_por uuid references public.usuarios(id),
-  criado_por_nome text,
-  criado_por_email text,
-  criado_em timestamp with time zone not null default now(),
-  constraint reinf_relatorios_modelo_tabela_check check (modelo_tabela in ('valores_por_mes', 'totais_distribuidos')),
-  constraint reinf_relatorios_status_envio_check check (status_envio in ('salvo', 'enviado')),
-  constraint reinf_relatorios_periodicidade_check check (periodicidade in ('Mensal', 'Trimestral')),
-  constraint reinf_relatorios_meses_array_check check (jsonb_typeof(meses) = 'array'),
-  constraint reinf_relatorios_socios_array_check check (jsonb_typeof(socios) = 'array')
-);
-
-alter table public.reinf_relatorios
-  add column if not exists modelo_tabela text not null default 'valores_por_mes';
-
-alter table public.reinf_relatorios
-  add column if not exists modelo_tabela_label text not null default 'Tabela por meses';
+-- Portal de Gestao Contabil - Status de envio dos relatorios REINF
+-- Execute no SQL Editor do Supabase para diferenciar relatorios apenas salvos
+-- de relatorios cujo e-mail foi efetivamente enviado.
 
 alter table public.reinf_relatorios
   add column if not exists status_envio text not null default 'salvo';
@@ -48,20 +11,10 @@ alter table public.reinf_relatorios
 alter table public.reinf_relatorios
   add column if not exists email_resend_id text;
 
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'reinf_relatorios_modelo_tabela_check'
-      and conrelid = 'public.reinf_relatorios'::regclass
-  ) then
-    alter table public.reinf_relatorios
-      add constraint reinf_relatorios_modelo_tabela_check
-      check (modelo_tabela in ('valores_por_mes', 'totais_distribuidos'));
-  end if;
-end;
-$$;
+update public.reinf_relatorios
+set status_envio = 'salvo'
+where status_envio is null
+   or btrim(status_envio) = '';
 
 do $$
 begin
@@ -78,42 +31,8 @@ begin
 end;
 $$;
 
-create index if not exists idx_reinf_relatorios_cliente_id
-  on public.reinf_relatorios(cliente_id);
-
-create index if not exists idx_reinf_relatorios_criado_em
-  on public.reinf_relatorios(criado_em desc);
-
 create index if not exists idx_reinf_relatorios_status_envio
   on public.reinf_relatorios(status_envio);
-
-alter table public.reinf_relatorios enable row level security;
-
-create or replace function public.is_portal_usuario_ativo()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.usuarios u
-    where u.auth_user_id = auth.uid()
-      and u.status = 'Ativo'
-      and u.perfil_acesso in (
-        'coordenador_administrador',
-        'setor_contabil_operacional'
-      )
-  );
-$$;
-
-drop policy if exists reinf_relatorios_select_authenticated_active on public.reinf_relatorios;
-create policy reinf_relatorios_select_authenticated_active
-on public.reinf_relatorios
-for select
-to authenticated
-using (public.is_portal_usuario_ativo());
 
 create or replace function public.salvar_reinf_relatorio_portal(
   p_relatorio jsonb
@@ -294,51 +213,3 @@ $$;
 
 revoke all on function public.salvar_reinf_relatorio_portal(jsonb) from public;
 grant execute on function public.salvar_reinf_relatorio_portal(jsonb) to authenticated;
-
-create or replace function public.excluir_reinf_relatorio_portal(
-  p_relatorio_id uuid
-)
-returns public.reinf_relatorios
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_usuario public.usuarios%rowtype;
-  v_relatorio public.reinf_relatorios;
-begin
-  select *
-    into v_usuario
-  from public.usuarios u
-  where u.auth_user_id = auth.uid()
-    and u.status = 'Ativo'
-    and u.perfil_acesso in (
-      'coordenador_administrador',
-      'setor_contabil_operacional'
-    )
-  limit 1;
-
-  if v_usuario.id is null then
-    raise exception 'Usuario sem permissao para excluir relatorio REINF.';
-  end if;
-
-  if p_relatorio_id is null then
-    raise exception 'Relatorio REINF e obrigatorio para exclusao.';
-  end if;
-
-  delete from public.reinf_relatorios r
-  where r.id = p_relatorio_id
-  returning * into v_relatorio;
-
-  if v_relatorio.id is null then
-    raise exception 'Relatorio REINF nao encontrado.';
-  end if;
-
-  return v_relatorio;
-end;
-$$;
-
-revoke all on function public.excluir_reinf_relatorio_portal(uuid) from public;
-grant execute on function public.excluir_reinf_relatorio_portal(uuid) to authenticated;
-
-grant select on table public.reinf_relatorios to authenticated;

@@ -4,6 +4,11 @@ function normalizeJsonArray(value: unknown) {
   return Array.isArray(value) ? value : [];
 }
 
+function normalizeStatusEnvio(value: unknown) {
+  const status = String(value ?? '').trim();
+  return status === 'enviado' ? 'enviado' : 'salvo';
+}
+
 function normalizeRow(row: Record<string, unknown>) {
   return {
     id: row.id,
@@ -15,6 +20,9 @@ function normalizeRow(row: Record<string, unknown>) {
     revisor: String(row.revisor ?? '').trim(),
     modelo_tabela: String(row.modelo_tabela ?? '').trim(),
     modelo_tabela_label: String(row.modelo_tabela_label ?? '').trim(),
+    status_envio: normalizeStatusEnvio(row.status_envio),
+    enviado_em: row.enviado_em ?? null,
+    email_resend_id: String(row.email_resend_id ?? '').trim(),
     periodicidade: String(row.periodicidade ?? '').trim(),
     ano_referencia: String(row.ano_referencia ?? '').trim(),
     meses: normalizeJsonArray(row.meses),
