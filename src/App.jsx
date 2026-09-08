@@ -264,7 +264,6 @@ const ALERT_FILTER_LABELS = {
   critico: 'Situação crítica',
   tecnica: 'Pendência técnica',
   reinf: 'Distribuição de lucro pendente',
-  recibo_reinf: 'Comprovante de distribuição de lucro pendente',
   ecd: 'ECD pendente',
   ecd_envio: 'Aguardando envio da ECD',
   ecd_responsavel: 'Responsável ECD pendente',
@@ -322,16 +321,21 @@ const ATTACHMENT_FILTERS = {
   missing: 'Sem anexo',
 };
 
-const BASE_CLIENTS_VISIBLE_KEYS = new Set([
+const BASE_CLIENTS_TABLE_COLUMN_KEYS = [
+  'status',
+  'situacao',
+  'competencia_em_dia',
+  'alertas_acompanhamento',
   'anexo_cartao_cnpj',
   'anexo_cartao_qsa',
+  'contrato_social',
   'tipo_cliente',
   'regime_tributario',
   'atividades',
   'dificuldade',
   'responsavel',
   'revisor',
-]);
+];
 
 const CONTRATO_SOCIAL_TABLE_FIELD = {
   key: 'contrato_social',
@@ -340,13 +344,23 @@ const CONTRATO_SOCIAL_TABLE_FIELD = {
   type: 'contrato_social',
 };
 
-const BASE_CLIENTS_TABLE_COLUMNS = TABLE_COLUMNS
-  .filter((field) => BASE_CLIENTS_VISIBLE_KEYS.has(field.key))
-  .flatMap((field) => (
-    field.key === 'anexo_cartao_qsa'
-      ? [field, CONTRATO_SOCIAL_TABLE_FIELD]
-      : [field]
-  ));
+const ALERTAS_ACOMPANHAMENTO_TABLE_FIELD = {
+  key: 'alertas_acompanhamento',
+  label: 'Alertas e acompanhamento',
+  group: 'Alertas e Pendências',
+  type: 'alertas',
+  sortable: false,
+};
+
+const BASE_CLIENTS_TABLE_COLUMNS = BASE_CLIENTS_TABLE_COLUMN_KEYS
+  .map((key) => (
+    key === CONTRATO_SOCIAL_TABLE_FIELD.key
+      ? CONTRATO_SOCIAL_TABLE_FIELD
+      : key === ALERTAS_ACOMPANHAMENTO_TABLE_FIELD.key
+        ? ALERTAS_ACOMPANHAMENTO_TABLE_FIELD
+      : TABLE_COLUMNS.find((field) => field.key === key)
+  ))
+  .filter(Boolean);
 
 const EDIT_MODAL_HIDDEN_FIELDS = new Set([
   'data_enviada_reinf',
@@ -1879,7 +1893,6 @@ function getClientAlertSignals(client) {
     },
     isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
     isReinfPendente(client) && { key: 'reinf', label: 'Distribuição de lucro pendente', tone: 'warning' },
-    isReciboReinfPendente(client) && { key: 'recibo_reinf', label: 'Comprovante de distribuição de lucro pendente', tone: 'warning' },
     isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
     isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
@@ -1899,21 +1912,362 @@ function getClientAlertSignals(client) {
     isAtaPendente(client) && { key: 'ata', label: 'Ata pendente', tone: 'warning' },
   ].filter(Boolean);
 }
+
+function ClientAlertsPopover({ client, alert, anchorRect, onClose, onViewClient }) {
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onClose?.();
+    }
+
+    function handleOutsideClick() {
+      onClose?.();
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', handleOutsideClick);
+    window.addEventListener('resize', handleOutsideClick);
+    window.addEventListener('scroll', handleOutsideClick, true);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleOutsideClick);
+      window.removeEventListener('resize', handleOutsideClick);
+      window.removeEventListener('scroll', handleOutsideClick, true);
+    };
+  }, [onClose]);
+
+  if (!alert || !anchorRect) return null;
+
+  const width = 340;
+  const viewportPadding = 12;
+  const left = Math.max(
+    viewportPadding,
+    Math.min(anchorRect.left, window.innerWidth - width - viewportPadding),
+  );
+  const top = Math.max(
+    viewportPadding,
+    Math.min(anchorRect.bottom + 8, window.innerHeight - 320),
+  );
+  const summaryAlerts = alert.summary ? alert.alerts ?? [] : [];
+  const action = alert.summary ? null : getClientAlertAction(alert);
+
+  return createPortal(
+    <div
+      className="fixed z-[90] w-[340px] rounded-lg border border-slate-200 bg-white p-4 text-left shadow-2xl dark:border-gray-700 dark:bg-gray-950"
+      style={{ left, top }}
+      onClick={(event) => event.stopPropagation()}
+      role="dialog"
+      aria-label={alert.summary ? 'Alertas adicionais' : alert.label}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+            {alert.summary ? 'Alertas adicionais' : action?.area ?? 'Alerta'}
+          </p>
+          <h3 className="mt-1 text-sm font-black leading-snug text-slate-950 dark:text-gray-100">
+            {alert.summary ? `${summaryAlerts.length} alerta(s) adicionais` : alert.label}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+          aria-label="Fechar detalhes do alerta"
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      </div>
+
+      {alert.summary ? (
+        <div className="mt-3 space-y-2">
+          {summaryAlerts.map((item) => {
+            const itemAction = getClientAlertAction(item);
+            return (
+              <div key={item.key} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-gray-700 dark:bg-gray-900">
+                <p className="text-xs font-black text-slate-900 dark:text-gray-100">{item.label}</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-gray-400">{itemAction.area}</p>
+                <p className="mt-1 text-xs font-semibold leading-snug text-slate-600 dark:text-gray-300">{itemAction.nextAction}</p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass(alert.tone)}`}>
+              {action?.priorityLabel ?? 'Atenção'}
+            </span>
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass('neutral')}`}>
+              {action?.section ?? action?.area ?? 'Cliente'}
+            </span>
+          </div>
+          <p className="text-sm font-semibold leading-relaxed text-slate-700 dark:text-gray-200">
+            {action?.description ?? 'Este alerta foi identificado a partir dos dados atuais do cliente.'}
+          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-gray-700 dark:bg-gray-900">
+            <p className="text-[11px] font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Próxima ação</p>
+            <p className="mt-1 text-sm font-bold leading-snug text-slate-800 dark:text-gray-100">
+              {action?.nextAction ?? 'Abrir o cliente e revisar as informações relacionadas.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          Fechar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onClose?.();
+            onViewClient?.(client);
+          }}
+          className="rounded-lg bg-brand-blue px-3 py-2 text-xs font-black text-white transition hover:bg-[#0056d6]"
+        >
+          Ver no cliente
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ClientAlertsTableCell({ client, onViewClient }) {
+  const [activeAlert, setActiveAlert] = useState(null);
+  const [anchorRect, setAnchorRect] = useState(null);
+  const signals = getClientAlertSignals(client);
+  if (!signals.length) {
+    return (
+      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass('success')}`}>
+        Sem alertas
+      </span>
+    );
+  }
+
+  const visibleSignals = signals.slice(0, 2);
+  const hiddenCount = signals.length - visibleSignals.length;
+  const hiddenSignals = signals.slice(visibleSignals.length);
+  const title = signals.map((signal) => signal.label).join(' | ');
+
+  function openAlertPopover(event, alert) {
+    event.stopPropagation();
+    setActiveAlert(alert);
+    setAnchorRect(event.currentTarget.getBoundingClientRect());
+  }
+
+  function closeAlertPopover() {
+    setActiveAlert(null);
+    setAnchorRect(null);
+  }
+
+  return (
+    <div className="flex min-w-64 max-w-72 flex-wrap gap-1.5" title={title} onClick={(event) => event.stopPropagation()}>
+      {visibleSignals.map((signal) => (
+        <button
+          type="button"
+          key={signal.key}
+          onClick={(event) => openAlertPopover(event, signal)}
+          className={`inline-flex max-w-[13rem] rounded-full border px-2.5 py-1 text-xs font-medium text-left transition hover:-translate-y-px hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30 ${chipClass(signal.tone)}`}
+        >
+          <span className="truncate">{signal.label}</span>
+        </button>
+      ))}
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={(event) => openAlertPopover(event, {
+            key: 'alertas_extras',
+            label: 'Alertas adicionais',
+            tone: 'neutral',
+            summary: true,
+            alerts: hiddenSignals,
+          })}
+          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium transition hover:-translate-y-px hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30 ${chipClass('neutral')}`}
+        >
+          +{hiddenCount}
+        </button>
+      ) : null}
+      <ClientAlertsPopover
+        client={client}
+        alert={activeAlert}
+        anchorRect={anchorRect}
+        onClose={closeAlertPopover}
+        onViewClient={onViewClient}
+      />
+    </div>
+  );
+}
+
 const PENDENCIA_ACTION_BY_SIGNAL = {
-  reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 95, priorityLabel: 'Alta', nextAction: 'Revisar envio e prazo da distribuição de lucro.' },
-  recibo_reinf: { key: 'reinf', area: 'Distribuição de Lucro', route: 'reinf', priority: 90, priorityLabel: 'Alta', nextAction: 'Anexar comprovante da distribuição de lucro.' },
-  ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Média', nextAction: 'Validar status e envio da ECD.' },
-  ecd_envio: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 78, priorityLabel: 'Média', nextAction: 'Validar status e envio da ECD.' },
-  ecd_responsavel: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 72, priorityLabel: 'Média', nextAction: 'Definir responsável pela ECD.' },
-  recibo_ecd: { key: 'ecd', area: 'ECD', route: 'ecd', priority: 82, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECD.' },
-  ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 76, priorityLabel: 'Média', nextAction: 'Validar status da ECF.' },
-  ecf_envio: { key: 'ecf_envio', area: 'ECF', route: 'ecd', priority: 77, priorityLabel: 'Média', nextAction: 'Confirmar envio da ECF.' },
-  recibo_ecf: { key: 'ecf', area: 'ECF', route: 'ecd', priority: 80, priorityLabel: 'Alta', nextAction: 'Anexar recibo da ECF.' },
-  documentos: { key: 'documentos', area: 'Documentação', route: 'cliente', priority: 68, priorityLabel: 'Média', nextAction: 'Cobrar documentos e registrar retorno do cliente.' },
-  ata: { key: 'ata', area: 'Ata', route: 'cliente', priority: 66, priorityLabel: 'Média', nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.' },
-  comunicacao: { key: 'comunicacao', area: 'Comunicação', route: 'cliente', priority: 70, priorityLabel: 'Média', nextAction: 'Notificar cliente e registrar retorno.' },
-  retorno: { key: 'acompanhamento', area: 'Retorno', route: 'cliente', priority: 74, priorityLabel: 'Média', nextAction: 'Registrar contato e acompanhar retorno do cliente.' },
+  atraso: {
+    key: 'status_contabil',
+    area: 'Status Contábil',
+    section: 'Status Contábil',
+    route: 'cliente',
+    priority: 96,
+    priorityLabel: 'Alta',
+    description: 'A competência do cliente está marcada como não em dia, atrasada ou com dias de atraso.',
+    nextAction: 'Revisar competência, situação e dias de atraso do cliente.',
+  },
+  critico: {
+    key: 'status_contabil',
+    area: 'Status Contábil',
+    section: 'Status Contábil',
+    route: 'cliente',
+    priority: 94,
+    priorityLabel: 'Alta',
+    description: 'A situação do cliente indica criticidade operacional.',
+    nextAction: 'Verificar o motivo da situação crítica e atualizar o acompanhamento.',
+  },
+  reinf: {
+    key: 'reinf',
+    area: 'Distribuição de Lucro',
+    section: 'Distribuição de Lucro',
+    route: 'reinf',
+    priority: 95,
+    priorityLabel: 'Alta',
+    description: 'A distribuição de lucro ainda possui pendência de envio ou validação.',
+    nextAction: 'Revisar envio e prazo da distribuição de lucro.',
+  },
+  ecd: {
+    key: 'ecd',
+    area: 'ECD',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 78,
+    priorityLabel: 'Média',
+    description: 'A obrigação ECD está pendente para este cliente.',
+    nextAction: 'Validar status e envio da ECD.',
+  },
+  ecd_envio: {
+    key: 'ecd',
+    area: 'ECD',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 78,
+    priorityLabel: 'Média',
+    description: 'A ECD está aguardando confirmação de envio.',
+    nextAction: 'Validar status e envio da ECD.',
+  },
+  ecd_responsavel: {
+    key: 'ecd',
+    area: 'ECD',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 72,
+    priorityLabel: 'Média',
+    description: 'Ainda falta definir o responsável pela ECD deste cliente.',
+    nextAction: 'Definir responsável pela ECD.',
+  },
+  recibo_ecd: {
+    key: 'ecd',
+    area: 'ECD',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 82,
+    priorityLabel: 'Alta',
+    description: 'O recibo da ECD ainda não está anexado ou validado.',
+    nextAction: 'Anexar recibo da ECD.',
+  },
+  ecf: {
+    key: 'ecf',
+    area: 'ECF',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 76,
+    priorityLabel: 'Média',
+    description: 'A obrigação ECF está pendente para este cliente.',
+    nextAction: 'Validar status da ECF.',
+  },
+  ecf_envio: {
+    key: 'ecf_envio',
+    area: 'ECF',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 77,
+    priorityLabel: 'Média',
+    description: 'A ECF está aguardando confirmação de envio.',
+    nextAction: 'Confirmar envio da ECF.',
+  },
+  recibo_ecf: {
+    key: 'ecf',
+    area: 'ECF',
+    section: 'ECD / ECF',
+    route: 'ecd',
+    priority: 80,
+    priorityLabel: 'Alta',
+    description: 'O recibo da ECF ainda não está anexado ou validado.',
+    nextAction: 'Anexar recibo da ECF.',
+  },
+  tecnica: {
+    key: 'pendencia_tecnica',
+    area: 'Alertas e Pendências',
+    section: 'Alertas e Pendências',
+    route: 'cliente',
+    priority: 88,
+    priorityLabel: 'Alta',
+    description: 'Existe uma pendência técnica registrada para este cliente.',
+    nextAction: 'Revisar a pendência técnica e registrar o encaminhamento.',
+  },
+  documentos: {
+    key: 'documentos',
+    area: 'Documentação',
+    section: 'Documentação',
+    route: 'cliente',
+    priority: 68,
+    priorityLabel: 'Média',
+    description: 'A documentação do cliente está marcada como atrasada ou incompleta.',
+    nextAction: 'Cobrar documentos e registrar retorno do cliente.',
+  },
+  ata: {
+    key: 'ata',
+    area: 'Ata',
+    section: 'REINF e Lucros',
+    route: 'cliente',
+    priority: 66,
+    priorityLabel: 'Média',
+    description: 'A ata necessária para o processo ainda está pendente.',
+    nextAction: 'Solicitar entrega da ata e registrar a data de recebimento.',
+  },
+  comunicacao: {
+    key: 'comunicacao',
+    area: 'Comunicação',
+    section: 'Alertas e Pendências',
+    route: 'cliente',
+    priority: 70,
+    priorityLabel: 'Média',
+    description: 'O cliente precisa ser comunicado ou ainda há registro de comunicação pendente.',
+    nextAction: 'Notificar cliente e registrar retorno.',
+  },
+  retorno: {
+    key: 'acompanhamento',
+    area: 'Retorno',
+    section: 'Alertas e Pendências',
+    route: 'cliente',
+    priority: 74,
+    priorityLabel: 'Média',
+    description: 'Existe acompanhamento aguardando retorno do cliente.',
+    nextAction: 'Registrar contato e acompanhar retorno do cliente.',
+  },
 };
+
+function getClientAlertAction(alert) {
+  return PENDENCIA_ACTION_BY_SIGNAL[alert?.key] ?? {
+    key: alert?.key ?? 'alerta',
+    area: 'Cliente',
+    section: 'Cadastro do cliente',
+    route: 'cliente',
+    priority: 60,
+    priorityLabel: 'Atenção',
+    description: 'Este alerta foi identificado a partir dos dados atuais do cliente.',
+    nextAction: 'Abrir o cliente e revisar as informações relacionadas.',
+  };
+}
 
 function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, writeDisabled, writeDisabledReason, onSuccess, onRemove, onError }) {
   const anexo = fieldValueToAnexo(client[fieldKey], tipoAnexo, client);
@@ -4169,7 +4523,7 @@ function ClientsTable({
         </div>
       </div>
       <TableScrollArea className="border-x-0 border-b-0 rounded-none shadow-none" topClassName="mx-4 mt-3 sm:mx-5">
-        <table className="table-base base-clients-table min-w-[1760px] 2xl:min-w-[1840px]">
+        <table className="table-base base-clients-table min-w-[2570px] 2xl:min-w-[2670px]">
           <thead className="table-head sticky top-0 z-10">
             <tr>
               <th className="table-head-cell table-sticky-left w-72 px-4">
@@ -4188,14 +4542,18 @@ function ClientsTable({
               </th>
               {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                 <th key={field.key} className="table-head-cell">
-                  <button
-                    type="button"
-                    onClick={() => sortColumn(field.key)}
-                    className="inline-flex items-center gap-1.5 rounded-md transition hover:text-brand-blue"
-                  >
-                    {field.label}
-                    <ArrowDownUp size={13} aria-hidden="true" />
-                  </button>
+                  {field.sortable === false ? (
+                    <span>{field.label}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => sortColumn(field.key)}
+                      className="inline-flex items-center gap-1.5 rounded-md transition hover:text-brand-blue"
+                    >
+                      {field.label}
+                      <ArrowDownUp size={13} aria-hidden="true" />
+                    </button>
+                  )}
                 </th>
               ))}
               <th className="table-head-cell table-sticky-right w-28">
@@ -4233,7 +4591,9 @@ function ClientsTable({
                   </td>
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                   <td key={field.key} className="table-cell">
-                    {renderClientCell?.(client, field.key) ?? (field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
+                    {field.key === 'alertas_acompanhamento' ? (
+                      <ClientAlertsTableCell client={client} onViewClient={() => onView(client.id)} />
+                    ) : renderClientCell?.(client, field.key) ?? (field.key === 'status' || field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
                         {valueOrDash(getResolvedFieldValue(client, field.key))}
                       </span>

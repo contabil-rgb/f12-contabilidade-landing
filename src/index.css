@@ -1076,41 +1076,55 @@
   .base-clients-table .table-head-cell:nth-child(2),
   .base-clients-table .table-cell:nth-child(2),
   .base-clients-table .table-head-cell:nth-child(3),
-  .base-clients-table .table-cell:nth-child(3),
+  .base-clients-table .table-cell:nth-child(3) {
+    width: 8rem;
+  }
+
   .base-clients-table .table-head-cell:nth-child(4),
   .base-clients-table .table-cell:nth-child(4) {
-    width: 13rem;
+    width: 11rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(5),
   .base-clients-table .table-cell:nth-child(5) {
-    width: 8rem;
+    width: 18rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(6),
   .base-clients-table .table-cell:nth-child(6),
   .base-clients-table .table-head-cell:nth-child(7),
-  .base-clients-table .table-cell:nth-child(7) {
-    width: 9rem;
-  }
-
+  .base-clients-table .table-cell:nth-child(7),
   .base-clients-table .table-head-cell:nth-child(8),
   .base-clients-table .table-cell:nth-child(8) {
-    width: 8rem;
+    width: 13rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(9),
   .base-clients-table .table-cell:nth-child(9) {
-    width: 7.5rem;
+    width: 8rem;
   }
 
   .base-clients-table .table-head-cell:nth-child(10),
-  .base-clients-table .table-cell:nth-child(10) {
+  .base-clients-table .table-cell:nth-child(10),
+  .base-clients-table .table-head-cell:nth-child(11),
+  .base-clients-table .table-cell:nth-child(11) {
+    width: 11rem;
+  }
+
+  .base-clients-table .table-head-cell:nth-child(12),
+  .base-clients-table .table-cell:nth-child(12) {
     width: 7.5rem;
   }
 
-  .base-clients-table .table-head-cell:nth-child(11),
-  .base-clients-table .table-cell:nth-child(11) {
+  .base-clients-table .table-head-cell:nth-child(13),
+  .base-clients-table .table-cell:nth-child(13),
+  .base-clients-table .table-head-cell:nth-child(14),
+  .base-clients-table .table-cell:nth-child(14) {
+    width: 10rem;
+  }
+
+  .base-clients-table .table-head-cell:nth-child(15),
+  .base-clients-table .table-cell:nth-child(15) {
     width: 6.75rem;
   }
 
