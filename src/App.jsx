@@ -1864,10 +1864,6 @@ function matchesEcdEcfStatusMode(client, mode, tipo = 'ecd') {
   return true;
 }
 
-function hasComprovanteObrigacaoPendente(client) {
-  return isReciboReinfPendente(client) || isReciboEcdPendente(client) || isReciboEcfPendente(client);
-}
-
 function hasObrigacaoAnual(client) {
   return isYes(client?.ecd) || isYes(client?.ecf);
 }
@@ -7179,11 +7175,10 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
 
   return (
     <div className="min-w-0 space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard title="ECD obrigatoria" value={countWhere(scopedClients, (client) => isYes(client.ecd))} icon={BookOpenCheck} tone="info" />
         <MetricCard title="Pendências ECD" value={countWhere(scopedClients, (client) => hasPendenciaObrigacaoEcd(client))} icon={AlertTriangle} tone="warning" />
         <MetricCard title="Pendências ECF" value={countWhere(scopedClients, (client) => hasPendenciaObrigacaoEcf(client))} icon={FolderClock} tone="warning" />
-        <MetricCard title="Comprovantes pendentes" value={countWhere(scopedClients, (client) => hasComprovanteObrigacaoPendente(client))} icon={Paperclip} tone="warning" />
       </section>
 
       <section className="surface-card p-5">
