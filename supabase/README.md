@@ -52,6 +52,10 @@ Arquivos SQL ativos do projeto.
 - `supabase/listagens-ampliar-categorias.sql`
   - complementa categorias de listagens que antes dependiam mais do bootstrap local
 
+- `supabase/clientes-exclusao-arquivados.sql`
+  - cria a funcao segura para excluir definitivamente clientes arquivados/inativos
+  - execute depois de `anexos.sql`, `contratos-sociais.sql` e `reinf-relatorios.sql`
+
 ## Validacao rapida
 
 Use:

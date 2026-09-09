@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 import { CLIENT_STATUS_OPTIONS } from '../data/schema.js';
 import { sanitizeResponsavelEcdByRegime } from '../lib/ecdRules.js';
 
+const BUCKET_DOCUMENTOS_CLIENTES = 'documentos-clientes';
+
 const DATE_FIELDS = new Set([
   'data_enviada_reinf',
   'data_entrega_ecd',
@@ -171,6 +173,61 @@ type ListarClientesOptions = {
   apenasArquivados?: boolean;
 };
 
+type ExcluirClienteArquivadoRpcRow = {
+  cliente_id?: string | null;
+  cliente_nome?: string | null;
+  arquivos_storage?: string[] | null;
+  anexos_count?: number | null;
+  contratos_sociais_count?: number | null;
+  relatorios_reinf_desvinculados_count?: number | null;
+};
+
+type ArquivoStorageFalha = {
+  caminho: string;
+  erro: string;
+};
+
+export type ExcluirClienteArquivadoResultado = {
+  cliente_id: string;
+  cliente_nome: string;
+  arquivos_storage: string[];
+  anexos_count: number;
+  contratos_sociais_count: number;
+  relatorios_reinf_desvinculados_count: number;
+  arquivos_storage_removidos: string[];
+  arquivos_storage_falhas: ArquivoStorageFalha[];
+};
+
+function normalizeStoragePaths(paths: unknown) {
+  if (!Array.isArray(paths)) return [];
+  return [
+    ...new Set(
+      paths
+        .map((path) => String(path ?? '').trim())
+        .filter((path) => path && !/^(blob:|https?:\/\/)/i.test(path)),
+    ),
+  ];
+}
+
+async function removerArquivosStorage(paths: string[]) {
+  const removidos: string[] = [];
+  const falhas: ArquivoStorageFalha[] = [];
+
+  for (const caminho of normalizeStoragePaths(paths)) {
+    const { error } = await supabase.storage
+      .from(BUCKET_DOCUMENTOS_CLIENTES)
+      .remove([caminho]);
+
+    if (error) {
+      falhas.push({ caminho, erro: error.message });
+    } else {
+      removidos.push(caminho);
+    }
+  }
+
+  return { removidos, falhas };
+}
+
 export async function listarClientes({ incluirArquivados = false, apenasArquivados = false }: ListarClientesOptions = {}) {
   let query = supabase
     .from('clientes')
@@ -335,4 +392,34 @@ export async function restaurarCliente(id: string) {
 
   const row = Array.isArray(data) ? data[0] : data;
   return normalizeRow(row as Record<string, unknown>);
+}
+
+export async function excluirClienteArquivado(id: string): Promise<ExcluirClienteArquivadoResultado> {
+  const { data, error } = await supabase.rpc('excluir_cliente_arquivado_portal', {
+    p_cliente_id: id,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível excluir cliente arquivado no Supabase: ${error.message}`);
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as ExcluirClienteArquivadoRpcRow | null;
+
+  if (!row) {
+    throw new Error('O Supabase não retornou confirmação da exclusão do cliente.');
+  }
+
+  const arquivosStorage = normalizeStoragePaths(row.arquivos_storage);
+  const limpezaStorage = await removerArquivosStorage(arquivosStorage);
+
+  return {
+    cliente_id: String(row.cliente_id ?? id),
+    cliente_nome: String(row.cliente_nome ?? 'Cliente excluído'),
+    arquivos_storage: arquivosStorage,
+    anexos_count: Number(row.anexos_count ?? 0) || 0,
+    contratos_sociais_count: Number(row.contratos_sociais_count ?? 0) || 0,
+    relatorios_reinf_desvinculados_count: Number(row.relatorios_reinf_desvinculados_count ?? 0) || 0,
+    arquivos_storage_removidos: limpezaStorage.removidos,
+    arquivos_storage_falhas: limpezaStorage.falhas,
+  };
 }

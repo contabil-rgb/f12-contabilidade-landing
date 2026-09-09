@@ -105,6 +105,7 @@ import {
   buscarClientePorId as buscarClientePorIdSupabase,
   atualizarCliente as atualizarClienteSupabase,
   criarCliente as criarClienteSupabase,
+  excluirClienteArquivado as excluirClienteArquivadoSupabase,
   inativarCliente as inativarClienteSupabase,
   listarClientes as listarClientesSupabase,
   listarClientesVinculadosResponsavel,
@@ -4649,9 +4650,11 @@ function ClientsTable({
   onEdit,
   onInactivate,
   onRestore,
+  onDelete,
   canEditRow,
   canInactivateRow,
   canRestoreRow,
+  canDeleteRow,
   renderClientCell,
   selectedClientIds = [],
   onToggleSelect,
@@ -4827,9 +4830,23 @@ function ClientsTable({
                         <RefreshCcw size={16} aria-hidden="true" />
                       </button>
                     ) : null}
+                    {canDeleteRow?.(client) ? (
+                      <button
+                        type="button"
+                        aria-label="Excluir cliente"
+                        title="Excluir cliente"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete?.(client);
+                        }}
+                        className="table-icon-action text-red-300 hover:border-red-400/50 hover:text-red-200"
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    ) : null}
                   </div>
                 </td>
-                </tr>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -4938,9 +4955,11 @@ function BaseClientesPage(props) {
         onEdit={props.onEdit}
         onInactivate={props.onInactivate}
         onRestore={props.onRestore}
+        onDelete={props.onDelete}
         canEditRow={props.canEditRow}
         canInactivateRow={props.canInactivateRow}
         canRestoreRow={props.canRestoreRow}
+        canDeleteRow={props.canDeleteRow}
         renderClientCell={props.renderClientCell}
         selectedClientIds={selectedClientIds}
         onToggleSelect={toggleClientSelection}
@@ -11246,6 +11265,53 @@ export default function App() {
     }
   }
 
+  async function deleteArchivedClient(client) {
+    if (!can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE)) {
+      setToast({ title: 'Acesso negado', message: 'Seu perfil não pode excluir clientes arquivados.' });
+      return;
+    }
+    if (!ensureSupabaseWriteReady('excluir o cliente arquivado')) return;
+    if (!isClientArchived(client)) {
+      setToast({ title: 'Cliente ativo', message: 'Arquive o cliente antes de excluir definitivamente.' });
+      return;
+    }
+    if (!isUuid(client.id)) {
+      setToast({ title: 'Cliente inválido', message: 'Somente clientes salvos no Supabase podem ser excluídos.' });
+      return;
+    }
+
+    const clientName = client.nome_identificacao || client.razao_social || 'este cliente';
+    const confirmed = window.confirm(
+      `Excluir definitivamente ${clientName}? Esta ação não poderá ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await excluirClienteArquivadoSupabase(client.id);
+      updateClientsPersisted((current) => current.filter((item) => item.id !== client.id));
+      if (selectedClientId === client.id) {
+        setSelectedClientId(null);
+        if (page === 'detalhe') setPage('clientes');
+      }
+
+      const falhasStorage = result.arquivos_storage_falhas?.length ?? 0;
+      setSupabaseStatus({ connected: true, message: 'Cliente excluído no Supabase' });
+      setToast({
+        title: falhasStorage ? 'Cliente excluído com pendência no Storage' : 'Cliente excluído',
+        message: falhasStorage
+          ? `${result.cliente_nome}. ${formatNumber(falhasStorage)} arquivo(s) não foram removidos do Storage.`
+          : result.cliente_nome,
+      });
+      void resyncSupabaseAfterMutation('exclusão de cliente arquivado');
+    } catch (error) {
+      setSupabaseStatus({ connected: false, message: 'Falha ao excluir cliente no Supabase' });
+      setToast({
+        title: 'Falha ao excluir cliente',
+        message: `${error.message}. O cliente foi mantido na lista para evitar divergência.`,
+      });
+    }
+  }
+
   async function handleImport(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -11873,6 +11939,7 @@ export default function App() {
         }}
         onInactivate={inactivateClient}
         onRestore={restoreClient}
+        onDelete={deleteArchivedClient}
         canCreateClient={canCreateClient}
         canCreateClientEnabled={canCreateClient && canWritePortalData}
         createDisabledReason={writeBlockedReason}
@@ -11880,6 +11947,7 @@ export default function App() {
         canEditRow={(client) => canWritePortalData && !isClientArchived(client) && canEditClient(currentUserFull, client)}
         canInactivateRow={(client) => canWritePortalData && !isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         canRestoreRow={(client) => canWritePortalData && isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
+        canDeleteRow={(client) => canWritePortalData && isClientArchived(client) && can(currentUserFull, PERMISSIONS.CLIENTS_INACTIVATE) && canViewClient(currentUserFull, client)}
         canBatchUpdateResponsavel={(client) => canWritePortalData && canViewClient(currentUserFull, client) && canEditClientField(currentUserFull, 'responsavel')}
         responsavelOptions={getResponsaveisAtivosCatalogo(responsavelCatalogo)}
         onBatchUpdateResponsavel={batchUpdateResponsavel}
