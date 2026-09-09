@@ -1882,10 +1882,58 @@ function hasPendenciaAtrasada(client) {
   return isReinfPendente(client);
 }
 
+function getClientEcdAlertSignals(client) {
+  const ecdPendente = isEcdPendente(client);
+  const reciboPendente = isReciboEcdPendente(client);
+  const signals = [];
+
+  if (ecdPendente && reciboPendente) {
+    signals.push({
+      key: 'ecd',
+      aliases: ['recibo_ecd'],
+      label: 'ECD pendente',
+      tone: 'warning',
+      description: 'O status da ECD está pendente e o recibo ainda não foi anexado ou validado.',
+      nextAction: 'Validar a ECD e anexar o recibo correspondente.',
+    });
+  } else {
+    if (ecdPendente) signals.push({ key: 'ecd', label: 'ECD pendente', tone: 'warning' });
+    if (reciboPendente) signals.push({ key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' });
+  }
+
+  if (isEcdAguardandoEnvio(client)) signals.push({ key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' });
+  if (isEcdResponsavelPendente(client)) signals.push({ key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' });
+
+  return signals;
+}
+
+function getClientEcfAlertSignals(client) {
+  const ecfPendente = isEcfPendente(client);
+  const reciboPendente = isReciboEcfPendente(client);
+
+  if (ecfPendente && reciboPendente) {
+    return [{
+      key: 'ecf',
+      aliases: ['recibo_ecf'],
+      label: 'ECF pendente',
+      tone: 'warning',
+      description: 'O status da ECF está pendente e o recibo ainda não foi anexado ou validado.',
+      nextAction: 'Validar a ECF e anexar o recibo correspondente.',
+    }];
+  }
+
+  return [
+    ecfPendente && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
+    reciboPendente && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
+  ].filter(Boolean);
+}
+
 function getClientAlertSignals(client, options = {}) {
   const diasAtraso = getDiasAtrasoValue(client);
   const dataNotificacao = getDataNotificacaoClienteValue(client);
   const reinfAlert = getClientReinfAlertSignal(client, options.reinfRelatorios ?? []);
+  const ecdAlerts = getClientEcdAlertSignals(client);
+  const ecfAlerts = getClientEcfAlertSignals(client);
   return [
     isEmAtraso(client) && {
       key: 'atraso',
@@ -1894,12 +1942,8 @@ function getClientAlertSignals(client, options = {}) {
     },
     isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
     reinfAlert,
-    isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
-    isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
-    isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
-    isReciboEcdPendente(client) && { key: 'recibo_ecd', label: 'Recibo ECD pendente', tone: 'warning' },
-    isEcfPendente(client) && { key: 'ecf', label: 'ECF pendente', tone: 'warning' },
-    isReciboEcfPendente(client) && { key: 'recibo_ecf', label: 'Recibo ECF pendente', tone: 'warning' },
+    ...ecdAlerts,
+    ...ecfAlerts,
     isPendenciaTecnica(client) && { key: 'tecnica', label: 'Pendência técnica', tone: 'danger' },
     isDocumentoAtrasado(client) && { key: 'documentos', label: 'Documentação atrasada', tone: 'warning' },
     isComunicacaoPendente(client) && { key: 'comunicacao', label: 'Comunicação pendente', tone: 'info' },
@@ -3539,7 +3583,9 @@ function EcdEcfObrigacaoStatusCell({ client, tipo = 'ecd' }) {
 
 function matchesAlert(client, alertKey, options = {}) {
   if (!alertKey) return true;
-  return getClientAlertSignals(client, options).some((alert) => alert.key === alertKey);
+  return getClientAlertSignals(client, options).some((alert) => (
+    alert.key === alertKey || (alert.aliases ?? []).includes(alertKey)
+  ));
 }
 
 function isClientArchived(client) {
