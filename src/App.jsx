@@ -1893,8 +1893,9 @@ function getClientEcdAlertSignals(client) {
       aliases: ['recibo_ecd'],
       label: 'ECD pendente',
       tone: 'warning',
-      description: 'O status da ECD está pendente e o recibo ainda não foi anexado ou validado.',
-      nextAction: 'Validar a ECD e anexar o recibo correspondente.',
+      priorityLabel: 'Alta',
+      description: 'Há duas pendências na ECD: o status da obrigação ainda precisa ser validado e o recibo não foi anexado ou confirmado.',
+      nextAction: 'Regularizar o status da ECD e anexar o recibo correspondente.',
     });
   } else {
     if (ecdPendente) signals.push({ key: 'ecd', label: 'ECD pendente', tone: 'warning' });
@@ -1917,8 +1918,9 @@ function getClientEcfAlertSignals(client) {
       aliases: ['recibo_ecf'],
       label: 'ECF pendente',
       tone: 'warning',
-      description: 'O status da ECF está pendente e o recibo ainda não foi anexado ou validado.',
-      nextAction: 'Validar a ECF e anexar o recibo correspondente.',
+      priorityLabel: 'Alta',
+      description: 'Há duas pendências na ECF: o status da obrigação ainda precisa ser validado e o recibo não foi anexado ou confirmado.',
+      nextAction: 'Regularizar o status da ECF e anexar o recibo correspondente.',
     }];
   }
 
@@ -2186,8 +2188,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
     route: 'ecd',
     priority: 78,
     priorityLabel: 'Média',
-    description: 'A obrigação ECD está pendente para este cliente.',
-    nextAction: 'Validar status e envio da ECD.',
+    description: 'O status da obrigação ECD ainda está pendente para este cliente.',
+    nextAction: 'Validar o status da ECD e registrar a situação correta.',
   },
   ecd_envio: {
     key: 'ecd',
@@ -2216,8 +2218,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
     route: 'ecd',
     priority: 82,
     priorityLabel: 'Alta',
-    description: 'O recibo da ECD ainda não está anexado ou validado.',
-    nextAction: 'Anexar recibo da ECD.',
+    description: 'O recibo da ECD ainda não está anexado ou confirmado no cadastro.',
+    nextAction: 'Anexar ou confirmar o recibo da ECD.',
   },
   ecf: {
     key: 'ecf',
@@ -2226,8 +2228,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
     route: 'ecd',
     priority: 76,
     priorityLabel: 'Média',
-    description: 'A obrigação ECF está pendente para este cliente.',
-    nextAction: 'Validar status da ECF.',
+    description: 'O status da obrigação ECF ainda está pendente para este cliente.',
+    nextAction: 'Validar o status da ECF e registrar a situação correta.',
   },
   ecf_envio: {
     key: 'ecf_envio',
@@ -2246,8 +2248,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
     route: 'ecd',
     priority: 80,
     priorityLabel: 'Alta',
-    description: 'O recibo da ECF ainda não está anexado ou validado.',
-    nextAction: 'Anexar recibo da ECF.',
+    description: 'O recibo da ECF ainda não está anexado ou confirmado no cadastro.',
+    nextAction: 'Anexar ou confirmar o recibo da ECF.',
   },
   tecnica: {
     key: 'pendencia_tecnica',
