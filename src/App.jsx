@@ -1882,9 +1882,10 @@ function hasPendenciaAtrasada(client) {
   return isReinfPendente(client);
 }
 
-function getClientAlertSignals(client) {
+function getClientAlertSignals(client, options = {}) {
   const diasAtraso = getDiasAtrasoValue(client);
   const dataNotificacao = getDataNotificacaoClienteValue(client);
+  const reinfAlert = getClientReinfAlertSignal(client, options.reinfRelatorios ?? []);
   return [
     isEmAtraso(client) && {
       key: 'atraso',
@@ -1892,7 +1893,7 @@ function getClientAlertSignals(client) {
       tone: 'danger',
     },
     isSituacaoCritica(client) && { key: 'critico', label: 'Situação crítica', tone: 'danger' },
-    isReinfPendente(client) && { key: 'reinf', label: 'Distribuição de lucro pendente', tone: 'warning' },
+    reinfAlert,
     isEcdPendente(client) && { key: 'ecd', label: 'ECD pendente', tone: 'warning' },
     isEcdAguardandoEnvio(client) && { key: 'ecd_envio', label: 'Aguardando envio', tone: 'warning' },
     isEcdResponsavelPendente(client) && { key: 'ecd_responsavel', label: 'Responsável não definido', tone: 'warning' },
@@ -2037,10 +2038,10 @@ function ClientAlertsPopover({ client, alert, anchorRect, onClose, onViewClient 
   );
 }
 
-function ClientAlertsTableCell({ client, onViewClient }) {
+function ClientAlertsTableCell({ client, reinfRelatorios = [], onViewClient }) {
   const [activeAlert, setActiveAlert] = useState(null);
   const [anchorRect, setAnchorRect] = useState(null);
-  const signals = getClientAlertSignals(client);
+  const signals = getClientAlertSignals(client, { reinfRelatorios });
   if (!signals.length) {
     return (
       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass('success')}`}>
@@ -2131,8 +2132,8 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
     route: 'reinf',
     priority: 95,
     priorityLabel: 'Alta',
-    description: 'A distribuição de lucro ainda possui pendência de envio ou validação.',
-    nextAction: 'Revisar envio e prazo da distribuição de lucro.',
+    description: 'A distribuição de lucro exige acompanhamento no novo controle de relatórios e envio.',
+    nextAction: 'Abrir a distribuição de lucro e conferir se o relatório deve ser preparado, salvo ou enviado.',
   },
   ecd: {
     key: 'ecd',
@@ -2257,7 +2258,7 @@ const PENDENCIA_ACTION_BY_SIGNAL = {
 };
 
 function getClientAlertAction(alert) {
-  return PENDENCIA_ACTION_BY_SIGNAL[alert?.key] ?? {
+  const baseAction = PENDENCIA_ACTION_BY_SIGNAL[alert?.key] ?? {
     key: alert?.key ?? 'alerta',
     area: 'Cliente',
     section: 'Cadastro do cliente',
@@ -2266,6 +2267,14 @@ function getClientAlertAction(alert) {
     priorityLabel: 'Atenção',
     description: 'Este alerta foi identificado a partir dos dados atuais do cliente.',
     nextAction: 'Abrir o cliente e revisar as informações relacionadas.',
+  };
+  return {
+    ...baseAction,
+    area: alert?.area ?? baseAction.area,
+    section: alert?.section ?? baseAction.section,
+    priorityLabel: alert?.priorityLabel ?? baseAction.priorityLabel,
+    description: alert?.description ?? baseAction.description,
+    nextAction: alert?.nextAction ?? baseAction.nextAction,
   };
 }
 
@@ -2405,6 +2414,8 @@ const REINF_TOTAL_FIELD_OPTIONS = [
 ];
 const REINF_HISTORY_STATUS_SAVED = 'salvo';
 const REINF_HISTORY_STATUS_SENT = 'enviado';
+const REINF_ALERT_CONTROL_START_AT = '2026-09-09T00:00:00-04:00';
+const REINF_ALERT_CONTROL_START_TIMESTAMP = new Date(REINF_ALERT_CONTROL_START_AT).getTime();
 
 function createEmptyReinfTotalValues() {
   return REINF_TOTAL_FIELD_OPTIONS.reduce((values, field) => ({
@@ -3283,10 +3294,62 @@ function getReinfRelatorioTimestamp(relatorio) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function getReinfRelatorioAlertControlTimestamp(relatorio) {
+  const rawDate = relatorio?.criado_em || relatorio?.enviado_em || '';
+  const timestamp = new Date(rawDate).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isReinfRelatorioInAlertControlScope(relatorio) {
+  return getReinfRelatorioAlertControlTimestamp(relatorio) >= REINF_ALERT_CONTROL_START_TIMESTAMP;
+}
+
 function getLatestReinfRelatorioByClient(relatorios = [], client) {
   return (relatorios ?? [])
     .filter((relatorio) => isReinfRelatorioFromClient(relatorio, client))
     .sort((a, b) => getReinfRelatorioTimestamp(b) - getReinfRelatorioTimestamp(a))[0] ?? null;
+}
+
+function getReinfRelatoriosControleByClient(relatorios = [], client) {
+  return (relatorios ?? [])
+    .filter((relatorio) => (
+      isReinfRelatorioFromClient(relatorio, client)
+      && isReinfRelatorioInAlertControlScope(relatorio)
+    ))
+    .sort((a, b) => getReinfRelatorioTimestamp(b) - getReinfRelatorioTimestamp(a));
+}
+
+function getClientReinfAlertSignal(client, relatorios = []) {
+  const relatoriosControle = getReinfRelatoriosControleByClient(relatorios, client);
+  const hasSentReport = relatoriosControle.some((relatorio) => (
+    normalizeReinfHistoryStatus(relatorio?.status_envio) === REINF_HISTORY_STATUS_SENT
+  ));
+
+  if (hasSentReport) return null;
+
+  const latestSavedReport = relatoriosControle.find((relatorio) => (
+    normalizeReinfHistoryStatus(relatorio?.status_envio) === REINF_HISTORY_STATUS_SAVED
+  ));
+
+  if (latestSavedReport) {
+    return {
+      key: 'reinf',
+      label: 'Distribuição de lucro salva, envio pendente',
+      tone: 'warning',
+      description: 'Existe relatório de distribuição de lucro salvo no novo controle, mas o e-mail ainda não foi enviado.',
+      nextAction: 'Abrir a distribuição de lucro, conferir o relatório salvo e concluir o envio do e-mail.',
+    };
+  }
+
+  if (!isReinfPendente(client)) return null;
+
+  return {
+    key: 'reinf',
+    label: 'Distribuição de lucro pendente',
+    tone: 'warning',
+    description: 'A distribuição de lucro ainda não possui relatório salvo ou e-mail enviado no novo controle.',
+    nextAction: 'Preparar a distribuição de lucro e salvar ou enviar o relatório.',
+  };
 }
 
 function getReinfRelatorioSocioTotalValue(socio, months = [], modeloTabela = REINF_TABLE_MODEL_MONTHLY) {
@@ -3474,9 +3537,9 @@ function EcdEcfObrigacaoStatusCell({ client, tipo = 'ecd' }) {
   );
 }
 
-function matchesAlert(client, alertKey) {
+function matchesAlert(client, alertKey, options = {}) {
   if (!alertKey) return true;
-  return getClientAlertSignals(client).some((alert) => alert.key === alertKey);
+  return getClientAlertSignals(client, options).some((alert) => alert.key === alertKey);
 }
 
 function isClientArchived(client) {
@@ -3513,7 +3576,7 @@ function matchesClientStatusFilter(client, filterValue) {
   return normalizeText(normalizeClientStatus(client?.status)) === normalizeText(statusToMatch);
 }
 
-function filterClients(clients, filters) {
+function filterClients(clients, filters, options = {}) {
   return clients.filter((client) => {
     if (!matchesClientStatusFilter(client, filters.arquivamento)) return false;
 
@@ -3525,7 +3588,7 @@ function filterClients(clients, filters) {
       if (!searchable.includes(search)) return false;
     }
 
-    if (!matchesAlert(client, filters.alerta)) return false;
+    if (!matchesAlert(client, filters.alerta, options)) return false;
 
     const matchesBaseFilters = FILTER_FIELDS.every((field) => {
       const filterValue = filters[field];
@@ -4551,6 +4614,7 @@ function ClientsTable({
   onToggleSelectVisible,
   onOpenBatchResponsavel,
   canSelectRow,
+  reinfRelatorios = [],
 }) {
   function sortColumn(key) {
     setSort((current) => ({
@@ -4662,7 +4726,11 @@ function ClientsTable({
                 {BASE_CLIENTS_TABLE_COLUMNS.map((field) => (
                   <td key={field.key} className="table-cell">
                     {field.key === 'alertas_acompanhamento' ? (
-                      <ClientAlertsTableCell client={client} onViewClient={() => onView(client.id)} />
+                      <ClientAlertsTableCell
+                        client={client}
+                        reinfRelatorios={reinfRelatorios}
+                        onViewClient={() => onView(client.id)}
+                      />
                     ) : renderClientCell?.(client, field.key) ?? (field.key === 'status' || field.key === 'situacao' || field.key === 'competencia_em_dia' ? (
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${chipClass(statusTone(getResolvedFieldValue(client, field.key), client))}`}>
                         {valueOrDash(getResolvedFieldValue(client, field.key))}
@@ -4819,6 +4887,7 @@ function BaseClientesPage(props) {
       <SearchAndFilters {...props} clientsForOptions={props.allClients ?? props.clients} />
       <ClientsTable
         clients={props.clients}
+        reinfRelatorios={props.reinfRelatorios}
         sort={props.sort}
         setSort={props.setSort}
         onView={props.onView}
@@ -9583,14 +9652,14 @@ export default function App() {
   const activeClients = useMemo(() => getActiveClients(enrichedClients), [enrichedClients]);
 
   const filteredClients = useMemo(() => {
-    const filtered = filterClients(enrichedClients, filters);
+    const filtered = filterClients(enrichedClients, filters, { reinfRelatorios });
     return sortByLocale(filtered, sort.key, sort.direction);
-  }, [enrichedClients, filters, sort]);
+  }, [enrichedClients, filters, sort, reinfRelatorios]);
 
   const filteredActiveClients = useMemo(() => {
-    const filtered = filterClients(activeClients, { ...filters, arquivamento: 'todos' });
+    const filtered = filterClients(activeClients, { ...filters, arquivamento: 'todos' }, { reinfRelatorios });
     return sortByLocale(filtered, sort.key, sort.direction);
-  }, [activeClients, filters, sort]);
+  }, [activeClients, filters, sort, reinfRelatorios]);
 
   const selectedClient = useMemo(
     () => enrichedClients.find((client) => client.id === selectedClientId),
@@ -11747,6 +11816,7 @@ export default function App() {
         visibleCount={filteredClients.length}
         totalCount={enrichedClients.length}
         clients={filteredClients}
+        reinfRelatorios={reinfRelatorios}
         sort={sort}
         setSort={setSort}
         onView={openClient}
