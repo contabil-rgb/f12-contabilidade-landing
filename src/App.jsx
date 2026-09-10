@@ -228,10 +228,10 @@ const DEFAULT_FILTERS = {
 
 const FILTER_FIELDS = [
   'tipo_cliente',
-  'grupo_empresarial',
   'regime_tributario',
-  'atividades',
   'responsavel',
+  'grupo_empresarial',
+  'atividades',
   'revisor',
   'situacao',
   'competencia_em_dia',
@@ -6989,6 +6989,7 @@ function ReinfPage({
     sociosStatus: '',
   };
   const [filters, setFilters] = useState(emptyFilters);
+  const [showAllFilters, setShowAllFilters] = useState(false);
   const [focusedClientId, setFocusedClientId] = useState('');
   const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const [selectedSocioByClientId, setSelectedSocioByClientId] = useState({});
@@ -7075,7 +7076,7 @@ function ReinfPage({
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 grid max-w-7xl gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div className="mt-4 grid max-w-7xl gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -7084,12 +7085,6 @@ function ReinfPage({
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <FilterSelect
-            label="Grupo Empresarial"
-            value={filters.grupo_empresarial}
-            options={uniqueValues(clients.map((client) => client.grupo_empresarial))}
-            onChange={(value) => updateFilter({ grupo_empresarial: value })}
-          />
           <FilterSelect
             label="Responsável"
             value={filters.responsavel}
@@ -7102,14 +7097,31 @@ function ReinfPage({
             options={uniqueValues(clients.map((client) => client.revisor))}
             onChange={(value) => updateFilter({ revisor: value })}
           />
-          <FilterSelect
-            label="Sócios"
-            value={filters.sociosStatus}
-            options={[
-              { value: 'com_socios', label: 'Com sócios' },
-              { value: 'sem_socios', label: 'Sem sócios' },
-            ]}
-            onChange={(value) => updateFilter({ sociosStatus: value })}
+          {showAllFilters ? (
+            <>
+              <FilterSelect
+                label="Grupo Empresarial"
+                value={filters.grupo_empresarial}
+                options={uniqueValues(clients.map((client) => client.grupo_empresarial))}
+                onChange={(value) => updateFilter({ grupo_empresarial: value })}
+              />
+              <FilterSelect
+                label="Sócios"
+                value={filters.sociosStatus}
+                options={[
+                  { value: 'com_socios', label: 'Com sócios' },
+                  { value: 'sem_socios', label: 'Sem sócios' },
+                ]}
+                onChange={(value) => updateFilter({ sociosStatus: value })}
+              />
+            </>
+          ) : null}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <FilterDisclosureButton
+            expanded={showAllFilters}
+            hiddenCount={2}
+            onClick={() => setShowAllFilters((current) => !current)}
           />
         </div>
       </section>
@@ -7306,11 +7318,11 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
-          <FilterSelect label="Grupo Empresarial" value={filters.grupo_empresarial} options={uniqueValues(scopedClients.map((client) => client.grupo_empresarial))} onChange={(value) => updateFilter({ grupo_empresarial: value })} />
           <FilterSelect label={activeResponsavelFilterLabel} value={filters.responsavel_ecd} options={activeResponsavelOptions} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
+          <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
           {showAllFilters ? (
             <>
-              <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
+              <FilterSelect label="Grupo Empresarial" value={filters.grupo_empresarial} options={uniqueValues(scopedClients.map((client) => client.grupo_empresarial))} onChange={(value) => updateFilter({ grupo_empresarial: value })} />
               <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
               <FilterSelect label={activeAttachmentFilterLabel} value={filters[activeAttachmentFilterKey]} options={attachmentOptions} onChange={(value) => updateFilter({ [activeAttachmentFilterKey]: value })} includeBlank={false} />
               <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
@@ -7962,7 +7974,9 @@ function ReportsPage({
   const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
   const previewResultRef = useRef(null);
   const hasGeneratedPreview = Boolean(previewGeneratedAt) && canGenerateReportPreview;
-  const reportHiddenFiltersCount = ['lucros', 'ecd_ecf'].includes(selectedReportType) ? 1 : 0;
+  const reportHiddenFiltersCount = selectedReportType === 'lucros' || selectedReportType === 'ecd_ecf'
+    ? 2
+    : 1;
 
   function updateReportFilter(key, value) {
     setReportFilters((current) => ({ ...current, [key]: value }));
@@ -8309,41 +8323,43 @@ function ReportsPage({
       return (
         <>
           <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
-          <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} searchable />
           <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} searchable />
           {showAllReportFilters ? (
-            <div className="sm:col-span-2 xl:col-span-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
-                <button
-                  type="button"
-                  onClick={() => updateReportFilter('meses', [])}
-                  className="text-xs font-black text-brand-blue hover:text-blue-300"
-                >
-                  Todos
-                </button>
+            <>
+              <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
+              <div className="sm:col-span-2 xl:col-span-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
+                  <button
+                    type="button"
+                    onClick={() => updateReportFilter('meses', [])}
+                    className="text-xs font-black text-brand-blue hover:text-blue-300"
+                  >
+                    Todos
+                  </button>
+                </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  {REINF_MONTH_OPTIONS.map((month) => {
+                    const selected = reportFilters.meses.includes(month.value);
+                    return (
+                      <button
+                        key={month.value}
+                        type="button"
+                        onClick={() => toggleReportMonth(month.value)}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition ${
+                          selected
+                            ? 'border-brand-blue bg-brand-blue text-white'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'
+                        }`}
+                      >
+                        {month.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                {REINF_MONTH_OPTIONS.map((month) => {
-                  const selected = reportFilters.meses.includes(month.value);
-                  return (
-                    <button
-                      key={month.value}
-                      type="button"
-                      onClick={() => toggleReportMonth(month.value)}
-                      className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition ${
-                        selected
-                          ? 'border-brand-blue bg-brand-blue text-white'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'
-                      }`}
-                    >
-                      {month.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            </>
           ) : null}
         </>
       );
@@ -8353,11 +8369,13 @@ function ReportsPage({
       return (
         <>
           <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
-          <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
           <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} searchable />
           {showAllReportFilters ? (
-            <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
+            <>
+              <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
+              <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
+            </>
           ) : null}
         </>
       );
@@ -8366,10 +8384,12 @@ function ReportsPage({
     return (
       <>
         <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
-        <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
         <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
         {selectedReportType === 'clientes' ? (
           <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} searchable />
+        ) : null}
+        {showAllReportFilters ? (
+          <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
         ) : null}
       </>
     );
