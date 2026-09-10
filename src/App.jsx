@@ -4484,6 +4484,26 @@ function PageHeader({ title, description, right }) {
   );
 }
 
+function FilterDisclosureButton({
+  expanded,
+  hiddenCount = 0,
+  onClick,
+  className = '',
+}) {
+  if (!hiddenCount) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:text-blue-300 ${className}`}
+    >
+      {expanded ? 'Mostrar menos' : `Mostrar mais (${hiddenCount})`}
+      <ChevronDown size={14} className={`transition ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+    </button>
+  );
+}
+
 function SearchAndFilters({
   filters,
   setFilters,
@@ -4499,6 +4519,8 @@ function SearchAndFilters({
   createDisabledReason = '',
   clientsForOptions = [],
 }) {
+  const [showAllFilters, setShowAllFilters] = useState(false);
+
   function updateFilter(patch) {
     setFilters((current) => ({ ...current, ...patch }));
     onManualFilter?.();
@@ -4539,6 +4561,9 @@ function SearchAndFilters({
   const activeFiltersLabel = activeFilterItems.length === 1
     ? '1 filtro ativo'
     : `${formatNumber(activeFilterItems.length)} filtros ativos`;
+  const primaryFilterFields = FILTER_FIELDS.slice(0, 3);
+  const secondaryFilterFields = FILTER_FIELDS.slice(3);
+  const visibleFilterFields = showAllFilters ? FILTER_FIELDS : primaryFilterFields;
 
   return (
     <SurfacePanel className="min-w-0 overflow-hidden p-0">
@@ -4654,7 +4679,7 @@ function SearchAndFilters({
             labelClassName="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-gray-400"
             buttonClassName="select-shell mt-2 normal-case"
           />
-          {FILTER_FIELDS.map((fieldKey) => {
+          {visibleFilterFields.map((fieldKey) => {
             const field = FIELD_DEFINITIONS.find((item) => item.key === fieldKey);
             const options = getFilterOptionsForField(listagens, field, filters[fieldKey], clientsForOptions);
             return (
@@ -4670,6 +4695,13 @@ function SearchAndFilters({
               />
             );
           })}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <FilterDisclosureButton
+            expanded={showAllFilters}
+            hiddenCount={secondaryFilterFields.length}
+            onClick={() => setShowAllFilters((current) => !current)}
+          />
         </div>
       </div>
 
@@ -7159,6 +7191,7 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
   const [mode, setMode] = useState('todos');
   const [dateView, setDateView] = useState('ecd');
   const [filters, setFilters] = useState(emptyFilters);
+  const [showAllFilters, setShowAllFilters] = useState(false);
   const [focusedClientId, setFocusedClientId] = useState('');
   const [focusedClientLabel, setFocusedClientLabel] = useState('');
   const updateFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
@@ -7275,10 +7308,21 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
           </label>
           <FilterSelect label="Grupo Empresarial" value={filters.grupo_empresarial} options={uniqueValues(scopedClients.map((client) => client.grupo_empresarial))} onChange={(value) => updateFilter({ grupo_empresarial: value })} />
           <FilterSelect label={activeResponsavelFilterLabel} value={filters.responsavel_ecd} options={activeResponsavelOptions} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
-          <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
-          <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
-          <FilterSelect label={activeAttachmentFilterLabel} value={filters[activeAttachmentFilterKey]} options={attachmentOptions} onChange={(value) => updateFilter({ [activeAttachmentFilterKey]: value })} includeBlank={false} />
-          <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
+          {showAllFilters ? (
+            <>
+              <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
+              <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
+              <FilterSelect label={activeAttachmentFilterLabel} value={filters[activeAttachmentFilterKey]} options={attachmentOptions} onChange={(value) => updateFilter({ [activeAttachmentFilterKey]: value })} includeBlank={false} />
+              <FilterSelect label="Situação rápida" value={mode} options={modeOptions} onChange={setMode} includeBlank={false} />
+            </>
+          ) : null}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <FilterDisclosureButton
+            expanded={showAllFilters}
+            hiddenCount={4}
+            onClick={() => setShowAllFilters((current) => !current)}
+          />
         </div>
       </section>
 
@@ -7625,6 +7669,7 @@ function ReportsPage({
     situacao: '',
     meses: [],
   });
+  const [showAllReportFilters, setShowAllReportFilters] = useState(false);
   const reportScope = Array.isArray(filteredClients) ? filteredClients : clients;
   const clientesComAtraso = reportScope.filter((client) => hasPendenciaAtrasada(client));
   const clientesComPendencias = reportScope.filter((client) => hasPendenciaAtiva(client));
@@ -7734,6 +7779,9 @@ function ReportsPage({
     { value: 'observacoes', label: 'Pendências/Observações', eyebrow: 'Registros', description: 'Observações registradas nos clientes.' },
   ];
   const selectedReport = reportTypes.find((item) => item.value === selectedReportType) ?? reportTypes[0];
+  useEffect(() => {
+    setShowAllReportFilters(false);
+  }, [selectedReportType]);
   const responsavelOptions = uniqueValues(
     reportScope
       .map((client) => (selectedReportType === 'ecd_ecf' ? getObrigacaoResponsavel(client) : client.responsavel))
@@ -7914,6 +7962,7 @@ function ReportsPage({
   const [previewGeneratedAt, setPreviewGeneratedAt] = useState(null);
   const previewResultRef = useRef(null);
   const hasGeneratedPreview = Boolean(previewGeneratedAt) && canGenerateReportPreview;
+  const reportHiddenFiltersCount = ['lucros', 'ecd_ecf'].includes(selectedReportType) ? 1 : 0;
 
   function updateReportFilter(key, value) {
     setReportFilters((current) => ({ ...current, [key]: value }));
@@ -8263,37 +8312,39 @@ function ReportsPage({
           <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} searchable />
           <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} searchable />
-          <div className="sm:col-span-2 xl:col-span-4">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
-              <button
-                type="button"
-                onClick={() => updateReportFilter('meses', [])}
-                className="text-xs font-black text-brand-blue hover:text-blue-300"
-              >
-                Todos
-              </button>
+          {showAllReportFilters ? (
+            <div className="sm:col-span-2 xl:col-span-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">Período</span>
+                <button
+                  type="button"
+                  onClick={() => updateReportFilter('meses', [])}
+                  className="text-xs font-black text-brand-blue hover:text-blue-300"
+                >
+                  Todos
+                </button>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                {REINF_MONTH_OPTIONS.map((month) => {
+                  const selected = reportFilters.meses.includes(month.value);
+                  return (
+                    <button
+                      key={month.value}
+                      type="button"
+                      onClick={() => toggleReportMonth(month.value)}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition ${
+                        selected
+                          ? 'border-brand-blue bg-brand-blue text-white'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'
+                      }`}
+                    >
+                      {month.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-              {REINF_MONTH_OPTIONS.map((month) => {
-                const selected = reportFilters.meses.includes(month.value);
-                return (
-                  <button
-                    key={month.value}
-                    type="button"
-                    onClick={() => toggleReportMonth(month.value)}
-                    className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition ${
-                      selected
-                        ? 'border-brand-blue bg-brand-blue text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-brand-blue dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200'
-                    }`}
-                  >
-                    {month.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          ) : null}
         </>
       );
     }
@@ -8305,7 +8356,9 @@ function ReportsPage({
           <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
           <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} searchable />
-          <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
+          {showAllReportFilters ? (
+            <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
+          ) : null}
         </>
       );
     }
@@ -8392,6 +8445,13 @@ function ReportsPage({
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {renderReportFilters()}
+        </div>
+        <div className="mt-3 flex justify-end">
+          <FilterDisclosureButton
+            expanded={showAllReportFilters}
+            hiddenCount={reportHiddenFiltersCount}
+            onClick={() => setShowAllReportFilters((current) => !current)}
+          />
         </div>
       </section>
 
