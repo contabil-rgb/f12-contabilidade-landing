@@ -2344,7 +2344,23 @@ function AttachmentCell({ client, fieldKey, tipoAnexo, disabled, writeDisabled, 
   );
 }
 
-function ReinfAttachmentSentDateCell({ client }) {
+function ReinfAttachmentSentDateCell({ client, relatorios = [] }) {
+  const latestSentRelatorio = getLatestSentReinfRelatorioByClient(relatorios, client);
+  if (latestSentRelatorio?.enviado_em) {
+    const sentMonths = [...new Set(Array.isArray(latestSentRelatorio.meses) ? latestSentRelatorio.meses : [])];
+    const periodLabel = getReinfPeriodLabel(
+      sentMonths,
+      latestSentRelatorio.ano_referencia || '',
+    );
+
+    return (
+      <span className="flex flex-col gap-0.5 font-semibold text-slate-700 dark:text-gray-200">
+        <span>{formatDateDisplay(latestSentRelatorio.enviado_em)}</span>
+        <span className="text-xs font-bold text-slate-500 dark:text-gray-400">{periodLabel}</span>
+      </span>
+    );
+  }
+
   const attachment = parseAttachment(client.anexo_recibo_reinf);
   const dataPersistida = getObrigacoesPersistidas(client)?.reinf_data_enviada;
   const rawDate = dataPersistida || attachment.attachedAt || '';
@@ -3351,6 +3367,21 @@ function getLatestReinfRelatorioByClient(relatorios = [], client) {
   return (relatorios ?? [])
     .filter((relatorio) => isReinfRelatorioFromClient(relatorio, client))
     .sort((a, b) => getReinfRelatorioTimestamp(b) - getReinfRelatorioTimestamp(a))[0] ?? null;
+}
+
+function getReinfRelatorioSentTimestamp(relatorio) {
+  const timestamp = new Date(relatorio?.enviado_em ?? '').getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getLatestSentReinfRelatorioByClient(relatorios = [], client) {
+  return (relatorios ?? [])
+    .filter((relatorio) => (
+      isReinfRelatorioFromClient(relatorio, client)
+      && normalizeReinfHistoryStatus(relatorio?.status_envio) === REINF_HISTORY_STATUS_SENT
+      && getReinfRelatorioSentTimestamp(relatorio) > 0
+    ))
+    .sort((a, b) => getReinfRelatorioSentTimestamp(b) - getReinfRelatorioSentTimestamp(a))[0] ?? null;
 }
 
 function getReinfRelatoriosControleByClient(relatorios = [], client) {
@@ -7080,7 +7111,7 @@ function ReinfPage({
                 return <ReinfSocioCpfCell client={client} selectedSocioByClientId={selectedSocioByClientId} />;
               }
               if (column === 'data_envio_recibo_reinf') {
-                return <ReinfAttachmentSentDateCell client={client} />;
+                return <ReinfAttachmentSentDateCell client={client} relatorios={reinfRelatorios} />;
               }
              return undefined;
            }}
