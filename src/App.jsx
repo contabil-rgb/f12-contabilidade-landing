@@ -1230,15 +1230,15 @@ function clearPersistedObrigacoes(client) {
   return next;
 }
 
-function AttachmentBadge({ value }) {
+function AttachmentBadge({ value, className = '' }) {
   const attachment = parseAttachment(value);
   const attached = attachment.has;
   return (
     <span
-      className={`inline-flex max-w-56 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-black ${chipClass(attached ? 'success' : 'muted')}`}
+      className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-black sm:max-w-56 ${chipClass(attached ? 'success' : 'muted')} ${className}`}
       title={attached ? attachment.name : 'Sem anexo'}
     >
-      <Paperclip size={13} aria-hidden="true" />
+      <Paperclip size={13} className="shrink-0" aria-hidden="true" />
       <span className="truncate">{attached ? `Anexado: ${attachment.name}` : 'Sem anexo'}</span>
     </span>
   );
@@ -9067,6 +9067,44 @@ function FullscreenStatusState({ label }) {
   );
 }
 
+function getModalAttachmentGroupTitle(group) {
+  if (group === 'Identificação') return 'Anexos de identificação';
+  if (group === 'ECD / ECF') return 'Recibos e anexos';
+  if (group === 'REINF e Lucros') return 'Anexos e recibos';
+  return 'Anexos';
+}
+
+function ClientModalAttachmentGroup({ title, fields = [], renderField }) {
+  const [open, setOpen] = useState(false);
+  if (!fields.length) return null;
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 dark:border-gray-800 dark:bg-gray-900/45">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span>
+          <span className="block text-sm font-black text-slate-800 dark:text-gray-100">{title}</span>
+          <span className="mt-0.5 block text-xs font-semibold normal-case text-slate-500 dark:text-gray-400">
+            {formatNumber(fields.length)} campo(s) de anexo
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black normal-case text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+          {open ? 'Ocultar anexos' : 'Mostrar anexos'}
+          <ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </span>
+      </button>
+      {open ? (
+        <div className="grid gap-3 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-3 dark:border-gray-800">
+          {fields.map((field) => renderField(field))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ClientModal({
   client,
   listagens,
@@ -9167,6 +9205,44 @@ function ClientModal({
     });
   }
 
+  function renderClientModalField(field) {
+    return (
+      <FormField
+        key={field.key}
+        field={{
+          ...field,
+          label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label,
+          required: field.required || (field.key === 'revisor' && revisorRequired),
+        }}
+        value={form[field.key] ?? ''}
+        cliente={form}
+        listagens={listagens}
+        officialListagens={officialListagens}
+        disabled={!canEditFieldForClient(field.key)}
+        disabledReason={deniedReasonForField(null, field.key)}
+        onChange={(value) => updateField(field.key, value)}
+        onAttachmentSuccess={(tipoAnexo, anexo) => {
+          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
+          if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
+          onAnexoSuccess?.(form.id, tipoAnexo, anexo);
+        }}
+        onAttachmentRemove={(tipoAnexo, anexo) => {
+          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
+          if (fieldKey) updateField(fieldKey, '');
+          onAnexoRemove?.(form.id, tipoAnexo, anexo);
+        }}
+        onAttachmentError={onAnexoError}
+        responsavelOptions={responsavelOptions}
+        responsavelEcfOptions={responsavelEcfOptions}
+        responsavelEcfBusy={responsavelEcfBusy}
+        onCreateResponsavelEcf={onCreateResponsavelEcf}
+        onDeleteResponsavelEcf={onDeleteResponsavelEcf}
+        grupoEmpresarialBusy={grupoEmpresarialBusy}
+        onCreateGrupoEmpresarial={onCreateGrupoEmpresarial}
+      />
+    );
+  }
+
   return (
     <div className="modal-backdrop z-50 overflow-y-auto">
       <form onSubmit={submit} className="modal-panel modal-panel-xl mx-auto my-6">
@@ -9193,6 +9269,8 @@ function ClientModal({
             if (group === 'ECD / ECF' && !showEcdEcfGroup) return null;
 
             const visibleFields = modalFields.filter((field) => field.group === group);
+            const mainFields = visibleFields.filter((field) => field.type !== 'attachment');
+            const attachmentFields = visibleFields.filter((field) => field.type === 'attachment');
 
             if (!visibleFields.length) return null;
 
@@ -9200,43 +9278,16 @@ function ClientModal({
               <Fragment key={group}>
                 <section className="modal-section">
                   <h3 className="text-base font-black text-slate-950 dark:text-gray-100">{group}</h3>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {visibleFields.map((field) => (
-                      <FormField
-                        key={field.key}
-                        field={{
-                          ...field,
-                          label: EDIT_MODAL_FIELD_LABEL_OVERRIDES[field.key] ?? field.label,
-                          required: field.required || (field.key === 'revisor' && revisorRequired),
-                        }}
-                        value={form[field.key] ?? ''}
-                        cliente={form}
-                        listagens={listagens}
-                        officialListagens={officialListagens}
-                        disabled={!canEditFieldForClient(field.key)}
-                        disabledReason={deniedReasonForField(null, field.key)}
-                        onChange={(value) => updateField(field.key, value)}
-                        onAttachmentSuccess={(tipoAnexo, anexo) => {
-                          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
-                          if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
-                          onAnexoSuccess?.(form.id, tipoAnexo, anexo);
-                        }}
-                        onAttachmentRemove={(tipoAnexo, anexo) => {
-                          const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
-                          if (fieldKey) updateField(fieldKey, '');
-                          onAnexoRemove?.(form.id, tipoAnexo, anexo);
-                        }}
-                        onAttachmentError={onAnexoError}
-                        responsavelOptions={responsavelOptions}
-                        responsavelEcfOptions={responsavelEcfOptions}
-                        responsavelEcfBusy={responsavelEcfBusy}
-                        onCreateResponsavelEcf={onCreateResponsavelEcf}
-                        onDeleteResponsavelEcf={onDeleteResponsavelEcf}
-                        grupoEmpresarialBusy={grupoEmpresarialBusy}
-                        onCreateGrupoEmpresarial={onCreateGrupoEmpresarial}
-                      />
-                    ))}
-                  </div>
+                  {mainFields.length ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {mainFields.map((field) => renderClientModalField(field))}
+                    </div>
+                  ) : null}
+                  <ClientModalAttachmentGroup
+                    title={getModalAttachmentGroupTitle(group)}
+                    fields={attachmentFields}
+                    renderField={renderClientModalField}
+                  />
                 </section>
                 {group === FIELD_GROUPS[0] ? (
                   <>
@@ -9443,6 +9494,8 @@ function FormField({
 }) {
   const [grupoEmpresarialDraft, setGrupoEmpresarialDraft] = useState('');
   const [grupoEmpresarialLocalBusy, setGrupoEmpresarialLocalBusy] = useState(false);
+  const [grupoEmpresarialCreateOpen, setGrupoEmpresarialCreateOpen] = useState(false);
+  const [attachmentOptionsOpen, setAttachmentOptionsOpen] = useState(false);
   const baseClass =
     'form-control-shell mt-1';
   const computedDisabled = disabled;
@@ -9465,58 +9518,76 @@ function FormField({
     const canUpload = Boolean(tipoAnexo && isUuid(cliente?.id));
     const attachmentWriteDisabled = isClientArchived(cliente);
     const attachmentWriteDisabledReason = 'Restaure o cliente antes de anexar, substituir ou remover arquivos.';
+    const attachmentName = attachment.structured ? attachment.name : String(value ?? '').trim();
 
     return (
       <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
         <span>{label}</span>
-        <div className={`mt-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 ${disabled ? 'bg-slate-100 text-slate-400 dark:bg-gray-800/60 dark:text-gray-500' : ''}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <AttachmentBadge value={value} />
-            <div className="flex flex-wrap gap-2">
-              {canUpload ? (
-                <UploadAnexoButton
-                  cliente={cliente}
-                  tipoAnexo={tipoAnexo}
-                  anexo={anexo}
-                  disabled={disabled}
-                  writeDisabled={attachmentWriteDisabled}
-                  writeDisabledReason={attachmentWriteDisabledReason}
-                  onSuccess={(novoAnexo) => {
-                    onChange(anexoToFieldValue(novoAnexo));
-                    onAttachmentSuccess?.(tipoAnexo, novoAnexo);
-                  }}
-                  onRemove={(anexoRemovido) => {
-                    onChange('');
-                    onAttachmentRemove?.(tipoAnexo, anexoRemovido ?? anexo);
-                  }}
-                  onError={onAttachmentError}
-                  labelAnexar={field.key === 'anexo_recibo_reinf' ? 'Anexar recibo REINF' : 'Anexar'}
-                  labelSubstituir={field.key === 'anexo_recibo_reinf' ? 'Substituir recibo REINF' : 'Substituir'}
-                />
-              ) : null}
-              {attachment.has && !attachment.path && attachment.href ? (
-                <button
-                  type="button"
-                  onClick={() => window.open(attachment.href, '_blank', 'noopener,noreferrer')}
-                  disabled={disabled}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Paperclip size={14} aria-hidden="true" />
-                  Visualizar link
-                </button>
-              ) : null}
+        <div className={`mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800 ${disabled ? 'bg-slate-100 text-slate-400 dark:bg-gray-800/60 dark:text-gray-500' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setAttachmentOptionsOpen((current) => !current)}
+            className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left"
+          >
+            <span className="block min-w-0">
+              <AttachmentBadge value={value} className="max-w-[8.5rem] sm:max-w-[9.5rem]" />
+              <span className="mt-1 block max-w-full truncate text-[11px] font-semibold normal-case text-slate-500 dark:text-gray-400">
+                {attachmentName || 'Nenhum arquivo informado'}
+              </span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 justify-self-end rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-black normal-case text-slate-600 dark:border-gray-700 dark:text-gray-300">
+              {attachmentOptionsOpen ? 'Ocultar opções' : 'Mostrar opções'}
+              <ChevronDown size={13} className={`transition ${attachmentOptionsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </span>
+          </button>
+          {attachmentOptionsOpen ? (
+            <div className="border-t border-slate-200 p-3 dark:border-gray-700">
+              <div className="flex flex-wrap gap-2">
+                {canUpload ? (
+                  <UploadAnexoButton
+                    cliente={cliente}
+                    tipoAnexo={tipoAnexo}
+                    anexo={anexo}
+                    disabled={disabled}
+                    writeDisabled={attachmentWriteDisabled}
+                    writeDisabledReason={attachmentWriteDisabledReason}
+                    onSuccess={(novoAnexo) => {
+                      onChange(anexoToFieldValue(novoAnexo));
+                      onAttachmentSuccess?.(tipoAnexo, novoAnexo);
+                    }}
+                    onRemove={(anexoRemovido) => {
+                      onChange('');
+                      onAttachmentRemove?.(tipoAnexo, anexoRemovido ?? anexo);
+                    }}
+                    onError={onAttachmentError}
+                    labelAnexar={field.key === 'anexo_recibo_reinf' ? 'Anexar recibo REINF' : 'Anexar'}
+                    labelSubstituir={field.key === 'anexo_recibo_reinf' ? 'Substituir recibo REINF' : 'Substituir'}
+                  />
+                ) : null}
+                {attachment.has && !attachment.path && attachment.href ? (
+                  <button
+                    type="button"
+                    onClick={() => window.open(attachment.href, '_blank', 'noopener,noreferrer')}
+                    disabled={disabled}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Paperclip size={14} aria-hidden="true" />
+                    Visualizar link
+                  </button>
+                ) : null}
+              </div>
+              <input
+                value={attachmentName}
+                onChange={(event) => onChange(event.target.value)}
+                disabled={disabled}
+                readOnly={attachment.structured && Boolean(attachment.path)}
+                title={disabled ? disabledReason : 'Informe o nome, link ou identificador do anexo.'}
+                placeholder="Cole um link ou identificador do anexo"
+                className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+              />
             </div>
-          </div>
+          ) : null}
         </div>
-        <input
-          value={attachment.structured ? attachment.name : value}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          readOnly={attachment.structured && Boolean(attachment.path)}
-          title={disabled ? disabledReason : 'Informe o nome, link ou identificador do anexo.'}
-          placeholder="Cole um link ou identificador do anexo"
-          className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
-        />
       </div>
     );
   }
@@ -9573,6 +9644,7 @@ function FormField({
           if (created !== false) {
             onChange(typeof created === 'string' ? created : draft);
             setGrupoEmpresarialDraft('');
+            setGrupoEmpresarialCreateOpen(false);
           }
         } finally {
           setGrupoEmpresarialLocalBusy(false);
@@ -9581,44 +9653,54 @@ function FormField({
 
       return (
         <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
-          <label>
-            {label}
-            <DropdownFilterSelect
-              label=""
-              value={dropdownValue}
-              options={options}
-              onChange={onChange}
-              includeBlank
-              emptyLabel="Não informado"
-              disabled={computedDisabled}
-              disabledReason={computedDisabledReason}
-              labelClassName="block"
-              buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
-            />
-          </label>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={grupoEmpresarialDraft}
-              onChange={(event) => setGrupoEmpresarialDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleCreateGrupoEmpresarial();
-                }
-              }}
-              disabled={computedDisabled || isGrupoBusy}
-              placeholder="Cadastrar novo grupo"
-              className="form-control-shell min-h-9 flex-1 text-xs normal-case disabled:bg-slate-100 disabled:text-slate-400"
-            />
+          <div className="flex items-center justify-between gap-2">
+            <span>{label}</span>
             <button
               type="button"
-              onClick={handleCreateGrupoEmpresarial}
-              disabled={computedDisabled || isGrupoBusy || !grupoEmpresarialDraft.trim()}
-              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+              onClick={() => setGrupoEmpresarialCreateOpen((current) => !current)}
+              disabled={computedDisabled}
+              className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-black normal-case text-slate-600 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300"
             >
-              {isGrupoBusy ? 'Salvando...' : 'Cadastrar'}
+              {grupoEmpresarialCreateOpen ? 'Cancelar' : 'Novo grupo'}
             </button>
           </div>
+          <DropdownFilterSelect
+            label=""
+            value={dropdownValue}
+            options={options}
+            onChange={onChange}
+            includeBlank
+            emptyLabel="Não informado"
+            disabled={computedDisabled}
+            disabledReason={computedDisabledReason}
+            labelClassName="block"
+            buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+          />
+          {grupoEmpresarialCreateOpen ? (
+            <div className="mt-2 flex gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
+              <input
+                value={grupoEmpresarialDraft}
+                onChange={(event) => setGrupoEmpresarialDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleCreateGrupoEmpresarial();
+                  }
+                }}
+                disabled={computedDisabled || isGrupoBusy}
+                placeholder="Nome do novo grupo"
+                className="form-control-shell min-h-9 flex-1 text-xs normal-case disabled:bg-slate-100 disabled:text-slate-400"
+              />
+              <button
+                type="button"
+                onClick={handleCreateGrupoEmpresarial}
+                disabled={computedDisabled || isGrupoBusy || !grupoEmpresarialDraft.trim()}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+              >
+                {isGrupoBusy ? 'Salvando...' : 'Cadastrar'}
+              </button>
+            </div>
+          ) : null}
           {hasOutsideListValue ? (
             <span className="mt-1 block text-[11px] font-semibold normal-case text-amber-600 dark:text-amber-300">
               Valor atual fora da lista cadastrada. Troque por uma opção oficial antes de salvar.
