@@ -12,6 +12,9 @@ function normalizeText(value: unknown) {
 const CATEGORY_ALIASES: Record<string, string> = {
   tipo_cliente: 'tipo_cliente',
   tipocliente: 'tipo_cliente',
+  grupo_empresarial: 'grupo_empresarial',
+  grupoempresarial: 'grupo_empresarial',
+  grupo: 'grupo_empresarial',
   regime_tributario: 'regime_tributario',
   regimetributario: 'regime_tributario',
   atividades: 'atividades',

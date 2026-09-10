@@ -211,6 +211,7 @@ const DEFAULT_FILTERS = {
   search: '',
   arquivamento: 'todos',
   tipo_cliente: '',
+  grupo_empresarial: '',
   regime_tributario: '',
   atividades: '',
   responsavel: '',
@@ -227,6 +228,7 @@ const DEFAULT_FILTERS = {
 
 const FILTER_FIELDS = [
   'tipo_cliente',
+  'grupo_empresarial',
   'regime_tributario',
   'atividades',
   'responsavel',
@@ -253,6 +255,7 @@ const PRESET_ONLY_FILTER_FIELDS = [
 
 const LOCKED_CLIENT_SELECT_FIELDS = new Set([
   'tipo_cliente',
+  'grupo_empresarial',
   'regime_tributario',
   'atividades',
   'dificuldade',
@@ -3276,6 +3279,7 @@ function buildReinfRelatoriosExportRows(relatorios = []) {
         Cliente: relatorio.razao_social || relatorio.nome_identificacao || '',
         CNPJ: formatCnpj(relatorio.cnpj),
         'Nome/identificação': relatorio.nome_identificacao || '',
+        'Grupo Empresarial': relatorio.grupo_empresarial || '',
         Responsável: relatorio.responsavel || '',
         Revisor: relatorio.revisor || '',
         'Modelo da tabela': relatorio.modelo_tabela_label || getReinfTableModelLabel(relatorio.modelo_tabela),
@@ -6947,6 +6951,7 @@ function ReinfPage({
   const emptyFilters = {
     search: '',
     cnpj: '',
+    grupo_empresarial: '',
     responsavel: '',
     revisor: '',
     sociosStatus: '',
@@ -6979,6 +6984,7 @@ function ReinfPage({
     const search = normalizeText(filters.search);
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
+    if (filters.grupo_empresarial && normalizeText(client.grupo_empresarial) !== normalizeText(filters.grupo_empresarial)) return false;
     if (filters.responsavel && normalizeText(client.responsavel) !== normalizeText(filters.responsavel)) return false;
     if (filters.revisor && normalizeText(client.revisor) !== normalizeText(filters.revisor)) return false;
     const sociosCount = getReinfSocios(client).length;
@@ -7037,7 +7043,7 @@ function ReinfPage({
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 grid max-w-6xl gap-3 md:grid-cols-[minmax(240px,360px)_minmax(180px,240px)_minmax(160px,220px)_minmax(160px,220px)_minmax(160px,220px)]">
+        <div className="mt-4 grid max-w-7xl gap-3 md:grid-cols-2 xl:grid-cols-6">
           <label className="text-xs font-bold uppercase tracking-normal text-slate-500 dark:text-gray-400">
             Cliente / Razão Social
             <input value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
@@ -7046,6 +7052,12 @@ function ReinfPage({
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
+          <FilterSelect
+            label="Grupo Empresarial"
+            value={filters.grupo_empresarial}
+            options={uniqueValues(clients.map((client) => client.grupo_empresarial))}
+            onChange={(value) => updateFilter({ grupo_empresarial: value })}
+          />
           <FilterSelect
             label="Responsável"
             value={filters.responsavel}
@@ -7138,6 +7150,7 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
   const emptyFilters = {
     search: '',
     cnpj: '',
+    grupo_empresarial: '',
     regime_tributario: '',
     responsavel_ecd: '',
     anexo_recibo_ecd: 'all',
@@ -7216,6 +7229,7 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
     if (!modeMatches) return false;
     if (search && !normalizeText(`${client.nome_identificacao} ${client.razao_social}`).includes(search)) return false;
     if (filters.cnpj && !normalizeText(client.cnpj).includes(normalizeText(filters.cnpj))) return false;
+    if (filters.grupo_empresarial && normalizeText(client.grupo_empresarial) !== normalizeText(filters.grupo_empresarial)) return false;
     if (filters.regime_tributario && normalizeText(client.regime_tributario) !== normalizeText(filters.regime_tributario)) return false;
     if (filters.responsavel_ecd && normalizeText(responsavelAtual) !== normalizeText(filters.responsavel_ecd)) return false;
     if (attachmentFilter === 'attached' && !reciboAnexado) return false;
@@ -7259,6 +7273,7 @@ function EcdEcfPage({ clients, responsavelOptions = [], responsavelEcfOptions = 
             CNPJ
             <input value={filters.cnpj} onChange={(event) => updateFilter({ cnpj: event.target.value })} className="input-shell mt-1 h-10 normal-case" />
           </label>
+          <FilterSelect label="Grupo Empresarial" value={filters.grupo_empresarial} options={uniqueValues(scopedClients.map((client) => client.grupo_empresarial))} onChange={(value) => updateFilter({ grupo_empresarial: value })} />
           <FilterSelect label={activeResponsavelFilterLabel} value={filters.responsavel_ecd} options={activeResponsavelOptions} onChange={(value) => updateFilter({ responsavel_ecd: value })} />
           <FilterSelect label="Visualização" value={dateView} options={dateViewOptions} onChange={setDateView} includeBlank={false} />
           <FilterSelect label="Regime Tributário" value={filters.regime_tributario} options={uniqueValues(scopedClients.map((client) => client.regime_tributario))} onChange={(value) => updateFilter({ regime_tributario: value })} />
@@ -7475,6 +7490,7 @@ function buildPendenciasObservacoesRows(clients) {
       Cliente: client.nome_identificacao || client.razao_social || '',
       'Razão Social': client.razao_social || '',
       CNPJ: client.cnpj || '',
+      'Grupo Empresarial': client.grupo_empresarial || '',
       'Responsável': client.responsavel || '',
       Revisor: client.revisor || '',
       'Pendências/Observações': client.pendencias_observacoes || '',
@@ -7486,6 +7502,7 @@ function buildBaseCompletaClientesRows(clients) {
     CNPJ: client.cnpj || '',
     'Razão Social': client.razao_social || '',
     'Nome/Identificação': client.nome_identificacao || '',
+    'Grupo Empresarial': client.grupo_empresarial || '',
     'Responsável': client.responsavel || '',
     Revisor: client.revisor || '',
     'Tipo de Cliente': client.tipo_cliente || '',
@@ -7547,8 +7564,9 @@ function buildEcdEcfReportRows(clients, filters = {}) {
   return (clients ?? []).flatMap((client) => {
     const responsavel = getObrigacaoResponsavel(client) || client?.responsavel || '';
     const responsavelOk = !filters.responsavel || normalizeText(responsavel) === normalizeText(filters.responsavel);
+    const grupoOk = !filters.grupo_empresarial || normalizeText(client?.grupo_empresarial) === normalizeText(filters.grupo_empresarial);
     const regimeOk = !filters.regime || normalizeText(client?.regime_tributario) === normalizeText(filters.regime);
-    if (!responsavelOk || !regimeOk) return [];
+    if (!responsavelOk || !grupoOk || !regimeOk) return [];
 
     return selectedTypes
       .filter((tipo) => isEcdEcfTipoAplicavel(client, tipo))
@@ -7559,6 +7577,7 @@ function buildEcdEcfReportRows(clients, filters = {}) {
           cliente: client?.nome_identificacao || client?.razao_social || 'Não informado',
           razao_social: client?.razao_social || '',
           cnpj: client?.cnpj || '',
+          grupo_empresarial: client?.grupo_empresarial || '',
           responsavel,
           regime: client?.regime_tributario || '',
           ...info,
@@ -7597,6 +7616,7 @@ function ReportsPage({
   const [selectedReportType, setSelectedReportType] = useState('clientes');
   const [reportFilters, setReportFilters] = useState({
     responsavel: '',
+    grupo_empresarial: '',
     regime: '',
     atividade: '',
     empresa: '',
@@ -7627,6 +7647,7 @@ function ReportsPage({
       cnpj: relatorio.cnpj || client.cnpj,
       razao_social: relatorio.razao_social || client.razao_social,
       nome_identificacao: relatorio.nome_identificacao || client.nome_identificacao,
+      grupo_empresarial: relatorio.grupo_empresarial || client.grupo_empresarial,
       responsavel: relatorio.responsavel || client.responsavel,
       revisor: relatorio.revisor || client.revisor,
     };
@@ -7722,6 +7743,11 @@ function ReportsPage({
     ? ['Lucro Real', 'Lucro Presumido']
     : uniqueValues(reportScope.map((client) => client.regime_tributario).filter(Boolean));
   const atividadeOptions = uniqueValues(reportScope.map((client) => client.atividades).filter(Boolean));
+  const grupoEmpresarialOptions = uniqueValues(
+    (selectedReportType === 'lucros' ? reinfRelatoriosEnriquecidos : reportScope)
+      .map((item) => item.grupo_empresarial)
+      .filter(Boolean)
+  );
   const empresaOptions = uniqueValues(
     (selectedReportType === 'lucros' ? reinfRelatoriosEnriquecidos : reportScope)
       .map((item) => item.nome_identificacao || item.razao_social)
@@ -7736,15 +7762,17 @@ function ReportsPage({
   const situacaoOptions = ['Entregues/Concluídos', 'Pendentes/Sem anexo'];
   const baseClientesReportRows = reportScope.filter((client) => {
     const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
+    const grupoOk = !reportFilters.grupo_empresarial || normalizeText(client.grupo_empresarial) === normalizeText(reportFilters.grupo_empresarial);
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
     const atividadeOk = !reportFilters.atividade || normalizeText(client.atividades) === normalizeText(reportFilters.atividade);
-    return responsavelOk && regimeOk && atividadeOk;
+    return responsavelOk && grupoOk && regimeOk && atividadeOk;
   });
   const observacoesReportRows = reportScope.filter((client) => {
     if (!hasPendenciasObservacoes(client)) return false;
     const responsavelOk = !reportFilters.responsavel || normalizeText(client.responsavel) === normalizeText(reportFilters.responsavel);
+    const grupoOk = !reportFilters.grupo_empresarial || normalizeText(client.grupo_empresarial) === normalizeText(reportFilters.grupo_empresarial);
     const regimeOk = !reportFilters.regime || normalizeText(client.regime_tributario) === normalizeText(reportFilters.regime);
-    return responsavelOk && regimeOk;
+    return responsavelOk && grupoOk && regimeOk;
   });
   const lucrosReportRows = reinfRelatoriosEnriquecidos.flatMap((relatorio) => {
     const relatorioIsTotalsModel = isReinfTotalsTableModel(relatorio.modelo_tabela);
@@ -7757,10 +7785,11 @@ function ReportsPage({
       : [{ nome: 'Sem sócio', cpf: '', valores_por_mes: {}, total: '' }];
     const empresaNome = relatorio.nome_identificacao || relatorio.razao_social || '';
     const responsavelOk = !reportFilters.responsavel || normalizeText(relatorio.responsavel) === normalizeText(reportFilters.responsavel);
+    const grupoOk = !reportFilters.grupo_empresarial || normalizeText(relatorio.grupo_empresarial) === normalizeText(reportFilters.grupo_empresarial);
     const empresaOk = !reportFilters.empresa || normalizeText(empresaNome) === normalizeText(reportFilters.empresa);
     const mesesOk = !reportFilters.meses.length || mesesSelecionados.length > 0;
 
-    if (!responsavelOk || !empresaOk || !mesesOk) return [];
+    if (!responsavelOk || !grupoOk || !empresaOk || !mesesOk) return [];
 
     return socios
       .filter((socio) => !reportFilters.socio || normalizeText(socio.nome) === normalizeText(reportFilters.socio))
@@ -7786,6 +7815,7 @@ function ReportsPage({
           cliente: empresaNome || 'Não informado',
           razao_social: relatorio.razao_social || '',
           cnpj: relatorio.cnpj || '',
+          grupo_empresarial: relatorio.grupo_empresarial || '',
           responsavel: relatorio.responsavel || '',
           revisor: relatorio.revisor || '',
           periodicidade: getReinfPeriodicityLabelFromMonths(mesesSelecionados, relatorio.periodicidade || ''),
@@ -7811,6 +7841,7 @@ function ReportsPage({
       Empresa: row.cliente,
       'Razão social': row.razao_social,
       CNPJ: formatCnpj(row.cnpj),
+      'Grupo Empresarial': row.grupo_empresarial,
       Responsável: row.responsavel,
       Revisor: row.revisor,
       'Modelo da tabela': row.modelo_tabela_label || getReinfTableModelLabel(row.modelo_tabela),
@@ -7845,6 +7876,7 @@ function ReportsPage({
     Cliente: row.cliente,
     'Razão social': row.razao_social,
     CNPJ: formatCnpj(row.cnpj),
+    'Grupo Empresarial': row.grupo_empresarial,
     Responsável: row.responsavel,
     Regime: row.regime,
     Obrigação: row.obrigacao,
@@ -7899,6 +7931,7 @@ function ReportsPage({
   function clearReportFilters() {
     setReportFilters({
       responsavel: '',
+      grupo_empresarial: '',
       regime: '',
       atividade: '',
       empresa: '',
@@ -8227,6 +8260,7 @@ function ReportsPage({
       return (
         <>
           <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+          <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Empresa" value={reportFilters.empresa} options={empresaOptions} onChange={(value) => updateReportFilter('empresa', value)} searchable />
           <DropdownFilterSelect label="Sócio" value={reportFilters.socio} options={socioOptions} onChange={(value) => updateReportFilter('socio', value)} searchable />
           <div className="sm:col-span-2 xl:col-span-4">
@@ -8268,6 +8302,7 @@ function ReportsPage({
       return (
         <>
           <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+          <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
           <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
           <DropdownFilterSelect label="Obrigação" value={reportFilters.obrigacao} options={obrigacaoOptions} onChange={(value) => updateReportFilter('obrigacao', value)} searchable />
           <DropdownFilterSelect label="Situação" value={reportFilters.situacao} options={situacaoOptions} onChange={(value) => updateReportFilter('situacao', value)} searchable />
@@ -8278,6 +8313,7 @@ function ReportsPage({
     return (
       <>
         <DropdownFilterSelect label="Responsável" value={reportFilters.responsavel} options={responsavelOptions} onChange={(value) => updateReportFilter('responsavel', value)} searchable />
+        <DropdownFilterSelect label="Grupo Empresarial" value={reportFilters.grupo_empresarial} options={grupoEmpresarialOptions} onChange={(value) => updateReportFilter('grupo_empresarial', value)} searchable />
         <DropdownFilterSelect label="Regime tributário" value={reportFilters.regime} options={regimeOptions} onChange={(value) => updateReportFilter('regime', value)} searchable />
         {selectedReportType === 'clientes' ? (
           <DropdownFilterSelect label="Atividade" value={reportFilters.atividade} options={atividadeOptions} onChange={(value) => updateReportFilter('atividade', value)} searchable />
@@ -8989,6 +9025,8 @@ function ClientModal({
   responsavelEcfBusy = false,
   onCreateResponsavelEcf,
   onDeleteResponsavelEcf,
+  grupoEmpresarialBusy = false,
+  onCreateGrupoEmpresarial,
 }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_CLIENT,
@@ -9134,6 +9172,8 @@ function ClientModal({
                         responsavelEcfBusy={responsavelEcfBusy}
                         onCreateResponsavelEcf={onCreateResponsavelEcf}
                         onDeleteResponsavelEcf={onDeleteResponsavelEcf}
+                        grupoEmpresarialBusy={grupoEmpresarialBusy}
+                        onCreateGrupoEmpresarial={onCreateGrupoEmpresarial}
                       />
                     ))}
                   </div>
@@ -9338,7 +9378,11 @@ function FormField({
   responsavelEcfBusy = false,
   onCreateResponsavelEcf,
   onDeleteResponsavelEcf,
+  grupoEmpresarialBusy = false,
+  onCreateGrupoEmpresarial,
 }) {
+  const [grupoEmpresarialDraft, setGrupoEmpresarialDraft] = useState('');
+  const [grupoEmpresarialLocalBusy, setGrupoEmpresarialLocalBusy] = useState(false);
   const baseClass =
     'form-control-shell mt-1';
   const computedDisabled = disabled;
@@ -9450,6 +9494,82 @@ function FormField({
       ? resolvedOfficialValue.value
       : value;
     const isClientStatusField = field.key === 'status';
+    if (field.key === 'grupo_empresarial') {
+      const isGrupoBusy = grupoEmpresarialBusy || grupoEmpresarialLocalBusy;
+      async function handleCreateGrupoEmpresarial() {
+        if (computedDisabled || isGrupoBusy) return;
+        const draft = grupoEmpresarialDraft.trim();
+        if (!draft) return;
+        const existing = officialOptions.find((option) => normalizeText(option) === normalizeText(draft));
+        if (existing) {
+          onChange(existing);
+          setGrupoEmpresarialDraft('');
+          return;
+        }
+
+        setGrupoEmpresarialLocalBusy(true);
+        try {
+          const created = await onCreateGrupoEmpresarial?.(draft);
+          if (created !== false) {
+            onChange(typeof created === 'string' ? created : draft);
+            setGrupoEmpresarialDraft('');
+          }
+        } finally {
+          setGrupoEmpresarialLocalBusy(false);
+        }
+      }
+
+      return (
+        <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
+          <label>
+            {label}
+            <DropdownFilterSelect
+              label=""
+              value={dropdownValue}
+              options={options}
+              onChange={onChange}
+              includeBlank
+              emptyLabel="Não informado"
+              disabled={computedDisabled}
+              disabledReason={computedDisabledReason}
+              labelClassName="block"
+              buttonClassName={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+            />
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={grupoEmpresarialDraft}
+              onChange={(event) => setGrupoEmpresarialDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleCreateGrupoEmpresarial();
+                }
+              }}
+              disabled={computedDisabled || isGrupoBusy}
+              placeholder="Cadastrar novo grupo"
+              className="form-control-shell min-h-9 flex-1 text-xs normal-case disabled:bg-slate-100 disabled:text-slate-400"
+            />
+            <button
+              type="button"
+              onClick={handleCreateGrupoEmpresarial}
+              disabled={computedDisabled || isGrupoBusy || !grupoEmpresarialDraft.trim()}
+              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+            >
+              {isGrupoBusy ? 'Salvando...' : 'Cadastrar'}
+            </button>
+          </div>
+          {hasOutsideListValue ? (
+            <span className="mt-1 block text-[11px] font-semibold normal-case text-amber-600 dark:text-amber-300">
+              Valor atual fora da lista cadastrada. Troque por uma opção oficial antes de salvar.
+            </span>
+          ) : null}
+          {computedDisabledReason ? (
+            <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
+          ) : null}
+        </div>
+      );
+    }
     if (field.key === 'responsavel_ecf') {
       return (
         <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
@@ -9637,6 +9757,7 @@ export default function App() {
   const [responsavelCatalogoBusy, setResponsavelCatalogoBusy] = useState(false);
   const [responsavelEcfCatalogo, setResponsavelEcfCatalogo] = useState([]);
   const [responsavelEcfCatalogoBusy, setResponsavelEcfCatalogoBusy] = useState(false);
+  const [grupoEmpresarialCatalogoBusy, setGrupoEmpresarialCatalogoBusy] = useState(false);
   const [metadata, setMetadata] = useState(initialState.metadata ?? { ...INITIAL_METADATA });
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(initialSessionState.session);
@@ -11551,6 +11672,72 @@ export default function App() {
     }
   }
 
+  async function createGrupoEmpresarialCatalogo(valorInput) {
+    if (!ensureSupabaseWriteReady('cadastrar o grupo empresarial')) return false;
+
+    const valor = String(valorInput ?? '').trim();
+    if (!valor) {
+      setToast({ title: 'Grupo obrigatório', message: 'Informe um nome antes de cadastrar.' });
+      return false;
+    }
+
+    const existente = [
+      ...(officialListagens.grupo_empresarial ?? []),
+      ...(listagens.grupo_empresarial ?? []),
+    ].find((item) => normalizeText(item) === normalizeText(valor));
+    if (existente) {
+      const canonical = String(existente).trim();
+      setToast({
+        title: 'Grupo já cadastrado',
+        message: canonical,
+      });
+      return canonical;
+    }
+
+    setGrupoEmpresarialCatalogoBusy(true);
+    try {
+      const saved = await criarValorListagem('grupo_empresarial', valor);
+      const savedValue = String(saved?.valor ?? valor).trim();
+      setListagens((currentListagens) => ({
+        ...currentListagens,
+        grupo_empresarial: uniqueValues([...(currentListagens.grupo_empresarial ?? []), savedValue]).filter(Boolean),
+      }));
+      setOfficialListagens((currentListagens) => ({
+        ...currentListagens,
+        grupo_empresarial: uniqueValues([...(currentListagens.grupo_empresarial ?? []), savedValue]).filter(Boolean),
+      }));
+      setToast({
+        title: 'Grupo empresarial cadastrado',
+        message: savedValue,
+      });
+      return savedValue;
+    } catch (error) {
+      const duplicate = isDuplicateListagemError(error);
+      if (duplicate) {
+        setListagens((currentListagens) => ({
+          ...currentListagens,
+          grupo_empresarial: uniqueValues([...(currentListagens.grupo_empresarial ?? []), valor]).filter(Boolean),
+        }));
+        setOfficialListagens((currentListagens) => ({
+          ...currentListagens,
+          grupo_empresarial: uniqueValues([...(currentListagens.grupo_empresarial ?? []), valor]).filter(Boolean),
+        }));
+        setToast({
+          title: 'Grupo já cadastrado',
+          message: valor,
+        });
+        return valor;
+      }
+      setToast({
+        title: 'Falha ao cadastrar grupo empresarial',
+        message: error.message || 'Não foi possível salvar o grupo empresarial no Supabase.',
+      });
+      return false;
+    } finally {
+      setGrupoEmpresarialCatalogoBusy(false);
+    }
+  }
+
   async function toggleResponsavelCatalogo(item) {
     if (!can(currentUserFull, PERMISSIONS.USERS_MANAGE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode gerenciar responsáveis.' });
@@ -12210,6 +12397,8 @@ export default function App() {
           responsavelEcfBusy={responsavelEcfCatalogoBusy}
           onCreateResponsavelEcf={createResponsavelEcfCatalogo}
           onDeleteResponsavelEcf={deleteResponsavelEcfCatalogo}
+          grupoEmpresarialBusy={grupoEmpresarialCatalogoBusy}
+          onCreateGrupoEmpresarial={createGrupoEmpresarialCatalogo}
         />
       ) : null}
       {editingUser ? (

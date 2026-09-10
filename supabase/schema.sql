@@ -11,6 +11,7 @@ create table if not exists public.clientes (
   razao_social text not null,
   nome_identificacao text,
   tipo_cliente text,
+  grupo_empresarial text,
   regime_tributario text,
   atividades text,
   dificuldade text,
@@ -78,6 +79,7 @@ create index if not exists idx_clientes_cnpj on public.clientes(cnpj);
 create index if not exists idx_clientes_razao_social on public.clientes(razao_social);
 create index if not exists idx_clientes_regime_tributario on public.clientes(regime_tributario);
 create index if not exists idx_clientes_tipo_cliente on public.clientes(tipo_cliente);
+create index if not exists idx_clientes_grupo_empresarial on public.clientes(grupo_empresarial);
 create index if not exists idx_clientes_responsavel on public.clientes(responsavel);
 create index if not exists idx_clientes_responsavel_ecf on public.clientes(responsavel_ecf);
 create index if not exists idx_clientes_revisor on public.clientes(revisor);

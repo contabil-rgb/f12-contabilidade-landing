@@ -28,6 +28,8 @@ const EXTRA_BASE_HEADER_MAP = {
   'nome identificacao': 'nome_identificacao',
   'nome/identificacao': 'nome_identificacao',
   'tipo de cliente': 'tipo_cliente',
+  'grupo empresarial': 'grupo_empresarial',
+  grupo: 'grupo_empresarial',
   'regime tributario': 'regime_tributario',
   atividade: 'atividades',
   'atividade principal': 'atividades',

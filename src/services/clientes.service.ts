@@ -25,6 +25,7 @@ const CLIENTE_FIELDS = new Set([
   'razao_social',
   'nome_identificacao',
   'tipo_cliente',
+  'grupo_empresarial',
   'regime_tributario',
   'atividades',
   'dificuldade',

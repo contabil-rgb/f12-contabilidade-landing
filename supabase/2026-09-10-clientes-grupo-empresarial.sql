@@ -1,3 +1,6 @@
+-- Portal de Gestao Contabil - Grupo empresarial dos clientes
+-- Adiciona o campo grupo_empresarial em public.clientes e atualiza as funcoes seguras
+-- de criacao/edicao para persistir o novo campo. Pode ser executado mais de uma vez.
 -- Portal de Gestao Contabil - Hardening de public.clientes
 -- Etapas 4.2, 4.3 e 4.4: funcoes seguras para criar, atualizar e inativar cliente.
 -- Pode ser executado mais de uma vez.
@@ -332,3 +335,43 @@ $$;
 
 revoke all on function public.inativar_cliente_portal(uuid) from public;
 grant execute on function public.inativar_cliente_portal(uuid) to authenticated;
+
+
+-- Permite cadastrar, alterar e remover grupos empresariais na tabela de listagens.
+grant select, insert, update, delete on table public.listagens to authenticated;
+
+alter table public.listagens enable row level security;
+
+drop policy if exists "listagens_insert_responsavel_coordenador" on public.listagens;
+create policy "listagens_insert_responsavel_coordenador"
+on public.listagens
+for insert
+to authenticated
+with check (
+  public.is_portal_acesso_total()
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
+);
+
+drop policy if exists "listagens_update_responsavel_coordenador" on public.listagens;
+create policy "listagens_update_responsavel_coordenador"
+on public.listagens
+for update
+to authenticated
+using (
+  public.is_portal_acesso_total()
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
+)
+with check (
+  public.is_portal_acesso_total()
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
+);
+
+drop policy if exists "listagens_delete_responsavel_coordenador" on public.listagens;
+create policy "listagens_delete_responsavel_coordenador"
+on public.listagens
+for delete
+to authenticated
+using (
+  public.is_portal_acesso_total()
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
+);

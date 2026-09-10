@@ -8,6 +8,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'nome_identificacao', label: 'Nome / Identificação', group: 'Identificação', type: 'text', required: true },
   { key: 'status', label: 'Status do cliente', group: 'Identificação', type: 'select', listKey: 'status_cliente' },
   { key: 'tipo_cliente', label: 'Tipo de Cliente', group: 'Identificação', type: 'select', listKey: 'tipo_cliente' },
+  { key: 'grupo_empresarial', label: 'Grupo Empresarial', group: 'Identificação', type: 'select', listKey: 'grupo_empresarial' },
   { key: 'regime_tributario', label: 'Regime Tributário', group: 'Identificação', type: 'select', listKey: 'regime_tributario', required: true },
   { key: 'atividades', label: 'Atividades', group: 'Identificação', type: 'select', listKey: 'atividades', required: true },
   { key: 'dificuldade', label: 'Dificuldade', group: 'Identificação', type: 'select', listKey: 'dificuldade', required: true },
@@ -91,6 +92,7 @@ export const EXCEL_HEADER_MAP = {
   Nome: 'nome_identificacao',
   'Status do cliente': 'status',
   'Tipo de Cliente': 'tipo_cliente',
+  'Grupo Empresarial': 'grupo_empresarial',
   'Regime Tributário': 'regime_tributario',
   Atividades: 'atividades',
   Dificuldade: 'dificuldade',
@@ -149,6 +151,8 @@ export const EXCEL_HEADER_MAP = {
 
 export const LIST_HEADER_MAP = {
   'Tipo de Cliente': 'tipo_cliente',
+  'Grupo Empresarial': 'grupo_empresarial',
+  Grupo: 'grupo_empresarial',
   'Regime Tributário': 'regime_tributario',
   Atividades: 'atividades',
   Responsável: 'responsavel',
@@ -177,6 +181,7 @@ export const LIST_HEADER_MAP = {
 // O Supabase continua sendo a fonte primaria das listagens persistidas.
 export const DEFAULT_LISTS = {
   tipo_cliente: ['Bodó', 'Tambaqui', 'Salmão'],
+  grupo_empresarial: [],
   regime_tributario: ['Simples Nacional', 'Lucro Presumido', 'Lucro Real', 'Isento'],
   atividades: ['Comércio', 'Serviço', 'Comércio e Serviço', 'Indústria', 'Holding'],
   responsavel: [],
@@ -226,7 +231,7 @@ export const TABLE_COLUMNS = FIELD_DEFINITIONS.filter(
 export const DETAIL_SECTIONS = [
   {
     title: 'Identificação',
-    fields: ['cnpj', 'anexo_cartao_cnpj', 'anexo_cartao_qsa', 'razao_social', 'nome_identificacao', 'tipo_cliente', 'regime_tributario', 'atividades', 'dificuldade'],
+    fields: ['cnpj', 'anexo_cartao_cnpj', 'anexo_cartao_qsa', 'razao_social', 'nome_identificacao', 'tipo_cliente', 'grupo_empresarial', 'regime_tributario', 'atividades', 'dificuldade'],
   },
   {
     title: 'ECF',

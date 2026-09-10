@@ -39,7 +39,7 @@ for insert
 to authenticated
 with check (
   public.is_portal_coordenador()
-  and categoria in ('responsavel', 'responsavel_ecf')
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
 );
 
 drop policy if exists "listagens_update_responsavel_coordenador" on public.listagens;
@@ -49,11 +49,11 @@ for update
 to authenticated
 using (
   public.is_portal_coordenador()
-  and categoria in ('responsavel', 'responsavel_ecf')
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
 )
 with check (
   public.is_portal_coordenador()
-  and categoria in ('responsavel', 'responsavel_ecf')
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
 );
 
 drop policy if exists "listagens_delete_responsavel_coordenador" on public.listagens;
@@ -63,5 +63,5 @@ for delete
 to authenticated
 using (
   public.is_portal_coordenador()
-  and categoria in ('responsavel', 'responsavel_ecf')
+  and categoria in ('responsavel', 'responsavel_ecf', 'grupo_empresarial')
 );
