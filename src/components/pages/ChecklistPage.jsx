@@ -16,8 +16,10 @@ import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
 import {
   CHECKLIST_STATUS,
   listarChecklistClienteItens,
+  listarChecklistItens,
   listarChecklistResumo,
   listarChecklistStatus,
+  salvarChecklistClienteItens,
   salvarChecklistStatus,
 } from '../../services/checklist.service';
 
@@ -127,7 +129,50 @@ function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
   );
 }
 
-function ClientChecklistDetails({ client, detail, ano, mes, busyKey, onReload, onStatusChange }) {
+function ClientChecklistDetails({
+  client,
+  detail,
+  ano,
+  mes,
+  catalogItems,
+  catalogLoading,
+  catalogError,
+  busyKey,
+  savingConfigId,
+  onReload,
+  onSaveClientItems,
+  onStatusChange,
+}) {
+  const linkedIdsKey = useMemo(
+    () => (detail?.itens ?? []).map((vinculo) => vinculo.item_id || vinculo.item?.id).filter(Boolean).join('|'),
+    [detail?.itens],
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+
+  useEffect(() => {
+    setSelectedItemIds(linkedIdsKey ? linkedIdsKey.split('|') : []);
+  }, [linkedIdsKey]);
+
+  const selectedSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const selectedCount = selectedItemIds.length;
+  const savingConfig = savingConfigId === client?.id;
+
+  function toggleCatalogItem(itemId) {
+    setSelectedItemIds((current) => (
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    ));
+  }
+
+  function selectAllCatalogItems() {
+    setSelectedItemIds(catalogItems.map((item) => item.id));
+  }
+
+  function clearCatalogItems() {
+    setSelectedItemIds([]);
+  }
+
   if (!detail || detail.loading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-900/55 dark:text-gray-300">
@@ -149,63 +194,143 @@ function ClientChecklistDetails({ client, detail, ano, mes, busyKey, onReload, o
     );
   }
 
-  if (!detail.itens?.length) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-gray-700 dark:bg-gray-900/45 dark:text-gray-300">
-        <div className="flex items-start gap-3">
-          <FileQuestion size={20} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
-          <div>
-            <p className="font-black text-slate-800 dark:text-gray-100">Nenhum item vinculado a este cliente.</p>
-            <p className="mt-1 font-medium leading-6">
-              A estrutura do checklist já está pronta. O vínculo dos itens por cliente entra na próxima etapa, então este cliente aparecerá aqui para acompanhamento assim que os itens forem selecionados.
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-900 dark:text-white">Itens aplicáveis ao cliente</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+              Selecione quais documentos entram no checklist deste cliente. A ordem segue o catálogo padrão configurado no Supabase.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+              {formatNumber(selectedCount)} selecionado(s)
+            </StatusBadge>
+            <ActionButton type="button" size="sm" variant="subtle" onClick={selectAllCatalogItems} disabled={catalogLoading || !catalogItems.length || savingConfig}>
+              Marcar todos
+            </ActionButton>
+            <ActionButton type="button" size="sm" variant="subtle" onClick={clearCatalogItems} disabled={catalogLoading || savingConfig}>
+              Limpar
+            </ActionButton>
+            <ActionButton
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={() => onSaveClientItems(client, selectedItemIds)}
+              disabled={catalogLoading || savingConfig}
+            >
+              {savingConfig ? 'Salvando...' : 'Salvar itens'}
+            </ActionButton>
+          </div>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-gray-800 dark:bg-gray-900/45">
-      <DataTableShell
-        headers={['Item', 'Status atual', 'Alterar status']}
-        minWidth="min-w-[760px]"
-        hasRows={detail.itens.length > 0}
-      >
-        <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-          {detail.itens.map((vinculo) => {
-            const item = vinculo.item;
-            const itemId = vinculo.item_id || item?.id;
-            const statusRow = detail.statusByItem?.[itemId];
-            const currentStatus = statusRow?.status || CHECKLIST_STATUS.PENDENTE;
-            const statusMeta = STATUS_BY_VALUE[currentStatus] || STATUS_BY_VALUE[CHECKLIST_STATUS.PENDENTE];
-            const rowBusyKey = `${client.id}:${itemId}`;
+        {catalogError ? (
+          <div className="mt-4">
+            <AlertBanner tone="danger" title="Erro ao carregar catálogo">
+              {catalogError}
+            </AlertBanner>
+          </div>
+        ) : null}
 
-            return (
-              <tr key={vinculo.id || itemId}>
-                <td className="table-cell-primary">
-                  <div className="min-w-0">
-                    <p className="font-black text-slate-900 dark:text-white">{item?.descricao || 'Item sem descrição'}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">
-                      Competência {String(mes).padStart(2, '0')}/{ano}
-                    </p>
-                  </div>
-                </td>
-                <td className="table-cell-primary">
-                  <StatusBadge toneClass={statusMeta.tone}>{statusMeta.label}</StatusBadge>
-                </td>
-                <td className="table-cell-primary">
-                  <ChecklistStatusButtons
-                    currentStatus={currentStatus}
-                    disabled={busyKey === rowBusyKey}
-                    onChange={(nextStatus) => onStatusChange(client, vinculo, nextStatus)}
+        {catalogLoading ? (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
+            Carregando catálogo de documentos...
+          </div>
+        ) : null}
+
+        {!catalogLoading && !catalogError && catalogItems.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
+            Nenhum item ativo foi encontrado no catálogo do checklist.
+          </div>
+        ) : null}
+
+        {!catalogLoading && !catalogError && catalogItems.length > 0 ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {catalogItems.map((item) => {
+              const checked = selectedSet.has(item.id);
+              return (
+                <label
+                  key={item.id}
+                  className={classNames(
+                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    checked
+                      ? 'border-blue-400/70 bg-blue-50 text-blue-900 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-100'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-200 dark:hover:border-blue-500/50',
+                    savingConfig ? 'pointer-events-none opacity-70' : '',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={savingConfig}
+                    onChange={() => toggleCatalogItem(item.id)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </DataTableShell>
+                  <span className="min-w-0 leading-5">{item.descricao}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
+      {!detail.itens?.length ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-gray-700 dark:bg-gray-900/45 dark:text-gray-300">
+          <div className="flex items-start gap-3">
+            <FileQuestion size={20} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+            <div>
+              <p className="font-black text-slate-800 dark:text-gray-100">Nenhum item vinculado a este cliente.</p>
+              <p className="mt-1 font-medium leading-6">
+                Selecione os documentos acima e clique em salvar para montar o checklist deste cliente.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-gray-800 dark:bg-gray-900/45">
+          <DataTableShell
+            headers={['Item', 'Status atual', 'Alterar status']}
+            minWidth="min-w-[760px]"
+            hasRows={detail.itens.length > 0}
+          >
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              {detail.itens.map((vinculo) => {
+                const item = vinculo.item;
+                const itemId = vinculo.item_id || item?.id;
+                const statusRow = detail.statusByItem?.[itemId];
+                const currentStatus = statusRow?.status || CHECKLIST_STATUS.PENDENTE;
+                const statusMeta = STATUS_BY_VALUE[currentStatus] || STATUS_BY_VALUE[CHECKLIST_STATUS.PENDENTE];
+                const rowBusyKey = `${client.id}:${itemId}`;
+
+                return (
+                  <tr key={vinculo.id || itemId}>
+                    <td className="table-cell-primary">
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-900 dark:text-white">{item?.descricao || 'Item sem descrição'}</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">
+                          Competência {String(mes).padStart(2, '0')}/{ano}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="table-cell-primary">
+                      <StatusBadge toneClass={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                    </td>
+                    <td className="table-cell-primary">
+                      <ChecklistStatusButtons
+                        currentStatus={currentStatus}
+                        disabled={busyKey === rowBusyKey}
+                        onChange={(nextStatus) => onStatusChange(client, vinculo, nextStatus)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </DataTableShell>
+        </div>
+      )}
     </div>
   );
 }
@@ -223,6 +348,10 @@ export default function ChecklistPage({ clients = [] }) {
   const [expandedClientId, setExpandedClientId] = useState('');
   const [detailsByClient, setDetailsByClient] = useState({});
   const [busyKey, setBusyKey] = useState('');
+  const [catalogItems, setCatalogItems] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [savingConfigId, setSavingConfigId] = useState('');
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -251,6 +380,23 @@ export default function ChecklistPage({ clients = [] }) {
       if (!silent) setLoadingResumo(false);
     }
   }
+
+  async function loadCatalogItems() {
+    setCatalogLoading(true);
+    setCatalogError('');
+    try {
+      const items = await listarChecklistItens();
+      setCatalogItems(items);
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : 'Não foi possível carregar o catálogo do checklist.');
+    } finally {
+      setCatalogLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCatalogItems();
+  }, []);
 
   useEffect(() => {
     setExpandedClientId('');
@@ -384,6 +530,43 @@ export default function ChecklistPage({ clients = [] }) {
       setToast({ tone: 'danger', title: 'Erro ao salvar status', message: err instanceof Error ? err.message : 'Não foi possível salvar o status.' });
     } finally {
       setBusyKey('');
+    }
+  }
+
+  async function handleSaveClientItems(client, selectedItemIds) {
+    if (!client?.id) return;
+
+    setSavingConfigId(client.id);
+    setToast(null);
+
+    const selectedIds = new Set(selectedItemIds);
+    const payload = catalogItems
+      .filter((item) => selectedIds.has(item.id))
+      .map((item, index) => ({
+        item_id: item.id,
+        ordem: index + 1,
+        ativo: true,
+      }));
+
+    try {
+      await salvarChecklistClienteItens(client.id, payload);
+      await Promise.all([
+        loadClientDetails(client.id, { force: true }),
+        loadResumo({ silent: true }),
+      ]);
+      setToast({
+        tone: 'success',
+        title: 'Itens do checklist salvos',
+        message: `${getClientName(client)} agora está com ${formatNumber(payload.length)} item(ns) vinculado(s).`,
+      });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao salvar itens do checklist',
+        message: err instanceof Error ? err.message : 'Não foi possível salvar os itens deste cliente.',
+      });
+    } finally {
+      setSavingConfigId('');
     }
   }
 
@@ -540,8 +723,13 @@ export default function ChecklistPage({ clients = [] }) {
                       detail={detailsByClient[row.cliente_id]}
                       ano={ano}
                       mes={mes}
+                      catalogItems={catalogItems}
+                      catalogLoading={catalogLoading}
+                      catalogError={catalogError}
                       busyKey={busyKey}
+                      savingConfigId={savingConfigId}
                       onReload={(clienteId) => loadClientDetails(clienteId, { force: true })}
+                      onSaveClientItems={handleSaveClientItems}
                       onStatusChange={handleStatusChange}
                     />
                   </div>
@@ -554,4 +742,3 @@ export default function ChecklistPage({ clients = [] }) {
     </div>
   );
 }
-
