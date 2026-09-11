@@ -34,8 +34,10 @@ import {
   listarChecklistStatus,
   registrarChecklistEnvio,
   enviarChecklistLembretes,
+  excluirChecklistItem,
   salvarChecklistClienteItens,
   salvarChecklistContato,
+  salvarChecklistItem,
   salvarChecklistStatus,
 } from '../../services/checklist.service';
 import { gerarUrlPublicaAssinaturaResponsavel } from '../../services/assinaturas-responsaveis.service';
@@ -468,6 +470,144 @@ function buildReminderHtml(client, ano, mes, pendencias, assinaturaUrl = '', ass
   `;
 }
 
+function getNextCatalogOrder(items = []) {
+  const maxOrder = items.reduce((max, item) => Math.max(max, toNumber(item?.ordem)), 0);
+  return maxOrder + 10;
+}
+
+function ChecklistCatalogManager({
+  items,
+  loading,
+  error,
+  form,
+  busyId,
+  onFormChange,
+  onSubmit,
+  onEdit,
+  onCancel,
+  onDelete,
+  onRefresh,
+}) {
+  const editing = Boolean(form.id);
+  const saving = busyId === 'new' || (editing && busyId === form.id);
+
+  return (
+    <SurfacePanel
+      title="Catálogo de documentos"
+      description="Gerencie os documentos disponíveis para vincular ao checklist dos clientes."
+      right={(
+        <ActionButton type="button" variant="secondary" onClick={onRefresh} disabled={loading}>
+          <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+          Atualizar catálogo
+        </ActionButton>
+      )}
+      bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
+    >
+      <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_150px_auto] lg:items-end">
+          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+            {editing ? 'Editar documento' : 'Novo documento'}
+            <input
+              type="text"
+              value={form.descricao}
+              onChange={(event) => onFormChange({ ...form, descricao: event.target.value })}
+              placeholder="Ex.: Comprovante de aluguel"
+              className="input-shell normal-case"
+              disabled={saving}
+            />
+          </label>
+
+          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+            Ordem
+            <input
+              type="number"
+              value={form.ordem}
+              onChange={(event) => onFormChange({ ...form, ordem: event.target.value })}
+              placeholder="10"
+              className="input-shell normal-case"
+              disabled={saving}
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            {editing ? (
+              <ActionButton type="button" size="sm" variant="subtle" onClick={onCancel} disabled={saving}>
+                Cancelar
+              </ActionButton>
+            ) : null}
+            <ActionButton type="submit" size="sm" variant="primary" disabled={saving}>
+              {saving ? 'Salvando...' : editing ? 'Salvar edição' : 'Adicionar item'}
+            </ActionButton>
+          </div>
+        </div>
+      </form>
+
+      {error ? (
+        <div className="mt-4">
+          <AlertBanner tone="danger" title="Erro ao carregar catálogo">
+            {error}
+          </AlertBanner>
+        </div>
+      ) : null}
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">Itens ativos do catálogo</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+              {formatNumber(items.length)} documento(s) ativo(s), ordenados por prioridade.
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
+            Carregando catálogo de documentos...
+          </div>
+        ) : null}
+
+        {!loading && !items.length ? (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
+            Nenhum item ativo foi encontrado. Cadastre o primeiro documento para montar os checklists.
+          </div>
+        ) : null}
+
+        {!loading && items.length ? (
+          <div className="mt-4 grid gap-2 xl:grid-cols-2">
+            {items.map((item) => {
+              const itemBusy = busyId === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-950/30"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                      {formatNumber(item.ordem)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-black text-slate-900 dark:text-white">{item.descricao}</p>
+                      <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">Ativo</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                    <ActionButton type="button" size="sm" variant="subtle" onClick={() => onEdit(item)} disabled={Boolean(busyId)}>
+                      Editar
+                    </ActionButton>
+                    <ActionButton type="button" size="sm" variant="danger" onClick={() => onDelete(item)} disabled={Boolean(busyId)}>
+                      {itemBusy ? 'Inativando...' : 'Inativar'}
+                    </ActionButton>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </SurfacePanel>
+  );
+}
+
 function ChecklistContactReminder({
   client,
   ano,
@@ -888,6 +1028,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [catalogItems, setCatalogItems] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
+  const [catalogForm, setCatalogForm] = useState({ id: '', descricao: '', ordem: '' });
+  const [catalogBusyId, setCatalogBusyId] = useState('');
   const [savingConfigId, setSavingConfigId] = useState('');
   const [contactsByClient, setContactsByClient] = useState({});
   const [contactsError, setContactsError] = useState('');
@@ -928,10 +1070,99 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     try {
       const items = await listarChecklistItens();
       setCatalogItems(items);
+      setCatalogForm((current) => (
+        current.id
+          ? current
+          : { ...current, ordem: current.ordem || String(getNextCatalogOrder(items)) }
+      ));
     } catch (err) {
       setCatalogError(err instanceof Error ? err.message : 'Não foi possível carregar o catálogo do checklist.');
     } finally {
       setCatalogLoading(false);
+    }
+  }
+
+  function resetCatalogForm(items = catalogItems) {
+    setCatalogForm({ id: '', descricao: '', ordem: String(getNextCatalogOrder(items)) });
+  }
+
+  async function refreshChecklistAfterCatalogChange(nextItems = catalogItems) {
+    await loadResumo({ silent: true });
+    if (expandedClientId) {
+      await loadClientDetails(expandedClientId, { force: true });
+    }
+    resetCatalogForm(nextItems);
+  }
+
+  async function handleSaveCatalogItem(event) {
+    event.preventDefault();
+    const descricao = String(catalogForm.descricao ?? '').trim();
+    const ordem = Number(catalogForm.ordem || 0);
+
+    if (!descricao) {
+      setToast({ tone: 'danger', title: 'Descrição obrigatória', message: 'Informe a descrição do item do checklist.' });
+      return;
+    }
+
+    if (!Number.isFinite(ordem)) {
+      setToast({ tone: 'danger', title: 'Ordem inválida', message: 'Informe uma ordem numérica para o item.' });
+      return;
+    }
+
+    const busyId = catalogForm.id || 'new';
+    setCatalogBusyId(busyId);
+    setToast(null);
+    try {
+      const saved = await salvarChecklistItem({
+        id: catalogForm.id || undefined,
+        descricao,
+        ordem,
+        ativo: true,
+      });
+      const items = await listarChecklistItens();
+      setCatalogItems(items);
+      await refreshChecklistAfterCatalogChange(items);
+      setToast({
+        tone: 'success',
+        title: catalogForm.id ? 'Item atualizado' : 'Item criado',
+        message: saved.descricao,
+      });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao salvar item',
+        message: err instanceof Error ? err.message : 'Não foi possível salvar o item do checklist.',
+      });
+    } finally {
+      setCatalogBusyId('');
+    }
+  }
+
+  function handleEditCatalogItem(item) {
+    setCatalogForm({ id: item.id, descricao: item.descricao, ordem: String(item.ordem ?? '') });
+  }
+
+  async function handleDeleteCatalogItem(item) {
+    if (!item?.id) return;
+    const confirmed = window.confirm(`Inativar o item "${item.descricao}" do catálogo do checklist?`);
+    if (!confirmed) return;
+
+    setCatalogBusyId(item.id);
+    setToast(null);
+    try {
+      const deleted = await excluirChecklistItem(item.id);
+      const items = await listarChecklistItens();
+      setCatalogItems(items);
+      await refreshChecklistAfterCatalogChange(items);
+      setToast({ title: 'Item inativado', message: deleted.descricao });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao inativar item',
+        message: err instanceof Error ? err.message : 'Não foi possível inativar o item do checklist.',
+      });
+    } finally {
+      setCatalogBusyId('');
     }
   }
 
@@ -1300,6 +1531,20 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           />
         </div>
       </SurfacePanel>
+
+      <ChecklistCatalogManager
+        items={catalogItems}
+        loading={catalogLoading}
+        error={catalogError}
+        form={catalogForm}
+        busyId={catalogBusyId}
+        onFormChange={setCatalogForm}
+        onSubmit={handleSaveCatalogItem}
+        onEdit={handleEditCatalogItem}
+        onCancel={() => resetCatalogForm()}
+        onDelete={handleDeleteCatalogItem}
+        onRefresh={loadCatalogItems}
+      />
 
       <SurfacePanel
         title="Filtros do checklist"
