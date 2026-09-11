@@ -70,12 +70,7 @@ export function isReadOnly(user) {
 export function canViewClient(user, client) {
   if (!user) return false;
   if (can(user, PERMISSIONS.CLIENTS_VIEW_ALL)) return true;
-  if (!can(user, PERMISSIONS.CLIENTS_VIEW_ASSIGNED)) return false;
-  const responsavel = normalizeText(client.responsavel);
-  if (!responsavel) return false;
-  const userName = normalizeText(user.nome);
-  const emailLocal = normalizeText(user.email).split('@')[0];
-  return userName.includes(responsavel) || responsavel.includes(userName) || emailLocal.includes(responsavel);
+  return can(user, PERMISSIONS.CLIENTS_VIEW_ASSIGNED);
 }
 
 export function canEditClientField(user, fieldKey) {
