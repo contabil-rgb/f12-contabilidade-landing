@@ -170,6 +170,7 @@ import { supabase } from './lib/supabase';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
 const LazyHistoryPage = lazy(() => import('./components/pages/HistoryPage.jsx'));
+const LazyChecklistPage = lazy(() => import('./components/pages/ChecklistPage.jsx'));
 const INITIAL_METADATA = Object.freeze({
   source: 'Inicialização do portal',
   importedAt: '',
@@ -183,6 +184,7 @@ const NAV_ITEMS = [
   { key: 'clientes', label: 'Base de Clientes', icon: Users },
   { key: 'reinf', label: 'Distribuição de Lucro', icon: FileSpreadsheet },
   { key: 'ecd', label: 'ECD / ECF', icon: BookOpenCheck },
+  { key: 'checklist', label: 'Checklist Documentos', icon: ClipboardList },
   { key: 'relatorios', label: 'Relatórios', icon: FileDown },
   { key: 'usuarios', label: 'Gestão de Usuários', icon: UserCog, permission: PERMISSIONS.USERS_MANAGE },
   { key: 'historico', label: 'Histórico', icon: History, permission: PERMISSIONS.HISTORY_VIEW },
@@ -193,6 +195,7 @@ const PAGE_DESCRIPTIONS = {
   clientes: 'Controle dos clientes, competências e obrigações',
   reinf: 'Preparação e envio da distribuição de lucro ao setor fiscal',
   ecd: 'Controle das obrigações anuais e responsáveis',
+  checklist: 'Acompanhamento mensal dos documentos dos clientes',
   relatorios: 'Relatórios operacionais e exportação',
   usuarios: 'Gestão dos usuários do portal',
   historico: 'Rastreabilidade das alterações da base',
@@ -202,7 +205,7 @@ const PAGE_DESCRIPTIONS = {
 const NAV_GROUPS = [
   { title: 'Visão Geral', keys: ['dashboard'] },
   { title: 'Clientes', keys: ['clientes', 'historico'] },
-  { title: 'Obrigações', keys: ['reinf', 'ecd'] },
+  { title: 'Obrigações', keys: ['reinf', 'ecd', 'checklist'] },
   { title: 'Relatórios', keys: ['relatorios'] },
   { title: 'Configurações', keys: ['usuarios'] },
 ];
@@ -12432,6 +12435,11 @@ export default function App() {
         searchContext={ecdSearchContext}
         onClearSearchContext={() => setEcdSearchContext(null)}
       />
+    ),
+    checklist: (
+      <Suspense fallback={<PageLoadingFallback label="Carregando checklist de documentos..." />}>
+        <LazyChecklistPage clients={activeClients} />
+      </Suspense>
     ),
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)
       ? (
