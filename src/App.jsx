@@ -12438,7 +12438,7 @@ export default function App() {
     ),
     checklist: (
       <Suspense fallback={<PageLoadingFallback label="Carregando checklist de documentos..." />}>
-        <LazyChecklistPage clients={activeClients} />
+        <LazyChecklistPage clients={activeClients} responsavelCatalogo={responsavelCatalogo} />
       </Suspense>
     ),
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)

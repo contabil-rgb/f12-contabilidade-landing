@@ -38,6 +38,7 @@ import {
   salvarChecklistContato,
   salvarChecklistStatus,
 } from '../../services/checklist.service';
+import { gerarUrlPublicaAssinaturaResponsavel } from '../../services/assinaturas-responsaveis.service';
 
 const MONTH_OPTIONS = [
   { value: 1, label: 'Janeiro' },
@@ -106,6 +107,24 @@ function getClientName(client) {
 
 function getResponsavel(client) {
   return client?.responsavel || 'Não informado';
+}
+
+function getClientResponsibleSignature(client, responsavelCatalogo = []) {
+  const responsavelNome = getResponsavel(client);
+  const hasResponsavelInformado = normalizeText(responsavelNome) !== normalizeText('Não informado');
+  const responsavelAssinatura = hasResponsavelInformado
+    ? responsavelCatalogo.find(
+      (item) => normalizeText(item?.valor) === normalizeText(responsavelNome),
+    ) ?? null
+    : null;
+  const assinaturaUrl = responsavelAssinatura?.assinatura_email_path
+    ? gerarUrlPublicaAssinaturaResponsavel(responsavelAssinatura.assinatura_email_path)
+    : '';
+
+  return {
+    nome: responsavelAssinatura?.valor || (hasResponsavelInformado ? responsavelNome : ''),
+    url: assinaturaUrl,
+  };
 }
 
 function buildStatusMap(statusRows = []) {
@@ -411,7 +430,7 @@ function buildReminderSubject(client, ano, mes) {
   return `Checklist de documentos - ${getMonthLabel(mes)}/${ano} - ${getClientName(client)}`;
 }
 
-function buildReminderText(client, ano, mes, pendencias) {
+function buildReminderText(client, ano, mes, pendencias, assinaturaNome = '') {
   const itens = pendencias.map((pendencia) => `- ${pendencia.item_descricao}`).join('\n');
   return [
     'Olá!',
@@ -424,14 +443,18 @@ function buildReminderText(client, ano, mes, pendencias) {
     'Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.',
     '',
     'Atenciosamente,',
-    'F12 Contabilidade',
+    assinaturaNome || 'F12 Contabilidade',
   ].join('\n');
 }
 
-function buildReminderHtml(client, ano, mes, pendencias) {
+function buildReminderHtml(client, ano, mes, pendencias, assinaturaUrl = '', assinaturaNome = '') {
   const itens = pendencias
     .map((pendencia) => `<li>${escapeHtml(pendencia.item_descricao)}</li>`)
     .join('');
+  const assinaturaHtml = assinaturaUrl
+    ? `<div style="margin-top:18px;"><img src="${escapeHtml(assinaturaUrl)}" alt="${escapeHtml(assinaturaNome || 'Assinatura digital')}" style="max-width:520px;width:100%;height:auto;display:block;border:0;" /></div>`
+    : `<p>${escapeHtml(assinaturaNome || 'F12 Contabilidade')}</p>`;
+
   return `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
       <p>Olá!</p>
@@ -439,7 +462,8 @@ function buildReminderHtml(client, ano, mes, pendencias) {
       <p><strong>Documentos pendentes:</strong></p>
       <ul>${itens}</ul>
       <p>Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.</p>
-      <p>Atenciosamente,<br/>F12 Contabilidade</p>
+      <p>Atenciosamente,</p>
+      ${assinaturaHtml}
     </div>
   `;
 }
@@ -499,16 +523,18 @@ function ChecklistContactReminder({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+    <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
-            <Mail size={16} aria-hidden="true" />
-            Contatos e lembretes
-          </p>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-            Informe os destinatários do checklist e envie o lembrete dos itens pendentes da competência {getMonthLabel(mes)}/{ano}.
-          </p>
+        <div className="flex min-w-0 gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
+            <Mail size={18} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-900 dark:text-white">Contatos e lembretes</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+              Informe os destinatários do checklist e envie o lembrete dos itens pendentes da competência {getMonthLabel(mes)}/{ano}.
+            </p>
+          </div>
         </div>
         <StatusBadge toneClass={pendingCount > 0
           ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
@@ -518,7 +544,7 @@ function ChecklistContactReminder({
         </StatusBadge>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
           E-mail principal
           <input
@@ -541,7 +567,7 @@ function ChecklistContactReminder({
           />
         </label>
 
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2 lg:col-span-2">
           <ActionButton type="button" size="sm" variant="secondary" onClick={handleSave} disabled={saving || sending}>
             {saving ? 'Salvando...' : 'Salvar contato'}
           </ActionButton>
@@ -569,8 +595,8 @@ function ChecklistContactReminder({
           Não há pendências para esta competência.
         </p>
       ) : (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
-          <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Pendências que serão enviadas</p>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/20 dark:bg-amber-400/10">
+          <p className="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências que serão enviadas</p>
           <ul className="mt-2 space-y-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
             {pendencias.slice(0, 8).map((pendencia) => (
               <li key={pendencia.item_id} className="flex gap-2">
@@ -587,7 +613,7 @@ function ChecklistContactReminder({
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-gray-800 dark:bg-gray-950/35">
         <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Últimos envios</p>
         {envios.length ? (
           <div className="mt-2 space-y-2">
@@ -693,13 +719,18 @@ function ClientChecklistDetails({
           onSendReminder={onSendReminder}
         />
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-900 dark:text-white">Itens aplicáveis ao cliente</p>
-              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                Selecione quais documentos entram no checklist deste cliente. A ordem segue o catálogo padrão configurado no Supabase.
-              </p>
+            <div className="flex min-w-0 gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200">
+                <ListChecks size={18} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900 dark:text-white">Itens aplicáveis ao cliente</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                  Selecione quais documentos entram no checklist deste cliente. A ordem segue o catálogo padrão configurado no Supabase.
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
@@ -787,7 +818,7 @@ function ClientChecklistDetails({
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-gray-800 dark:bg-gray-900/45">
+        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black text-slate-900 dark:text-white">Acompanhamento da competência</p>
@@ -841,7 +872,7 @@ function ClientChecklistDetails({
   );
 }
 
-export default function ChecklistPage({ clients = [] }) {
+export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }) {
   const initialCompetence = useMemo(() => getCurrentCompetence(), []);
   const [mes, setMes] = useState(initialCompetence.mes);
   const [ano, setAno] = useState(initialCompetence.ano);
@@ -1147,9 +1178,10 @@ export default function ChecklistPage({ clients = [] }) {
     const pendencias = detail.pendencias ?? [];
     const destinatario = String(values.email ?? '').trim();
     const cc = String(values.cc ?? '').trim();
+    const assinatura = getClientResponsibleSignature(client, responsavelCatalogo);
     const assunto = buildReminderSubject(client, ano, mes);
-    const texto = buildReminderText(client, ano, mes, pendencias);
-    const html = buildReminderHtml(client, ano, mes, pendencias);
+    const texto = buildReminderText(client, ano, mes, pendencias, assinatura.nome);
+    const html = buildReminderHtml(client, ano, mes, pendencias, assinatura.url, assinatura.nome);
 
     if (!destinatario || !pendencias.length) return;
 
@@ -1369,49 +1401,80 @@ export default function ChecklistPage({ clients = [] }) {
             const progressWidth = Math.max(0, Math.min(100, row.percentual_concluido));
 
             return (
-              <div key={row.cliente_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm transition hover:border-blue-300/55 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/70 dark:hover:border-blue-500/45">
+              <div
+                key={row.cliente_id}
+                className={classNames(
+                  'overflow-hidden rounded-2xl border bg-white/95 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300/55 hover:shadow-lg dark:bg-gray-900/75 dark:hover:border-blue-500/45',
+                  expanded ? 'border-blue-300/70 dark:border-blue-500/45' : 'border-slate-200 dark:border-gray-800',
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => toggleClient(row.cliente_id)}
-                  className="grid w-full gap-4 px-4 py-4 text-left transition hover:bg-slate-50/80 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] lg:items-center dark:hover:bg-gray-800/55"
+                  className="grid w-full gap-4 px-4 py-4 text-left transition hover:bg-slate-50/80 sm:px-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)_auto] xl:items-center dark:hover:bg-gray-800/55"
                 >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-black text-slate-950 dark:text-white">{row.nome}</p>
-                      <StatusBadge
-                        toneClass={hasContact
-                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
-                          : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
-                      >
-                        {hasContact ? 'Contato salvo' : 'Sem contato'}
-                      </StatusBadge>
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                      {formatCnpj(row.cnpj)} · Responsável: {row.responsavel}
-                    </p>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800">
-                      <div
-                        className={classNames(
-                          'h-full rounded-full transition-all',
-                          row.percentual_concluido >= 100
-                            ? 'bg-emerald-500'
-                            : row.percentual_concluido > 0
-                              ? 'bg-sky-500'
-                              : 'bg-amber-400',
-                        )}
-                        style={{ width: `${progressWidth}%` }}
-                      />
+                  <div className="flex min-w-0 gap-3">
+                    <span className={classNames(
+                      'mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-black',
+                      row.percentual_concluido >= 100
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
+                        : row.qtd_pendentes > 0
+                          ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
+                          : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200',
+                    )}
+                    >
+                      {row.percentual_concluido >= 100 ? <Check size={18} aria-hidden="true" /> : <FileQuestion size={18} aria-hidden="true" />}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-base font-black text-slate-950 dark:text-white">{row.nome}</p>
+                        <StatusBadge
+                          toneClass={hasContact
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
+                            : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
+                        >
+                          {hasContact ? 'Contato salvo' : 'Sem contato'}
+                        </StatusBadge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                        <span>{formatCnpj(row.cnpj)}</span>
+                        <span>Responsável: <strong className="text-slate-700 dark:text-gray-200">{row.responsavel}</strong></span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Progresso</p>
+                      <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.percentual_concluido)}%</p>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-800">
+                        <div
+                          className={classNames(
+                            'h-full rounded-full transition-all',
+                            row.percentual_concluido >= 100
+                              ? 'bg-emerald-500'
+                              : row.percentual_concluido > 0
+                                ? 'bg-sky-500'
+                                : 'bg-amber-400',
+                          )}
+                          style={{ width: `${progressWidth}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Itens</p>
+                      <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.total_itens)}</p>
+                      <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">documento(s)</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-400/20 dark:bg-amber-400/10">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências</p>
+                      <p className="mt-1 text-sm font-black text-amber-800 dark:text-amber-100">{formatNumber(row.qtd_pendentes)}</p>
+                      <p className="mt-1 text-[11px] font-bold text-amber-700/80 dark:text-amber-200/80">em aberto</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                     <StatusBadge toneClass={completionTone}>{formatNumber(row.percentual_concluido)}% concluído</StatusBadge>
-                    <StatusBadge toneClass="border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                      {formatNumber(row.total_itens)} item(ns)
-                    </StatusBadge>
-                    <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-                      {formatNumber(row.qtd_pendentes)} pendente(s)
-                    </StatusBadge>
                     <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                       {expanded ? 'Ocultar' : 'Abrir'}
                       <ChevronDown size={14} className={classNames('transition', expanded && 'rotate-180')} aria-hidden="true" />
@@ -1420,7 +1483,7 @@ export default function ChecklistPage({ clients = [] }) {
                 </button>
 
                 {expanded ? (
-                  <div className="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-950/20">
+                  <div className="border-t border-slate-200 bg-gradient-to-b from-slate-50/90 to-white p-4 sm:p-5 dark:border-gray-800 dark:from-gray-950/35 dark:to-gray-950/15">
                     <ClientChecklistDetails
                       client={row.client}
                       detail={detailsByClient[row.cliente_id]}
