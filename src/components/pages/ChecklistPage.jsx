@@ -3,8 +3,10 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileQuestion,
+  Mail,
   RefreshCcw,
   Search,
+  Send,
 } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import AlertBanner from '../ui/AlertBanner';
@@ -16,10 +18,16 @@ import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
 import {
   CHECKLIST_STATUS,
   listarChecklistClienteItens,
+  listarChecklistContatos,
+  listarChecklistEnvios,
   listarChecklistItens,
+  listarChecklistPendencias,
   listarChecklistResumo,
   listarChecklistStatus,
+  registrarChecklistEnvio,
+  enviarChecklistLembretes,
   salvarChecklistClienteItens,
+  salvarChecklistContato,
   salvarChecklistStatus,
 } from '../../services/checklist.service';
 
@@ -129,18 +137,260 @@ function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
   );
 }
 
+function formatDateTime(value) {
+  if (!value) return 'Data não informada';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function getMonthLabel(mes) {
+  return MONTH_OPTIONS.find((month) => month.value === Number(mes))?.label ?? String(mes).padStart(2, '0');
+}
+
+function isValidEmailList(value) {
+  const emails = splitEmails(value);
+
+  if (!emails.length) return true;
+  return emails.every((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+}
+
+function splitEmails(value) {
+  return String(value ?? '')
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function buildReminderSubject(client, ano, mes) {
+  return `Checklist de documentos - ${getMonthLabel(mes)}/${ano} - ${getClientName(client)}`;
+}
+
+function buildReminderText(client, ano, mes, pendencias) {
+  const itens = pendencias.map((pendencia) => `- ${pendencia.item_descricao}`).join('\n');
+  return [
+    'Olá!',
+    '',
+    `Identificamos documentos pendentes no checklist da competência ${getMonthLabel(mes)}/${ano} da empresa ${getClientName(client)}.`,
+    '',
+    'Documentos pendentes:',
+    itens,
+    '',
+    'Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.',
+    '',
+    'Atenciosamente,',
+    'F12 Contabilidade',
+  ].join('\n');
+}
+
+function buildReminderHtml(client, ano, mes, pendencias) {
+  const itens = pendencias
+    .map((pendencia) => `<li>${escapeHtml(pendencia.item_descricao)}</li>`)
+    .join('');
+  return `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
+      <p>Olá!</p>
+      <p>Identificamos documentos pendentes no checklist da competência <strong>${escapeHtml(getMonthLabel(mes))}/${escapeHtml(ano)}</strong> da empresa <strong>${escapeHtml(getClientName(client))}</strong>.</p>
+      <p><strong>Documentos pendentes:</strong></p>
+      <ul>${itens}</ul>
+      <p>Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.</p>
+      <p>Atenciosamente,<br/>F12 Contabilidade</p>
+    </div>
+  `;
+}
+
+function ChecklistContactReminder({
+  client,
+  ano,
+  mes,
+  contact,
+  pendencias,
+  envios,
+  savingContactId,
+  sendingReminderId,
+  onSaveContact,
+  onSendReminder,
+}) {
+  const [email, setEmail] = useState('');
+  const [cc, setCc] = useState('');
+  const [localError, setLocalError] = useState('');
+
+  useEffect(() => {
+    setEmail(contact?.email ?? '');
+    setCc(contact?.cc ?? '');
+    setLocalError('');
+  }, [contact?.email, contact?.cc]);
+
+  const saving = savingContactId === client?.id;
+  const sending = sendingReminderId === client?.id;
+  const hasEmail = String(email ?? '').trim().length > 0;
+  const pendingCount = pendencias.length;
+
+  function validateContact() {
+    if (email && !isValidEmailList(email)) {
+      setLocalError('Informe um e-mail principal válido.');
+      return false;
+    }
+    if (cc && !isValidEmailList(cc)) {
+      setLocalError('Informe e-mails em cópia válidos, separados por vírgula ou ponto e vírgula.');
+      return false;
+    }
+    setLocalError('');
+    return true;
+  }
+
+  function handleSave() {
+    if (!validateContact()) return;
+    onSaveContact(client, { email, cc });
+  }
+
+  function handleSend() {
+    if (!validateContact()) return;
+    if (!hasEmail) {
+      setLocalError('Informe e salve o e-mail principal antes de enviar o lembrete.');
+      return;
+    }
+    onSendReminder(client, { email, cc });
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
+            <Mail size={16} aria-hidden="true" />
+            Contatos e lembretes
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+            Informe os destinatários do checklist e envie o lembrete dos itens pendentes da competência {getMonthLabel(mes)}/{ano}.
+          </p>
+        </div>
+        <StatusBadge toneClass={pendingCount > 0
+          ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
+          : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'}
+        >
+          {formatNumber(pendingCount)} pendência(s)
+        </StatusBadge>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+        <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          E-mail principal
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="cliente@empresa.com.br"
+            className="field-input normal-case"
+          />
+        </label>
+
+        <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          Cópia
+          <input
+            type="text"
+            value={cc}
+            onChange={(event) => setCc(event.target.value)}
+            placeholder="email1@empresa.com.br; email2@empresa.com.br"
+            className="field-input normal-case"
+          />
+        </label>
+
+        <div className="flex flex-wrap gap-2">
+          <ActionButton type="button" size="sm" variant="secondary" onClick={handleSave} disabled={saving || sending}>
+            {saving ? 'Salvando...' : 'Salvar contato'}
+          </ActionButton>
+          <ActionButton
+            type="button"
+            size="sm"
+            variant="primary"
+            onClick={handleSend}
+            disabled={saving || sending || !hasEmail || pendingCount === 0}
+          >
+            <Send size={14} aria-hidden="true" />
+            {sending ? 'Enviando...' : 'Enviar lembrete'}
+          </ActionButton>
+        </div>
+      </div>
+
+      {localError ? (
+        <p className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          {localError}
+        </p>
+      ) : null}
+
+      {pendingCount === 0 ? (
+        <p className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
+          Não há pendências para esta competência.
+        </p>
+      ) : (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Pendências que serão enviadas</p>
+          <ul className="mt-2 space-y-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
+            {pendencias.slice(0, 8).map((pendencia) => (
+              <li key={pendencia.item_id} className="flex gap-2">
+                <span className="text-amber-500">•</span>
+                <span>{pendencia.item_descricao}</span>
+              </li>
+            ))}
+          </ul>
+          {pendencias.length > 8 ? (
+            <p className="mt-2 text-xs font-bold text-slate-500 dark:text-gray-400">
+              + {formatNumber(pendencias.length - 8)} pendência(s)
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
+        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Últimos envios</p>
+        {envios.length ? (
+          <div className="mt-2 space-y-2">
+            {envios.slice(0, 3).map((envio) => (
+              <div key={envio.id} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">
+                <p className="font-black text-slate-800 dark:text-gray-100">{formatDateTime(envio.enviado_em || envio.criado_em)}</p>
+                <p className="mt-1">Para: {envio.destinatario}</p>
+                <p className="mt-1">{formatNumber(envio.qtd_pendencias)} pendência(s) · {envio.enviado_por_nome || 'Usuário não informado'}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">Nenhum lembrete registrado para esta competência.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ClientChecklistDetails({
   client,
   detail,
   ano,
   mes,
+  contact,
   catalogItems,
   catalogLoading,
   catalogError,
   busyKey,
   savingConfigId,
+  savingContactId,
+  sendingReminderId,
   onReload,
   onSaveClientItems,
+  onSaveContact,
+  onSendReminder,
   onStatusChange,
 }) {
   const linkedIdsKey = useMemo(
@@ -196,6 +446,19 @@ function ClientChecklistDetails({
 
   return (
     <div className="space-y-4">
+      <ChecklistContactReminder
+        client={client}
+        ano={ano}
+        mes={mes}
+        contact={contact}
+        pendencias={detail.pendencias ?? []}
+        envios={detail.envios ?? []}
+        savingContactId={savingContactId}
+        sendingReminderId={sendingReminderId}
+        onSaveContact={onSaveContact}
+        onSendReminder={onSendReminder}
+      />
+
       <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -352,6 +615,10 @@ export default function ChecklistPage({ clients = [] }) {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
   const [savingConfigId, setSavingConfigId] = useState('');
+  const [contactsByClient, setContactsByClient] = useState({});
+  const [contactsError, setContactsError] = useState('');
+  const [savingContactId, setSavingContactId] = useState('');
+  const [sendingReminderId, setSendingReminderId] = useState('');
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -394,8 +661,19 @@ export default function ChecklistPage({ clients = [] }) {
     }
   }
 
+  async function loadContacts() {
+    setContactsError('');
+    try {
+      const rows = await listarChecklistContatos();
+      setContactsByClient(Object.fromEntries(rows.map((row) => [row.cliente_id, row])));
+    } catch (err) {
+      setContactsError(err instanceof Error ? err.message : 'Não foi possível carregar contatos do checklist.');
+    }
+  }
+
   useEffect(() => {
     loadCatalogItems();
+    loadContacts();
   }, []);
 
   useEffect(() => {
@@ -457,9 +735,11 @@ export default function ChecklistPage({ clients = [] }) {
     }));
 
     try {
-      const [itens, statusRows] = await Promise.all([
+      const [itens, statusRows, pendencias, envios] = await Promise.all([
         listarChecklistClienteItens(clienteId),
         listarChecklistStatus({ clienteId, ano, mes }),
+        listarChecklistPendencias({ clienteId, ano, mes }),
+        listarChecklistEnvios({ clienteId, ano, mes, limite: 20 }),
       ]);
       setDetailsByClient((current) => ({
         ...current,
@@ -468,6 +748,8 @@ export default function ChecklistPage({ clients = [] }) {
           error: '',
           itens,
           statusRows,
+          pendencias,
+          envios,
           statusByItem: buildStatusMap(statusRows),
         },
       }));
@@ -524,7 +806,10 @@ export default function ChecklistPage({ clients = [] }) {
         };
       });
 
-      await loadResumo({ silent: true });
+      await Promise.all([
+        loadResumo({ silent: true }),
+        loadClientDetails(client.id, { force: true }),
+      ]);
       setToast({ tone: 'success', title: 'Status atualizado', message: `${getClientName(client)} foi atualizado para a competência selecionada.` });
     } catch (err) {
       setToast({ tone: 'danger', title: 'Erro ao salvar status', message: err instanceof Error ? err.message : 'Não foi possível salvar o status.' });
@@ -567,6 +852,112 @@ export default function ChecklistPage({ clients = [] }) {
       });
     } finally {
       setSavingConfigId('');
+    }
+  }
+
+  async function handleSaveContact(client, values) {
+    if (!client?.id) return;
+
+    setSavingContactId(client.id);
+    setToast(null);
+
+    try {
+      const saved = await salvarChecklistContato({
+        cliente_id: client.id,
+        email: String(values.email ?? '').trim(),
+        cc: String(values.cc ?? '').trim(),
+      });
+      setContactsByClient((current) => ({
+        ...current,
+        [client.id]: saved,
+      }));
+      setToast({
+        tone: 'success',
+        title: 'Contato salvo',
+        message: `Contato do checklist de ${getClientName(client)} atualizado.`,
+      });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao salvar contato',
+        message: err instanceof Error ? err.message : 'Não foi possível salvar o contato do checklist.',
+      });
+    } finally {
+      setSavingContactId('');
+    }
+  }
+
+  async function handleSendReminder(client, values) {
+    if (!client?.id) return;
+
+    const detail = detailsByClient[client.id] ?? {};
+    const pendencias = detail.pendencias ?? [];
+    const destinatario = String(values.email ?? '').trim();
+    const cc = String(values.cc ?? '').trim();
+    const assunto = buildReminderSubject(client, ano, mes);
+    const texto = buildReminderText(client, ano, mes, pendencias);
+    const html = buildReminderHtml(client, ano, mes, pendencias);
+
+    if (!destinatario || !pendencias.length) return;
+
+    setSendingReminderId(client.id);
+    setToast(null);
+
+    try {
+      const savedContact = await salvarChecklistContato({
+        cliente_id: client.id,
+        email: destinatario,
+        cc,
+      });
+      setContactsByClient((current) => ({
+        ...current,
+        [client.id]: savedContact,
+      }));
+
+      const sent = await enviarChecklistLembretes({
+        destinatario,
+        cc,
+        assunto,
+        texto,
+        html,
+        cliente: {
+          id: client.id,
+          cnpj: client.cnpj ?? '',
+          razao_social: client.razao_social ?? '',
+          nome_identificacao: getClientName(client),
+        },
+        competencia: { ano, mes, descricao: `${getMonthLabel(mes)}/${ano}` },
+        pendencias: pendencias.map((pendencia) => ({
+          item_id: pendencia.item_id,
+          descricao: pendencia.item_descricao,
+        })),
+      });
+
+      const emailResendId = sent && typeof sent === 'object' ? String(sent.id ?? '') : '';
+      await registrarChecklistEnvio({
+        cliente_id: client.id,
+        competencias: [{ ano, mes }],
+        destinatario,
+        cc,
+        assunto,
+        qtd_pendencias: pendencias.length,
+        email_resend_id: emailResendId,
+      });
+
+      await loadClientDetails(client.id, { force: true });
+      setToast({
+        tone: 'success',
+        title: 'Lembrete enviado',
+        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s).`,
+      });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao enviar lembrete',
+        message: err instanceof Error ? err.message : 'Não foi possível enviar o lembrete.',
+      });
+    } finally {
+      setSendingReminderId('');
     }
   }
 
@@ -655,6 +1046,12 @@ export default function ChecklistPage({ clients = [] }) {
         </AlertBanner>
       ) : null}
 
+      {contactsError ? (
+        <AlertBanner tone="danger" title="Erro ao carregar contatos">
+          {contactsError}
+        </AlertBanner>
+      ) : null}
+
       {toast ? (
         <AlertBanner tone={toast.tone} title={toast.title}>
           {toast.message}
@@ -723,13 +1120,18 @@ export default function ChecklistPage({ clients = [] }) {
                       detail={detailsByClient[row.cliente_id]}
                       ano={ano}
                       mes={mes}
+                      contact={contactsByClient[row.cliente_id]}
                       catalogItems={catalogItems}
                       catalogLoading={catalogLoading}
                       catalogError={catalogError}
                       busyKey={busyKey}
                       savingConfigId={savingConfigId}
+                      savingContactId={savingContactId}
+                      sendingReminderId={sendingReminderId}
                       onReload={(clienteId) => loadClientDetails(clienteId, { force: true })}
                       onSaveClientItems={handleSaveClientItems}
+                      onSaveContact={handleSaveContact}
+                      onSendReminder={handleSendReminder}
                       onStatusChange={handleStatusChange}
                     />
                   </div>
