@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
+  AlertTriangle,
+  CalendarDays,
+  Check,
   ChevronDown,
   ClipboardCheck,
+  FileCheck2,
   FileQuestion,
+  ListChecks,
   Mail,
   RefreshCcw,
   Search,
   Send,
+  Users,
 } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import AlertBanner from '../ui/AlertBanner';
 import DataTableShell from '../ui/DataTableShell';
+import MetricTile from '../ui/MetricTile';
 import StatusBadge from '../ui/StatusBadge';
 import SurfacePanel from '../ui/SurfacePanel';
 import { classNames } from '../ui/classNames';
@@ -133,6 +141,231 @@ function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function useChecklistFloatingDropdown(open, containerRef) {
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    function updatePosition() {
+      if (typeof window === 'undefined') return;
+      const trigger = containerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportPadding = 12;
+      const gap = 6;
+      const menuWidth = Math.max(rect.width, 220);
+      const left = Math.min(
+        Math.max(rect.left, viewportPadding),
+        Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
+      );
+      const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+      const spaceAbove = rect.top - viewportPadding;
+      const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      const availableSpace = openUp ? spaceAbove : spaceBelow;
+      const maxHeight = Math.min(256, Math.max(144, availableSpace - gap));
+      const top = openUp
+        ? Math.max(viewportPadding, rect.top - maxHeight - gap)
+        : Math.min(rect.bottom + gap, window.innerHeight - viewportPadding - maxHeight);
+
+      setMenuStyle({
+        position: 'fixed',
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${menuWidth}px`,
+        maxHeight: `${maxHeight}px`,
+        zIndex: 9999,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, containerRef]);
+
+  return { menuRef, menuStyle };
+}
+
+function ChecklistDropdownSelect({
+  label,
+  value,
+  options,
+  onChange,
+  includeBlank = true,
+  emptyLabel = 'Todos',
+  searchable = true,
+  searchPlaceholder = 'Pesquisar opção',
+}) {
+  const [open, setOpen] = useState(false);
+  const [optionSearch, setOptionSearch] = useState('');
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const { menuRef, menuStyle } = useChecklistFloatingDropdown(open, containerRef);
+  const mappedOptions = options.map((option) => (
+    typeof option === 'string' || typeof option === 'number'
+      ? { value: option, label: String(option) }
+      : option
+  ));
+  const normalizedOptions = [
+    ...(includeBlank ? [{ value: '', label: emptyLabel }] : []),
+    ...mappedOptions,
+  ];
+  const normalizedSearch = normalizeText(optionSearch);
+  const filteredOptions = normalizedSearch
+    ? mappedOptions.filter((option) => normalizeText(`${option.label} ${option.value}`).includes(normalizedSearch))
+    : mappedOptions;
+  const visibleOptions = normalizedSearch
+    ? [
+      ...(includeBlank ? [{ value: '', label: emptyLabel }] : []),
+      ...filteredOptions,
+    ]
+    : normalizedOptions;
+  const firstFilteredOption = normalizedSearch ? filteredOptions[0] : null;
+  const selectedOption = normalizedOptions.find((option) => String(option.value) === String(value));
+  const selectedLabel = selectedOption?.label ?? emptyLabel;
+  const showSearch = searchable && mappedOptions.length > 0;
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event) {
+      if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, menuRef]);
+
+  useEffect(() => {
+    if (!open) {
+      setOptionSearch('');
+      return undefined;
+    }
+
+    if (!showSearch) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, showSearch]);
+
+  function handleSelect(nextValue) {
+    onChange(nextValue);
+    setOptionSearch('');
+    setOpen(false);
+  }
+
+  const dropdownMenu = open && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        ref={menuRef}
+        role="listbox"
+        style={menuStyle ?? { visibility: 'hidden' }}
+        className="dropdown-menu-shell overflow-soft normal-case ring-1 ring-slate-900/5 dark:ring-white/5"
+      >
+        {showSearch ? (
+          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
+              <Search size={14} className="shrink-0" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                value={optionSearch}
+                onChange={(event) => setOptionSearch(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    setOpen(false);
+                    return;
+                  }
+
+                  if (event.key === 'Enter' && firstFilteredOption) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleSelect(firstFilteredOption.value);
+                  }
+                }}
+                placeholder={searchPlaceholder}
+                className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold normal-case text-slate-800 outline-none placeholder:text-slate-400 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {visibleOptions.map((option) => {
+          const selected = String(option.value) === String(value);
+          return (
+            <button
+              key={`${option.value}-${option.label}`}
+              type="button"
+              role="option"
+              aria-selected={selected}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSelect(option.value);
+              }}
+              className={`dropdown-option ${selected ? 'dropdown-option-selected' : ''}`}
+            >
+              <span className="truncate">{option.label}</span>
+              {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
+
+        {normalizedSearch && visibleOptions.length === (includeBlank ? 1 : 0) ? (
+          <div className="px-3 py-3 text-sm font-semibold text-slate-500 dark:text-gray-400">
+            Nenhuma opção encontrada
+          </div>
+        ) : null}
+      </div>,
+      document.body,
+    )
+    : null;
+
+  return (
+    <div ref={containerRef} className="relative text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+        className="select-shell mt-2 flex items-center justify-between gap-2 text-left normal-case"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {dropdownMenu}
     </div>
   );
 }
@@ -285,7 +518,7 @@ function ChecklistContactReminder({
         </StatusBadge>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+      <div className="mt-4 grid gap-3">
         <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
           E-mail principal
           <input
@@ -293,7 +526,7 @@ function ChecklistContactReminder({
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="cliente@empresa.com.br"
-            className="field-input normal-case"
+            className="input-shell normal-case"
           />
         </label>
 
@@ -304,11 +537,11 @@ function ChecklistContactReminder({
             value={cc}
             onChange={(event) => setCc(event.target.value)}
             placeholder="email1@empresa.com.br; email2@empresa.com.br"
-            className="field-input normal-case"
+            className="input-shell normal-case"
           />
         </label>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <ActionButton type="button" size="sm" variant="secondary" onClick={handleSave} disabled={saving || sending}>
             {saving ? 'Salvando...' : 'Salvar contato'}
           </ActionButton>
@@ -446,97 +679,99 @@ function ClientChecklistDetails({
 
   return (
     <div className="space-y-4">
-      <ChecklistContactReminder
-        client={client}
-        ano={ano}
-        mes={mes}
-        contact={contact}
-        pendencias={detail.pendencias ?? []}
-        envios={detail.envios ?? []}
-        savingContactId={savingContactId}
-        sendingReminderId={sendingReminderId}
-        onSaveContact={onSaveContact}
-        onSendReminder={onSendReminder}
-      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <ChecklistContactReminder
+          client={client}
+          ano={ano}
+          mes={mes}
+          contact={contact}
+          pendencias={detail.pendencias ?? []}
+          envios={detail.envios ?? []}
+          savingContactId={savingContactId}
+          sendingReminderId={sendingReminderId}
+          onSaveContact={onSaveContact}
+          onSendReminder={onSendReminder}
+        />
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900 dark:text-white">Itens aplicáveis ao cliente</p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-              Selecione quais documentos entram no checklist deste cliente. A ordem segue o catálogo padrão configurado no Supabase.
-            </p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/75 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900 dark:text-white">Itens aplicáveis ao cliente</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                Selecione quais documentos entram no checklist deste cliente. A ordem segue o catálogo padrão configurado no Supabase.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                {formatNumber(selectedCount)} selecionado(s)
+              </StatusBadge>
+              <ActionButton type="button" size="sm" variant="subtle" onClick={selectAllCatalogItems} disabled={catalogLoading || !catalogItems.length || savingConfig}>
+                Marcar todos
+              </ActionButton>
+              <ActionButton type="button" size="sm" variant="subtle" onClick={clearCatalogItems} disabled={catalogLoading || savingConfig}>
+                Limpar
+              </ActionButton>
+              <ActionButton
+                type="button"
+                size="sm"
+                variant="primary"
+                onClick={() => onSaveClientItems(client, selectedItemIds)}
+                disabled={catalogLoading || savingConfig}
+              >
+                {savingConfig ? 'Salvando...' : 'Salvar itens'}
+              </ActionButton>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-              {formatNumber(selectedCount)} selecionado(s)
-            </StatusBadge>
-            <ActionButton type="button" size="sm" variant="subtle" onClick={selectAllCatalogItems} disabled={catalogLoading || !catalogItems.length || savingConfig}>
-              Marcar todos
-            </ActionButton>
-            <ActionButton type="button" size="sm" variant="subtle" onClick={clearCatalogItems} disabled={catalogLoading || savingConfig}>
-              Limpar
-            </ActionButton>
-            <ActionButton
-              type="button"
-              size="sm"
-              variant="primary"
-              onClick={() => onSaveClientItems(client, selectedItemIds)}
-              disabled={catalogLoading || savingConfig}
-            >
-              {savingConfig ? 'Salvando...' : 'Salvar itens'}
-            </ActionButton>
-          </div>
+
+          {catalogError ? (
+            <div className="mt-4">
+              <AlertBanner tone="danger" title="Erro ao carregar catálogo">
+                {catalogError}
+              </AlertBanner>
+            </div>
+          ) : null}
+
+          {catalogLoading ? (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
+              Carregando catálogo de documentos...
+            </div>
+          ) : null}
+
+          {!catalogLoading && !catalogError && catalogItems.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
+              Nenhum item ativo foi encontrado no catálogo do checklist.
+            </div>
+          ) : null}
+
+          {!catalogLoading && !catalogError && catalogItems.length > 0 ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {catalogItems.map((item) => {
+                const checked = selectedSet.has(item.id);
+                return (
+                  <label
+                    key={item.id}
+                    className={classNames(
+                      'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                      checked
+                        ? 'border-blue-400/70 bg-blue-50 text-blue-900 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-100'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-200 dark:hover:border-blue-500/50',
+                      savingConfig ? 'pointer-events-none opacity-70' : '',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={savingConfig}
+                      onChange={() => toggleCatalogItem(item.id)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="min-w-0 leading-5">{item.descricao}</span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
-
-        {catalogError ? (
-          <div className="mt-4">
-            <AlertBanner tone="danger" title="Erro ao carregar catálogo">
-              {catalogError}
-            </AlertBanner>
-          </div>
-        ) : null}
-
-        {catalogLoading ? (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-500 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
-            Carregando catálogo de documentos...
-          </div>
-        ) : null}
-
-        {!catalogLoading && !catalogError && catalogItems.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
-            Nenhum item ativo foi encontrado no catálogo do checklist.
-          </div>
-        ) : null}
-
-        {!catalogLoading && !catalogError && catalogItems.length > 0 ? (
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {catalogItems.map((item) => {
-              const checked = selectedSet.has(item.id);
-              return (
-                <label
-                  key={item.id}
-                  className={classNames(
-                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm font-semibold transition',
-                    checked
-                      ? 'border-blue-400/70 bg-blue-50 text-blue-900 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-100'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-200 dark:hover:border-blue-500/50',
-                    savingConfig ? 'pointer-events-none opacity-70' : '',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={savingConfig}
-                    onChange={() => toggleCatalogItem(item.id)}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="min-w-0 leading-5">{item.descricao}</span>
-                </label>
-              );
-            })}
-          </div>
-        ) : null}
       </div>
 
       {!detail.itens?.length ? (
@@ -553,6 +788,14 @@ function ClientChecklistDetails({
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-gray-800 dark:bg-gray-900/45">
+          <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-slate-900 dark:text-white">Acompanhamento da competência</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+                Atualize o status de cada item para {getMonthLabel(mes)}/{ano}.
+              </p>
+            </div>
+          </div>
           <DataTableShell
             headers={['Item', 'Status atual', 'Alterar status']}
             minWidth="min-w-[760px]"
@@ -722,7 +965,9 @@ export default function ChecklistPage({ clients = [] }) {
     const comChecklist = rows.filter((row) => row.total_itens > 0).length;
     const comPendencias = rows.filter((row) => row.qtd_pendentes > 0).length;
     const concluidos = rows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0).length;
-    return { comChecklist, comPendencias, concluidos };
+    const semChecklist = rows.length - comChecklist;
+    const totalPendencias = rows.reduce((total, row) => total + row.qtd_pendentes, 0);
+    return { comChecklist, comPendencias, concluidos, semChecklist, totalPendencias };
   }, [rows]);
 
   async function loadClientDetails(clienteId, { force = false } = {}) {
@@ -769,6 +1014,14 @@ export default function ChecklistPage({ clients = [] }) {
     const nextId = expandedClientId === clienteId ? '' : clienteId;
     setExpandedClientId(nextId);
     if (nextId) loadClientDetails(nextId);
+  }
+
+  function clearChecklistFilters() {
+    const currentCompetence = getCurrentCompetence();
+    setSearch('');
+    setResponsavel('');
+    setMes(currentCompetence.mes);
+    setAno(currentCompetence.ano);
   }
 
   async function handleStatusChange(client, vinculo, nextStatus) {
@@ -964,38 +1217,70 @@ export default function ChecklistPage({ clients = [] }) {
   return (
     <div className="space-y-5">
       <SurfacePanel
-        title="Checklist de Documentos"
-        description="Acompanhamento mensal dos documentos solicitados aos clientes. Nesta primeira versão, os status são atualizados manualmente por competência."
+        title="Central de checklist"
+        description="Acompanhe documentos pendentes por competência, configure itens por cliente e envie lembretes pelo e-mail do setor contábil."
         right={(
-          <ActionButton type="button" variant="secondary" onClick={() => loadResumo()} disabled={loadingResumo}>
-            <RefreshCcw size={16} className={loadingResumo ? 'animate-spin' : ''} aria-hidden="true" />
-            Atualizar
-          </ActionButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200" size="md">
+              <CalendarDays size={14} className="mr-1" aria-hidden="true" />
+              {getMonthLabel(mes)}/{ano}
+            </StatusBadge>
+            <ActionButton type="button" variant="secondary" onClick={() => loadResumo()} disabled={loadingResumo}>
+              <RefreshCcw size={16} className={loadingResumo ? 'animate-spin' : ''} aria-hidden="true" />
+              Atualizar
+            </ActionButton>
+          </div>
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-gray-800 dark:bg-gray-900/55">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Clientes com checklist</p>
-            <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{formatNumber(metrics.comChecklist)}</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-gray-800 dark:bg-gray-900/55">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Com pendências</p>
-            <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{formatNumber(metrics.comPendencias)}</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-gray-800 dark:bg-gray-900/55">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Concluídos</p>
-            <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{formatNumber(metrics.concluidos)}</p>
-          </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            title="Clientes com checklist"
+            value={formatNumber(metrics.comChecklist)}
+            detail={`${formatNumber(metrics.semChecklist)} ainda sem itens vinculados`}
+            icon={ListChecks}
+            tone="info"
+            className="min-h-[132px]"
+          />
+          <MetricTile
+            title="Com pendências"
+            value={formatNumber(metrics.comPendencias)}
+            detail={`${formatNumber(metrics.totalPendencias)} documento(s) pendente(s)`}
+            icon={AlertTriangle}
+            tone={metrics.comPendencias ? 'warning' : 'success'}
+            className="min-h-[132px]"
+          />
+          <MetricTile
+            title="Concluídos"
+            value={formatNumber(metrics.concluidos)}
+            detail="Clientes sem pendências na competência"
+            icon={FileCheck2}
+            tone="success"
+            className="min-h-[132px]"
+          />
+          <MetricTile
+            title="Carteira filtrada"
+            value={formatNumber(filteredRows.length)}
+            detail={`de ${formatNumber(rows.length)} cliente(s) ativos`}
+            icon={Users}
+            tone="muted"
+            className="min-h-[132px]"
+          />
         </div>
       </SurfacePanel>
 
       <SurfacePanel
-        title="Filtros"
-        description="Escolha a competência e filtre a carteira para revisar os documentos de cada cliente."
+        title="Filtros do checklist"
+        description="Escolha a competência e refine a carteira antes de revisar pendências ou enviar lembretes."
+        right={(
+          <ActionButton type="button" variant="secondary" onClick={clearChecklistFilters}>
+            <RefreshCcw size={16} aria-hidden="true" />
+            Limpar filtros
+          </ActionButton>
+        )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 lg:grid-cols-[1.35fr_0.7fr_0.7fr_1fr]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)]">
           <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
             Cliente, CNPJ ou razão social
             <div className="relative">
@@ -1005,38 +1290,35 @@ export default function ChecklistPage({ clients = [] }) {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Pesquisar cliente"
-                className="field-input pl-10 normal-case"
+                className="input-shell pl-10 normal-case"
               />
             </div>
           </label>
 
-          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
-            Mês
-            <select value={mes} onChange={(event) => setMes(Number(event.target.value))} className="field-input normal-case">
-              {MONTH_OPTIONS.map((month) => (
-                <option key={month.value} value={month.value}>{month.label}</option>
-              ))}
-            </select>
-          </label>
+          <ChecklistDropdownSelect
+            label="Mês"
+            value={mes}
+            options={MONTH_OPTIONS}
+            onChange={(value) => setMes(Number(value))}
+            includeBlank={false}
+          />
 
-          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
-            Ano
-            <select value={ano} onChange={(event) => setAno(Number(event.target.value))} className="field-input normal-case">
-              {yearOptions.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </label>
+          <ChecklistDropdownSelect
+            label="Ano"
+            value={ano}
+            options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
+            onChange={(value) => setAno(Number(value))}
+            includeBlank={false}
+          />
 
-          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
-            Responsável
-            <select value={responsavel} onChange={(event) => setResponsavel(event.target.value)} className="field-input normal-case">
-              <option value="">Todos</option>
-              {responsavelOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
+          <ChecklistDropdownSelect
+            label="Responsável"
+            value={responsavel}
+            options={responsavelOptions}
+            onChange={setResponsavel}
+            includeBlank
+            emptyLabel="Todos"
+          />
         </div>
       </SurfacePanel>
 
@@ -1083,19 +1365,43 @@ export default function ChecklistPage({ clients = [] }) {
           {filteredRows.map((row) => {
             const expanded = expandedClientId === row.cliente_id;
             const completionTone = getCompletionTone(row.percentual_concluido);
+            const hasContact = Boolean(contactsByClient[row.cliente_id]?.email);
+            const progressWidth = Math.max(0, Math.min(100, row.percentual_concluido));
 
             return (
-              <div key={row.cliente_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/60">
+              <div key={row.cliente_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm transition hover:border-blue-300/55 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/70 dark:hover:border-blue-500/45">
                 <button
                   type="button"
                   onClick={() => toggleClient(row.cliente_id)}
-                  className="flex w-full flex-col gap-4 px-4 py-4 text-left transition hover:bg-slate-50 sm:px-5 lg:flex-row lg:items-center lg:justify-between dark:hover:bg-gray-800/55"
+                  className="grid w-full gap-4 px-4 py-4 text-left transition hover:bg-slate-50/80 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] lg:items-center dark:hover:bg-gray-800/55"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-950 dark:text-white">{row.nome}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-black text-slate-950 dark:text-white">{row.nome}</p>
+                      <StatusBadge
+                        toneClass={hasContact
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
+                          : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
+                      >
+                        {hasContact ? 'Contato salvo' : 'Sem contato'}
+                      </StatusBadge>
+                    </div>
                     <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
                       {formatCnpj(row.cnpj)} · Responsável: {row.responsavel}
                     </p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800">
+                      <div
+                        className={classNames(
+                          'h-full rounded-full transition-all',
+                          row.percentual_concluido >= 100
+                            ? 'bg-emerald-500'
+                            : row.percentual_concluido > 0
+                              ? 'bg-sky-500'
+                              : 'bg-amber-400',
+                        )}
+                        style={{ width: `${progressWidth}%` }}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -1114,7 +1420,7 @@ export default function ChecklistPage({ clients = [] }) {
                 </button>
 
                 {expanded ? (
-                  <div className="border-t border-slate-200 p-4 sm:p-5 dark:border-gray-800">
+                  <div className="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-950/20">
                     <ClientChecklistDetails
                       client={row.client}
                       detail={detailsByClient[row.cliente_id]}
