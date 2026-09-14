@@ -89,6 +89,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
+const CATALOG_PREVIEW_LIMIT = 8;
 
 function getCurrentCompetence() {
   const today = new Date();
@@ -488,8 +489,18 @@ function ChecklistCatalogManager({
   onDelete,
   onRefresh,
 }) {
+  const [showAllCatalogItems, setShowAllCatalogItems] = useState(false);
   const editing = Boolean(form.id);
   const saving = busyId === 'new' || (editing && busyId === form.id);
+  const hasHiddenCatalogItems = items.length > CATALOG_PREVIEW_LIMIT;
+  const visibleCatalogItems = showAllCatalogItems ? items : items.slice(0, CATALOG_PREVIEW_LIMIT);
+  const hiddenCatalogItemsCount = Math.max(items.length - CATALOG_PREVIEW_LIMIT, 0);
+
+  useEffect(() => {
+    if (!hasHiddenCatalogItems && showAllCatalogItems) {
+      setShowAllCatalogItems(false);
+    }
+  }, [hasHiddenCatalogItems, showAllCatalogItems]);
 
   return (
     <SurfacePanel
@@ -556,6 +567,9 @@ function ChecklistCatalogManager({
             <p className="text-sm font-black text-slate-900 dark:text-white">Itens ativos do catálogo</p>
             <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
               {formatNumber(items.length)} documento(s) ativo(s), ordenados por prioridade.
+              {hasHiddenCatalogItems
+                ? ` Mostrando ${formatNumber(visibleCatalogItems.length)} de ${formatNumber(items.length)}.`
+                : ''}
             </p>
           </div>
         </div>
@@ -573,8 +587,9 @@ function ChecklistCatalogManager({
         ) : null}
 
         {!loading && items.length ? (
-          <div className="mt-4 grid gap-2 xl:grid-cols-2">
-            {items.map((item) => {
+          <>
+            <div className="mt-4 grid gap-2 xl:grid-cols-2">
+              {visibleCatalogItems.map((item) => {
               const itemBusy = busyId === item.id;
               return (
                 <div
@@ -600,8 +615,27 @@ function ChecklistCatalogManager({
                   </div>
                 </div>
               );
-            })}
-          </div>
+              })}
+            </div>
+
+            {hasHiddenCatalogItems ? (
+              <div className="mt-4 flex justify-end">
+                <ActionButton
+                  type="button"
+                  size="sm"
+                  variant="subtle"
+                  onClick={() => setShowAllCatalogItems((current) => !current)}
+                >
+                  {showAllCatalogItems ? 'Mostrar menos' : `Mostrar mais (${formatNumber(hiddenCatalogItemsCount)})`}
+                  <ChevronDown
+                    size={16}
+                    className={classNames('transition-transform', showAllCatalogItems ? 'rotate-180' : '')}
+                    aria-hidden="true"
+                  />
+                </ActionButton>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
     </SurfacePanel>
