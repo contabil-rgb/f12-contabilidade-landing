@@ -1051,6 +1051,33 @@
     white-space: nowrap;
   }
 
+  .checklist-status-table {
+    table-layout: fixed;
+  }
+
+  .checklist-status-table .table-head-cell,
+  .checklist-status-table .table-cell {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    vertical-align: middle;
+  }
+
+  .checklist-status-table .table-head-cell:nth-child(1),
+  .checklist-status-table .table-cell:nth-child(1) {
+    width: 56%;
+  }
+
+  .checklist-status-table .table-head-cell:nth-child(2),
+  .checklist-status-table .table-cell:nth-child(2) {
+    width: 16%;
+    text-align: center;
+  }
+
+  .checklist-status-table .table-head-cell:nth-child(3),
+  .checklist-status-table .table-cell:nth-child(3) {
+    width: 28%;
+  }
+
   .base-clients-table {
     table-layout: fixed;
   }

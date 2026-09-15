@@ -99,6 +99,17 @@ const CHECKLIST_QUICK_FILTERS = [
   { value: 'sem_contato', label: 'Sem contato salvo', description: 'Sem e-mail de lembrete' },
 ];
 
+const CATALOG_QUICK_FILTERS = [
+  { value: 'todos', label: 'Todos', description: 'Carteira filtrada' },
+  { value: 'com_checklist', label: 'Com checklist', description: 'Itens vinculados' },
+  { value: 'sem_checklist', label: 'Sem checklist', description: 'Sem itens vinculados' },
+];
+
+const CHECKLIST_VIEW_OPTIONS = [
+  { value: 'checklist', label: 'Acompanhamento dos documentos' },
+  { value: 'catalog', label: 'Catálogo de documentos' },
+];
+
 function getCurrentCompetence() {
   const today = new Date();
   return {
@@ -150,7 +161,7 @@ function getCompletionTone(percentual) {
 
 function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
       {STATUS_OPTIONS.map((status) => {
         const active = currentStatus === status.value;
         return (
@@ -160,7 +171,7 @@ function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
             disabled={disabled || active}
             onClick={() => onChange(status.value)}
             className={classNames(
-              'rounded-lg border px-3 py-1.5 text-xs font-black transition disabled:cursor-not-allowed',
+              'rounded-lg border px-2.5 py-1.5 text-center text-[11px] font-black leading-none transition disabled:cursor-not-allowed sm:px-3 sm:text-xs',
               active
                 ? status.button
                 : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-slate-950 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-500/60 dark:hover:text-white',
@@ -400,16 +411,6 @@ function ChecklistDropdownSelect({
   );
 }
 
-function formatDateTime(value) {
-  if (!value) return 'Data não informada';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date);
-}
-
 function getMonthLabel(mes) {
   return MONTH_OPTIONS.find((month) => month.value === Number(mes))?.label ?? String(mes).padStart(2, '0');
 }
@@ -426,26 +427,6 @@ function splitEmails(value) {
     .split(/[;,]/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function EmailChips({ value, emptyLabel = 'Não informado' }) {
-  const emails = splitEmails(value);
-  if (!emails.length) {
-    return <span className="text-slate-400 dark:text-gray-500">{emptyLabel}</span>;
-  }
-
-  return (
-    <span className="flex flex-wrap gap-1.5">
-      {emails.map((email) => (
-        <span
-          key={email}
-          className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-        >
-          {email}
-        </span>
-      ))}
-    </span>
-  );
 }
 
 function escapeHtml(value) {
@@ -564,7 +545,7 @@ function ChecklistWorkflowGuide() {
   const steps = [
     { title: '1. Filtre a carteira', detail: 'Escolha competência, responsável e situação do checklist.' },
     { title: '2. Revise o cliente', detail: 'Abra o card para ajustar itens, contato e status.' },
-    { title: '3. Envie e acompanhe', detail: 'Dispare o lembrete e confira o histórico de envios.' },
+    { title: '3. Envie o lembrete', detail: 'Dispare a cobrança dos itens pendentes da competência.' },
   ];
 
   return (
@@ -581,6 +562,36 @@ function ChecklistWorkflowGuide() {
             <div key={step.title} className="rounded-xl border border-blue-200/75 bg-white/80 px-3 py-2 dark:border-blue-400/20 dark:bg-slate-950/25">
               <p className="text-xs font-black text-blue-900 dark:text-blue-100">{step.title}</p>
               <p className="mt-1 text-[11px] font-semibold leading-5 text-blue-700/85 dark:text-blue-100/75">{step.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function CatalogWorkflowGuide() {
+  const steps = [
+    { title: '1. Mantenha o catálogo', detail: 'Cadastre, edite ou inative documentos padrão.' },
+    { title: '2. Aplique o padrão', detail: 'Use o lote para clientes que ainda estão sem checklist.' },
+    { title: '3. Ajuste por cliente', detail: 'Abra o cliente e salve somente os itens aplicáveis.' },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/10">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-black text-emerald-900 dark:text-emerald-100">Fluxo sugerido de configuração</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-emerald-800/80 dark:text-emerald-100/80">
+            Use esta aba para manter os documentos disponíveis e configurar quais itens se aplicam a cada cliente.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
+          {steps.map((step) => (
+            <div key={step.title} className="rounded-xl border border-emerald-200/75 bg-white/80 px-3 py-2 dark:border-emerald-400/20 dark:bg-slate-950/25">
+              <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">{step.title}</p>
+              <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-700/85 dark:text-emerald-100/75">{step.detail}</p>
             </div>
           ))}
         </div>
@@ -714,7 +725,7 @@ function ChecklistCatalogManager({
                       {formatNumber(item.ordem)}
                     </span>
                     <div className="min-w-0">
-                      <p className="break-words text-sm font-black text-slate-900 dark:text-white">{item.descricao}</p>
+                      <p className="truncate text-sm font-black text-slate-900 dark:text-white" title={item.descricao}>{item.descricao}</p>
                       <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">Ativo</p>
                     </div>
                   </div>
@@ -761,7 +772,6 @@ function ChecklistContactReminder({
   mes,
   contact,
   pendencias,
-  envios,
   savingContactId,
   sendingReminderId,
   onSaveContact,
@@ -900,79 +910,12 @@ function ChecklistContactReminder({
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-gray-800 dark:bg-gray-950/35">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Histórico de lembretes</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
-              Últimos envios registrados para {getMonthLabel(mes)}/{ano}.
-            </p>
-          </div>
-          {envios.length ? (
-            <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-              {formatNumber(envios.length)} envio(s)
-            </StatusBadge>
-          ) : null}
-        </div>
-
-        {envios.length ? (
-          <div className="mt-3 space-y-2">
-            {envios.slice(0, 5).map((envio, index) => (
-              <div key={envio.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 text-xs font-semibold text-slate-600 shadow-sm dark:border-gray-800 dark:bg-gray-900/65 dark:text-gray-300">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-black text-slate-900 dark:text-gray-100">{formatDateTime(envio.enviado_em || envio.criado_em)}</p>
-                      {index === 0 ? (
-                        <StatusBadge toneClass="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200">
-                          Último envio
-                        </StatusBadge>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">
-                      Enviado por {envio.enviado_por_nome || envio.enviado_por_email || 'Usuário não informado'}
-                    </p>
-                  </div>
-                  <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-                    {formatNumber(envio.qtd_pendencias)} pendência(s)
-                  </StatusBadge>
-                </div>
-
-                <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/35">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Destinatário principal</p>
-                    <div className="mt-1"><EmailChips value={envio.destinatario} /></div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/35">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Cópia</p>
-                    <div className="mt-1"><EmailChips value={envio.cc} emptyLabel="Sem cópia" /></div>
-                  </div>
-                </div>
-
-                {envio.assunto ? (
-                  <p className="mt-2 truncate text-[11px] font-bold text-slate-500 dark:text-gray-400" title={envio.assunto}>
-                    Assunto: {envio.assunto}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-            {envios.length > 5 ? (
-              <p className="px-1 text-xs font-bold text-slate-500 dark:text-gray-400">
-                + {formatNumber(envios.length - 5)} envio(s) anterior(es) nesta competência.
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-400">
-            Nenhum lembrete registrado para esta competência.
-          </p>
-        )}
-      </div>
     </div>
   );
 }
 
 function ClientChecklistDetails({
+  mode = 'checklist',
   client,
   detail,
   ano,
@@ -1004,6 +947,9 @@ function ClientChecklistDetails({
   const selectedSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const selectedCount = selectedItemIds.length;
   const savingConfig = savingConfigId === client?.id;
+  const isCatalogMode = mode === 'catalog';
+  const showCatalogConfiguration = isCatalogMode;
+  const showOperationalControls = !isCatalogMode;
 
   function toggleCatalogItem(itemId) {
     setSelectedItemIds((current) => (
@@ -1044,20 +990,22 @@ function ClientChecklistDetails({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <ChecklistContactReminder
-          client={client}
-          ano={ano}
-          mes={mes}
-          contact={contact}
-          pendencias={detail.pendencias ?? []}
-          envios={detail.envios ?? []}
-          savingContactId={savingContactId}
-          sendingReminderId={sendingReminderId}
-          onSaveContact={onSaveContact}
-          onSendReminder={onSendReminder}
-        />
+      <div className={classNames('grid gap-4', showOperationalControls && showCatalogConfiguration ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : '')}>
+        {showOperationalControls ? (
+          <ChecklistContactReminder
+            client={client}
+            ano={ano}
+            mes={mes}
+            contact={contact}
+            pendencias={detail.pendencias ?? []}
+            savingContactId={savingContactId}
+            sendingReminderId={sendingReminderId}
+            onSaveContact={onSaveContact}
+            onSendReminder={onSendReminder}
+          />
+        ) : null}
 
+        {showCatalogConfiguration ? (
         <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 gap-3">
@@ -1135,13 +1083,14 @@ function ClientChecklistDetails({
                       onChange={() => toggleCatalogItem(item.id)}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="min-w-0 leading-5">{item.descricao}</span>
+                    <span className="min-w-0 truncate leading-5" title={item.descricao}>{item.descricao}</span>
                   </label>
                 );
               })}
             </div>
           ) : null}
         </div>
+        ) : null}
       </div>
 
       {!detail.itens?.length ? (
@@ -1151,12 +1100,14 @@ function ClientChecklistDetails({
             <div>
               <p className="font-black text-slate-800 dark:text-gray-100">Nenhum item vinculado a este cliente.</p>
               <p className="mt-1 font-medium leading-6">
-                Selecione os documentos acima e clique em salvar para montar o checklist deste cliente.
+                {isCatalogMode
+                  ? 'Selecione os documentos acima e clique em salvar para montar o checklist deste cliente.'
+                  : 'Configure os documentos aplicáveis na aba Catálogo de Documentos para acompanhar pendências deste cliente.'}
               </p>
             </div>
           </div>
         </div>
-      ) : (
+      ) : showOperationalControls ? (
         <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1167,8 +1118,9 @@ function ClientChecklistDetails({
             </div>
           </div>
           <DataTableShell
-            headers={['Item', 'Status atual', 'Alterar status']}
-            minWidth="min-w-[760px]"
+            headers={['Item', 'Status', 'Alterar']}
+            minWidth="min-w-[560px]"
+            tableClassName="checklist-status-table"
             hasRows={detail.itens.length > 0}
           >
             <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
@@ -1182,18 +1134,13 @@ function ClientChecklistDetails({
 
                 return (
                   <tr key={vinculo.id || itemId}>
-                    <td className="table-cell-primary">
-                      <div className="min-w-0">
-                        <p className="font-black text-slate-900 dark:text-white">{item?.descricao || 'Item sem descrição'}</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-gray-500">
-                          Competência {String(mes).padStart(2, '0')}/{ano}
-                        </p>
-                      </div>
+                    <td className="table-cell table-cell-compact">
+                      <p className="max-w-[260px] truncate font-black text-slate-900 dark:text-white sm:max-w-[360px] lg:max-w-[440px]" title={item?.descricao || 'Item sem descrição'}>{item?.descricao || 'Item sem descrição'}</p>
                     </td>
-                    <td className="table-cell-primary">
-                      <StatusBadge toneClass={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                    <td className="table-cell table-cell-compact whitespace-nowrap">
+                      <StatusBadge toneClass={statusMeta.tone} className="whitespace-nowrap">{statusMeta.shortLabel || statusMeta.label}</StatusBadge>
                     </td>
-                    <td className="table-cell-primary">
+                    <td className="table-cell table-cell-compact">
                       <ChecklistStatusButtons
                         currentStatus={currentStatus}
                         disabled={busyKey === rowBusyKey}
@@ -1206,7 +1153,7 @@ function ClientChecklistDetails({
             </tbody>
           </DataTableShell>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1236,6 +1183,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [savingContactId, setSavingContactId] = useState('');
   const [sendingReminderId, setSendingReminderId] = useState('');
   const [applyingDefaultChecklist, setApplyingDefaultChecklist] = useState(false);
+  const [viewMode, setViewMode] = useState('checklist');
+  const isCatalogMode = viewMode === 'catalog';
+  const quickFilterOptions = isCatalogMode ? CATALOG_QUICK_FILTERS : CHECKLIST_QUICK_FILTERS;
+
+  useEffect(() => {
+    setQuickFilter('todos');
+    setExpandedClientId('');
+  }, [viewMode]);
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1428,6 +1383,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const hasContact = (row) => Boolean(contactsByClient[row.cliente_id]?.email);
     return {
       todos: baseFilteredRows.length,
+      com_checklist: baseFilteredRows.filter((row) => row.total_itens > 0).length,
       pendencias: baseFilteredRows.filter((row) => row.qtd_pendentes > 0).length,
       concluidos: baseFilteredRows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0).length,
       sem_checklist: baseFilteredRows.filter((row) => row.total_itens === 0).length,
@@ -1437,6 +1393,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
   const filteredRows = useMemo(() => {
     const hasContact = (row) => Boolean(contactsByClient[row.cliente_id]?.email);
+    if (quickFilter === 'com_checklist') return baseFilteredRows.filter((row) => row.total_itens > 0);
     if (quickFilter === 'pendencias') return baseFilteredRows.filter((row) => row.qtd_pendentes > 0);
     if (quickFilter === 'concluidos') return baseFilteredRows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0);
     if (quickFilter === 'sem_checklist') return baseFilteredRows.filter((row) => row.total_itens === 0);
@@ -1444,7 +1401,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     return baseFilteredRows;
   }, [baseFilteredRows, contactsByClient, quickFilter]);
 
-  const activeQuickFilterLabel = CHECKLIST_QUICK_FILTERS.find((option) => option.value === quickFilter)?.label ?? 'Todos';
+  const activeQuickFilterLabel = quickFilterOptions.find((option) => option.value === quickFilter)?.label ?? 'Todos';
 
   const batchDefaultTargets = useMemo(
     () => filteredRows.filter((row) => toNumber(row.total_itens) === 0),
@@ -1764,14 +1721,18 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   return (
     <div className="space-y-5">
       <SurfacePanel
-        title="Central de checklist"
-        description="Acompanhe documentos pendentes por competência, configure itens por cliente e envie lembretes pelo e-mail do setor contábil."
+        title={isCatalogMode ? 'Central do catálogo' : 'Central de checklist'}
+        description={isCatalogMode
+          ? 'Gerencie o catálogo padrão e configure quais documentos se aplicam a cada cliente.'
+          : 'Acompanhe documentos pendentes por competência, salve contatos e envie lembretes pelo e-mail do setor contábil.'}
         right={(
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200" size="md">
-              <CalendarDays size={14} className="mr-1" aria-hidden="true" />
-              {getMonthLabel(mes)}/{ano}
-            </StatusBadge>
+            {!isCatalogMode ? (
+              <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200" size="md">
+                <CalendarDays size={14} className="mr-1" aria-hidden="true" />
+                {getMonthLabel(mes)}/{ano}
+              </StatusBadge>
+            ) : null}
             <ActionButton type="button" variant="secondary" onClick={() => loadResumo()} disabled={loadingResumo}>
               <RefreshCcw size={16} className={loadingResumo ? 'animate-spin' : ''} aria-hidden="true" />
               Atualizar
@@ -1780,7 +1741,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className={classNames('grid gap-3 md:grid-cols-2', isCatalogMode ? 'xl:grid-cols-4' : 'xl:grid-cols-5')}>
           <MetricTile
             title="Clientes com checklist"
             value={formatNumber(metrics.comChecklist)}
@@ -1789,6 +1750,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             tone="info"
             className="min-h-[132px]"
           />
+          {!isCatalogMode ? (
+            <>
           <MetricTile
             title="Com pendências"
             value={formatNumber(metrics.comPendencias)}
@@ -1816,6 +1779,28 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             onClick={() => setQuickFilter('sem_contato')}
             className="min-h-[132px]"
           />
+            </>
+          ) : (
+            <>
+              <MetricTile
+                title="Itens ativos"
+                value={formatNumber(catalogItems.length)}
+                detail="Documentos disponíveis no catálogo"
+                icon={ClipboardCheck}
+                tone="success"
+                className="min-h-[132px]"
+              />
+              <MetricTile
+                title="Sem checklist"
+                value={formatNumber(metrics.semChecklist)}
+                detail="Clientes sem itens vinculados · clicar para filtrar"
+                icon={FileQuestion}
+                tone={metrics.semChecklist ? 'warning' : 'success'}
+                onClick={() => setQuickFilter('sem_checklist')}
+                className="min-h-[132px]"
+              />
+            </>
+          )}
           <MetricTile
             title="Carteira filtrada"
             value={formatNumber(filteredRows.length)}
@@ -1827,25 +1812,29 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         </div>
       </SurfacePanel>
 
-      <ChecklistWorkflowGuide />
+      {isCatalogMode ? <CatalogWorkflowGuide /> : <ChecklistWorkflowGuide />}
 
-      <ChecklistCatalogManager
-        items={catalogItems}
-        loading={catalogLoading}
-        error={catalogError}
-        form={catalogForm}
-        busyId={catalogBusyId}
-        onFormChange={setCatalogForm}
-        onSubmit={handleSaveCatalogItem}
-        onEdit={handleEditCatalogItem}
-        onCancel={() => resetCatalogForm()}
-        onDelete={handleDeleteCatalogItem}
-        onRefresh={loadCatalogItems}
-      />
+      {isCatalogMode ? (
+        <ChecklistCatalogManager
+          items={catalogItems}
+          loading={catalogLoading}
+          error={catalogError}
+          form={catalogForm}
+          busyId={catalogBusyId}
+          onFormChange={setCatalogForm}
+          onSubmit={handleSaveCatalogItem}
+          onEdit={handleEditCatalogItem}
+          onCancel={() => resetCatalogForm()}
+          onDelete={handleDeleteCatalogItem}
+          onRefresh={loadCatalogItems}
+        />
+      ) : null}
 
       <SurfacePanel
-        title="Filtros do checklist"
-        description="Escolha a competência e refine a carteira antes de revisar pendências ou enviar lembretes."
+        title={isCatalogMode ? 'Filtros do catálogo' : 'Filtros do checklist'}
+        description={isCatalogMode
+          ? 'Refine a carteira antes de configurar os documentos aplicáveis aos clientes.'
+          : 'Escolha a competência e refine a carteira antes de revisar pendências ou enviar lembretes.'}
         right={(
           <ActionButton type="button" variant="secondary" onClick={clearChecklistFilters}>
             <RefreshCcw size={16} aria-hidden="true" />
@@ -1854,10 +1843,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)]">
-          <label className="space-y-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
-            Cliente, CNPJ ou razão social
-            <div className="relative">
+        <div className={classNames('grid gap-3', isCatalogMode ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)_minmax(260px,0.9fr)]' : 'lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)_minmax(260px,0.9fr)]')}>
+          <label className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
+            <span className="block">Cliente, CNPJ ou razão social</span>
+            <div className="relative mt-2">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
               <input
                 type="search"
@@ -1869,21 +1858,25 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             </div>
           </label>
 
-          <ChecklistDropdownSelect
-            label="Mês"
-            value={mes}
-            options={MONTH_OPTIONS}
-            onChange={(value) => setMes(Number(value))}
-            includeBlank={false}
-          />
+          {!isCatalogMode ? (
+            <>
+              <ChecklistDropdownSelect
+                label="Mês"
+                value={mes}
+                options={MONTH_OPTIONS}
+                onChange={(value) => setMes(Number(value))}
+                includeBlank={false}
+              />
 
-          <ChecklistDropdownSelect
-            label="Ano"
-            value={ano}
-            options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
-            onChange={(value) => setAno(Number(value))}
-            includeBlank={false}
-          />
+              <ChecklistDropdownSelect
+                label="Ano"
+                value={ano}
+                options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
+                onChange={(value) => setAno(Number(value))}
+                includeBlank={false}
+              />
+            </>
+          ) : null}
 
           <ChecklistDropdownSelect
             label="Responsável"
@@ -1893,6 +1886,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             includeBlank
             emptyLabel="Todos"
           />
+
+          <ChecklistDropdownSelect
+            label="Visualização"
+            value={viewMode}
+            options={CHECKLIST_VIEW_OPTIONS}
+            onChange={setViewMode}
+            includeBlank={false}
+          />
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
@@ -1900,7 +1901,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Acompanhamento rápido</p>
               <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
-                Filtre a carteira pela situação do checklist na competência selecionada.
+                {isCatalogMode ? 'Filtre clientes por configuração do checklist.' : 'Filtre a carteira pela situação do checklist na competência selecionada.'}
               </p>
             </div>
             <p className="text-xs font-bold text-slate-500 dark:text-gray-400">
@@ -1908,7 +1909,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             </p>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {CHECKLIST_QUICK_FILTERS.map((option) => {
+            {quickFilterOptions.map((option) => {
               const active = quickFilter === option.value;
               return (
                 <button
@@ -1933,14 +1934,16 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         </div>
       </SurfacePanel>
 
-      <ChecklistBatchApplyPanel
-        filteredCount={filteredRows.length}
-        targetCount={batchDefaultTargets.length}
-        catalogCount={catalogItems.length}
-        applying={applyingDefaultChecklist}
-        catalogLoading={catalogLoading}
-        onApply={handleApplyDefaultChecklistToFiltered}
-      />
+      {isCatalogMode ? (
+        <ChecklistBatchApplyPanel
+          filteredCount={filteredRows.length}
+          targetCount={batchDefaultTargets.length}
+          catalogCount={catalogItems.length}
+          applying={applyingDefaultChecklist}
+          catalogLoading={catalogLoading}
+          onApply={handleApplyDefaultChecklistToFiltered}
+        />
+      ) : null}
 
       {error ? (
         <AlertBanner tone="danger" title="Erro ao carregar checklist">
@@ -1948,7 +1951,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         </AlertBanner>
       ) : null}
 
-      {contactsError ? (
+      {!isCatalogMode && contactsError ? (
         <AlertBanner tone="danger" title="Erro ao carregar contatos">
           {contactsError}
         </AlertBanner>
@@ -1961,8 +1964,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       ) : null}
 
       <SurfacePanel
-        title="Clientes"
-        description={`${formatNumber(filteredRows.length)} cliente(s) em "${activeQuickFilterLabel}" conforme os filtros aplicados.`}
+        title={isCatalogMode ? 'Clientes e vínculos' : 'Clientes'}
+        description={isCatalogMode
+          ? `${formatNumber(filteredRows.length)} cliente(s) em "${activeQuickFilterLabel}" para configurar documentos.`
+          : `${formatNumber(filteredRows.length)} cliente(s) em "${activeQuickFilterLabel}" conforme os filtros aplicados.`}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
         <div className="space-y-3">
@@ -2021,13 +2026,15 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-base font-black text-slate-950 dark:text-white">{row.nome}</p>
-                        <StatusBadge
-                          toneClass={hasContact
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
-                            : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
-                        >
-                          {hasContact ? 'Contato salvo' : 'Sem contato'}
-                        </StatusBadge>
+                        {!isCatalogMode ? (
+                          <StatusBadge
+                            toneClass={hasContact
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
+                              : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
+                          >
+                            {hasContact ? 'Contato salvo' : 'Sem contato'}
+                          </StatusBadge>
+                        ) : null}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
                         <span>{formatCnpj(row.cnpj)}</span>
@@ -2036,38 +2043,62 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                     </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Progresso</p>
-                      <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.percentual_concluido)}%</p>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-800">
-                        <div
-                          className={classNames(
-                            'h-full rounded-full transition-all',
-                            row.percentual_concluido >= 100
-                              ? 'bg-emerald-500'
-                              : row.percentual_concluido > 0
-                                ? 'bg-sky-500'
-                                : 'bg-amber-400',
-                          )}
-                          style={{ width: `${progressWidth}%` }}
-                        />
+                  <div className={classNames('grid gap-3', isCatalogMode ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}>
+                    {!isCatalogMode ? (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Progresso</p>
+                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.percentual_concluido)}%</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-800">
+                          <div
+                            className={classNames(
+                              'h-full rounded-full transition-all',
+                              row.percentual_concluido >= 100
+                                ? 'bg-emerald-500'
+                                : row.percentual_concluido > 0
+                                  ? 'bg-sky-500'
+                                  : 'bg-amber-400',
+                            )}
+                            style={{ width: `${progressWidth}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
                     <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
                       <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Itens</p>
                       <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.total_itens)}</p>
                       <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">documento(s)</p>
                     </div>
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-400/20 dark:bg-amber-400/10">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências</p>
-                      <p className="mt-1 text-sm font-black text-amber-800 dark:text-amber-100">{formatNumber(row.qtd_pendentes)}</p>
-                      <p className="mt-1 text-[11px] font-bold text-amber-700/80 dark:text-amber-200/80">em aberto</p>
-                    </div>
+                    {isCatalogMode ? (
+                      <div className={classNames(
+                        'rounded-xl border px-3 py-2',
+                        row.total_itens > 0
+                          ? 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-400/10'
+                          : 'border-amber-200 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-400/10',
+                      )}>
+                        <p className={classNames(
+                          'text-[10px] font-black uppercase tracking-wide',
+                          row.total_itens > 0 ? 'text-emerald-700 dark:text-emerald-200' : 'text-amber-700 dark:text-amber-200',
+                        )}>Configuração</p>
+                        <p className={classNames(
+                          'mt-1 text-sm font-black',
+                          row.total_itens > 0 ? 'text-emerald-800 dark:text-emerald-100' : 'text-amber-800 dark:text-amber-100',
+                        )}>{row.total_itens > 0 ? 'Configurado' : 'Pendente'}</p>
+                        <p className={classNames(
+                          'mt-1 text-[11px] font-bold',
+                          row.total_itens > 0 ? 'text-emerald-700/80 dark:text-emerald-200/80' : 'text-amber-700/80 dark:text-amber-200/80',
+                        )}>{row.total_itens > 0 ? 'com itens vinculados' : 'sem checklist'}</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-400/20 dark:bg-amber-400/10">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências</p>
+                        <p className="mt-1 text-sm font-black text-amber-800 dark:text-amber-100">{formatNumber(row.qtd_pendentes)}</p>
+                        <p className="mt-1 text-[11px] font-bold text-amber-700/80 dark:text-amber-200/80">em aberto</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                    <StatusBadge toneClass={completionTone}>{formatNumber(row.percentual_concluido)}% concluído</StatusBadge>
+                    <StatusBadge toneClass={isCatalogMode ? (row.total_itens > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200') : completionTone}>{isCatalogMode ? (row.total_itens > 0 ? 'Configurado' : 'Sem checklist') : `${formatNumber(row.percentual_concluido)}% concluído`}</StatusBadge>
                     <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                       {expanded ? 'Ocultar' : 'Abrir'}
                       <ChevronDown size={14} className={classNames('transition', expanded && 'rotate-180')} aria-hidden="true" />
@@ -2078,6 +2109,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                 {expanded ? (
                   <div className="border-t border-slate-200 bg-gradient-to-b from-slate-50/90 to-white p-4 sm:p-5 dark:border-gray-800 dark:from-gray-950/35 dark:to-gray-950/15">
                     <ClientChecklistDetails
+                      mode={isCatalogMode ? 'catalog' : 'checklist'}
                       client={row.client}
                       detail={detailsByClient[row.cliente_id]}
                       ano={ano}

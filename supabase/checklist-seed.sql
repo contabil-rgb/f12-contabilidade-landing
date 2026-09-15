@@ -5,21 +5,18 @@
 
 insert into public.checklist_itens (descricao, ordem, ativo)
 values
-  ('Extratos bancarios', 10, true),
-  ('Fatura de cartao', 20, true),
-  ('Comprovantes de pagamentos', 30, true),
-  ('Notas fiscais de entrada', 40, true),
-  ('Notas fiscais de saida', 50, true),
-  ('Relatorio de vendas', 60, true),
-  ('Relatorio de servicos prestados', 70, true),
-  ('Contratos de emprestimos', 80, true),
-  ('Folha de pagamento', 90, true),
-  ('Pro-labore', 100, true),
-  ('Recibos de aluguel', 110, true),
-  ('Guias pagas', 120, true),
-  ('Movimento de caixa', 130, true),
-  ('Comprovantes de despesas', 140, true),
-  ('Documentos diversos', 150, true)
+  ('Informação sobre alterações de constituição da empresa.', 10, true),
+  ('Movimentação do fluxo de caixa da empresa (Identificando cada recebimento/pagamento NF, NFC, Recibo e etc);', 20, true),
+  ('Relatório de caixinha (entrada e saída em dinheiro)', 30, true),
+  ('Extratos Bancários de todas as contas em formato OFX, Excel e PDF;', 40, true),
+  ('Extrato de Aplicações Financeiras em PDF, contendo: Aplicação, Resgate, Rendimento Bruto e Impostos retidos;', 50, true),
+  ('Comprovantes de SISPAG FORNECEDORES em PDF', 60, true),
+  ('Comprovantes de SISPAG SALÁRIOS em PDF', 70, true),
+  ('Extrato detalhado da administradora de cartão de crédito – Vendas recebidas e tarifas descontadas;', 80, true),
+  ('Contratos ou controles auxiliares de Empréstimos, financiamentos, Consórcios, Seguros, leasing ou arrendamentos em curso e seus devidos saldos devedores;', 90, true),
+  ('Fatura de Cartão Crédito Pessoa Jurídica;', 100, true),
+  ('Valor distribuído de lucro no período para cada sócio', 110, true),
+  ('Relação de compras de bens do ativo imobilizado do período (acompanhados das respectivas notas fiscais);', 120, true)
 on conflict (descricao)
 do update set ordem = excluded.ordem,
               ativo = excluded.ativo;
