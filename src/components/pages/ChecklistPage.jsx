@@ -91,6 +91,14 @@ const STATUS_OPTIONS = [
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
 const CATALOG_PREVIEW_LIMIT = 8;
 
+const CHECKLIST_QUICK_FILTERS = [
+  { value: 'todos', label: 'Todos', description: 'Carteira filtrada' },
+  { value: 'pendencias', label: 'Com pendências', description: 'Itens em aberto' },
+  { value: 'concluidos', label: 'Concluídos', description: 'Sem pendências' },
+  { value: 'sem_checklist', label: 'Sem checklist', description: 'Sem itens vinculados' },
+  { value: 'sem_contato', label: 'Sem contato salvo', description: 'Sem e-mail de lembrete' },
+];
+
 function getCurrentCompetence() {
   const today = new Date();
   return {
@@ -1106,6 +1114,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [ano, setAno] = useState(initialCompetence.ano);
   const [search, setSearch] = useState('');
   const [responsavel, setResponsavel] = useState('');
+  const [quickFilter, setQuickFilter] = useState('todos');
   const [resumos, setResumos] = useState([]);
   const [loadingResumo, setLoadingResumo] = useState(false);
   const [error, setError] = useState('');
@@ -1299,7 +1308,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     });
   }, [clients, resumos]);
 
-  const filteredRows = useMemo(() => {
+  const baseFilteredRows = useMemo(() => {
     const searchTerm = normalizeText(search);
     const responsavelTerm = normalizeText(responsavel);
     return rows
@@ -1312,6 +1321,26 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [responsavel, rows, search]);
 
+  const quickFilterCounts = useMemo(() => {
+    const hasContact = (row) => Boolean(contactsByClient[row.cliente_id]?.email);
+    return {
+      todos: baseFilteredRows.length,
+      pendencias: baseFilteredRows.filter((row) => row.qtd_pendentes > 0).length,
+      concluidos: baseFilteredRows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0).length,
+      sem_checklist: baseFilteredRows.filter((row) => row.total_itens === 0).length,
+      sem_contato: baseFilteredRows.filter((row) => !hasContact(row)).length,
+    };
+  }, [baseFilteredRows, contactsByClient]);
+
+  const filteredRows = useMemo(() => {
+    const hasContact = (row) => Boolean(contactsByClient[row.cliente_id]?.email);
+    if (quickFilter === 'pendencias') return baseFilteredRows.filter((row) => row.qtd_pendentes > 0);
+    if (quickFilter === 'concluidos') return baseFilteredRows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0);
+    if (quickFilter === 'sem_checklist') return baseFilteredRows.filter((row) => row.total_itens === 0);
+    if (quickFilter === 'sem_contato') return baseFilteredRows.filter((row) => !hasContact(row));
+    return baseFilteredRows;
+  }, [baseFilteredRows, contactsByClient, quickFilter]);
+
   const batchDefaultTargets = useMemo(
     () => filteredRows.filter((row) => toNumber(row.total_itens) === 0),
     [filteredRows],
@@ -1322,9 +1351,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const comPendencias = rows.filter((row) => row.qtd_pendentes > 0).length;
     const concluidos = rows.filter((row) => row.total_itens > 0 && row.qtd_pendentes === 0).length;
     const semChecklist = rows.length - comChecklist;
+    const semContato = rows.filter((row) => !contactsByClient[row.cliente_id]?.email).length;
     const totalPendencias = rows.reduce((total, row) => total + row.qtd_pendentes, 0);
-    return { comChecklist, comPendencias, concluidos, semChecklist, totalPendencias };
-  }, [rows]);
+    return { comChecklist, comPendencias, concluidos, semChecklist, semContato, totalPendencias };
+  }, [contactsByClient, rows]);
 
   async function loadClientDetails(clienteId, { force = false } = {}) {
     if (!clienteId) return;
@@ -1376,6 +1406,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const currentCompetence = getCurrentCompetence();
     setSearch('');
     setResponsavel('');
+    setQuickFilter('todos');
     setMes(currentCompetence.mes);
     setAno(currentCompetence.ano);
   }
@@ -1644,7 +1675,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <MetricTile
             title="Clientes com checklist"
             value={formatNumber(metrics.comChecklist)}
@@ -1667,6 +1698,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             detail="Clientes sem pendências na competência"
             icon={FileCheck2}
             tone="success"
+            className="min-h-[132px]"
+          />
+          <MetricTile
+            title="Sem contato"
+            value={formatNumber(metrics.semContato)}
+            detail="Clientes sem e-mail salvo"
+            icon={Mail}
+            tone={metrics.semContato ? 'warning' : 'success'}
             className="min-h-[132px]"
           />
           <MetricTile
@@ -1744,6 +1783,43 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             includeBlank
             emptyLabel="Todos"
           />
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Acompanhamento rápido</p>
+              <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
+                Filtre a carteira pela situação do checklist na competência selecionada.
+              </p>
+            </div>
+            <p className="text-xs font-bold text-slate-500 dark:text-gray-400">
+              {formatNumber(filteredRows.length)} de {formatNumber(baseFilteredRows.length)} cliente(s)
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {CHECKLIST_QUICK_FILTERS.map((option) => {
+              const active = quickFilter === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setQuickFilter(option.value)}
+                  className={classNames(
+                    'rounded-xl border px-3 py-2 text-left text-xs font-black transition hover:-translate-y-0.5',
+                    active
+                      ? 'border-blue-400 bg-blue-600 text-white shadow-lg shadow-blue-950/15 dark:border-blue-400 dark:bg-blue-500'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-950/35 dark:text-gray-200 dark:hover:border-blue-500/50',
+                  )}
+                >
+                  <span className="block">{option.label}</span>
+                  <span className={classNames('mt-1 block text-[11px] font-bold', active ? 'text-blue-100' : 'text-slate-500 dark:text-gray-400')}>
+                    {formatNumber(quickFilterCounts[option.value] ?? 0)} · {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </SurfacePanel>
 
