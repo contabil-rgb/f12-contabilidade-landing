@@ -428,6 +428,26 @@ function splitEmails(value) {
     .filter(Boolean);
 }
 
+function EmailChips({ value, emptyLabel = 'Não informado' }) {
+  const emails = splitEmails(value);
+  if (!emails.length) {
+    return <span className="text-slate-400 dark:text-gray-500">{emptyLabel}</span>;
+  }
+
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {emails.map((email) => (
+        <span
+          key={email}
+          className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+        >
+          {email}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -850,19 +870,71 @@ function ChecklistContactReminder({
       )}
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-gray-800 dark:bg-gray-950/35">
-        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Últimos envios</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Histórico de lembretes</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+              Últimos envios registrados para {getMonthLabel(mes)}/{ano}.
+            </p>
+          </div>
+          {envios.length ? (
+            <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+              {formatNumber(envios.length)} envio(s)
+            </StatusBadge>
+          ) : null}
+        </div>
+
         {envios.length ? (
-          <div className="mt-2 space-y-2">
-            {envios.slice(0, 3).map((envio) => (
-              <div key={envio.id} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-gray-800 dark:text-gray-300">
-                <p className="font-black text-slate-800 dark:text-gray-100">{formatDateTime(envio.enviado_em || envio.criado_em)}</p>
-                <p className="mt-1">Para: {envio.destinatario}</p>
-                <p className="mt-1">{formatNumber(envio.qtd_pendencias)} pendência(s) · {envio.enviado_por_nome || 'Usuário não informado'}</p>
+          <div className="mt-3 space-y-2">
+            {envios.slice(0, 5).map((envio, index) => (
+              <div key={envio.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 text-xs font-semibold text-slate-600 shadow-sm dark:border-gray-800 dark:bg-gray-900/65 dark:text-gray-300">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-black text-slate-900 dark:text-gray-100">{formatDateTime(envio.enviado_em || envio.criado_em)}</p>
+                      {index === 0 ? (
+                        <StatusBadge toneClass="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200">
+                          Último envio
+                        </StatusBadge>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">
+                      Enviado por {envio.enviado_por_nome || envio.enviado_por_email || 'Usuário não informado'}
+                    </p>
+                  </div>
+                  <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+                    {formatNumber(envio.qtd_pendencias)} pendência(s)
+                  </StatusBadge>
+                </div>
+
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/35">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Destinatário principal</p>
+                    <div className="mt-1"><EmailChips value={envio.destinatario} /></div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/35">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Cópia</p>
+                    <div className="mt-1"><EmailChips value={envio.cc} emptyLabel="Sem cópia" /></div>
+                  </div>
+                </div>
+
+                {envio.assunto ? (
+                  <p className="mt-2 truncate text-[11px] font-bold text-slate-500 dark:text-gray-400" title={envio.assunto}>
+                    Assunto: {envio.assunto}
+                  </p>
+                ) : null}
               </div>
             ))}
+            {envios.length > 5 ? (
+              <p className="px-1 text-xs font-bold text-slate-500 dark:text-gray-400">
+                + {formatNumber(envios.length - 5)} envio(s) anterior(es) nesta competência.
+              </p>
+            ) : null}
           </div>
         ) : (
-          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-gray-400">Nenhum lembrete registrado para esta competência.</p>
+          <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-400">
+            Nenhum lembrete registrado para esta competência.
+          </p>
         )}
       </div>
     </div>
