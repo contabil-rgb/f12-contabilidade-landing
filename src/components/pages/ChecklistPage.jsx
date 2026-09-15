@@ -107,8 +107,18 @@ const CATALOG_QUICK_FILTERS = [
 ];
 
 const CHECKLIST_VIEW_OPTIONS = [
-  { value: 'checklist', label: 'Acompanhamento dos documentos' },
-  { value: 'catalog', label: 'Catálogo de documentos' },
+  {
+    value: 'checklist',
+    label: 'Acompanhamento dos documentos',
+    description: 'Controle pendências, contatos e lembretes por competência.',
+    icon: ListChecks,
+  },
+  {
+    value: 'catalog',
+    label: 'Cadastro de documentos',
+    description: 'Configure os documentos padrão e os itens por cliente.',
+    icon: ClipboardCheck,
+  },
 ];
 
 function getCurrentCompetence() {
@@ -1755,6 +1765,49 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
   return (
     <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-2">
+        {CHECKLIST_VIEW_OPTIONS.map((option) => {
+          const active = viewMode === option.value;
+          const Icon = option.icon;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setViewMode(option.value)}
+              className={classNames(
+                'group rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft',
+                active
+                  ? 'border-blue-400 bg-blue-600 text-white shadow-blue-950/20 dark:border-blue-400 dark:bg-blue-500/90'
+                  : 'border-slate-200 bg-white/85 text-slate-800 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900/70 dark:text-gray-100 dark:hover:border-blue-500/50',
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <span className={classNames(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition',
+                  active
+                    ? 'border-white/25 bg-white/15 text-white'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 group-hover:border-blue-300 group-hover:text-blue-600 dark:border-gray-700 dark:bg-gray-950/40 dark:text-gray-300 dark:group-hover:border-blue-500/50 dark:group-hover:text-blue-200',
+                )}>
+                  <Icon size={18} aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className={classNames('block text-[11px] font-black uppercase tracking-wide', active ? 'text-blue-100' : 'text-slate-500 dark:text-gray-400')}>
+                    Página
+                  </span>
+                  <span className="mt-1 block text-base font-black leading-tight">
+                    {option.label}
+                  </span>
+                </span>
+              </div>
+              <span className={classNames('mt-3 block text-sm font-semibold leading-5', active ? 'text-blue-50' : 'text-slate-500 dark:text-gray-300')}>
+                {option.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <SurfacePanel
         title={isCatalogMode ? 'Central do catálogo' : 'Central de checklist'}
         description={isCatalogMode
@@ -1774,7 +1827,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             </ActionButton>
           </div>
         )}
-        bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
+        bodyClassName="px-4 pb-4 sm:px-5 sm:pb-5"
       >
         <div className={classNames('grid gap-3 md:grid-cols-2', isCatalogMode ? 'xl:grid-cols-4' : 'xl:grid-cols-5')}>
           <MetricTile
@@ -1783,7 +1836,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             detail={`${formatNumber(metrics.semChecklist)} ainda sem itens vinculados`}
             icon={ListChecks}
             tone="info"
-            className="min-h-[132px]"
+            className="min-h-[118px]"
           />
           {!isCatalogMode ? (
             <>
@@ -1794,7 +1847,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             icon={AlertTriangle}
             tone={metrics.comPendencias ? 'warning' : 'success'}
             onClick={() => setQuickFilter('pendencias')}
-            className="min-h-[132px]"
+            className="min-h-[118px]"
           />
           <MetricTile
             title="Concluídos"
@@ -1803,7 +1856,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             icon={FileCheck2}
             tone="success"
             onClick={() => setQuickFilter('concluidos')}
-            className="min-h-[132px]"
+            className="min-h-[118px]"
           />
           <MetricTile
             title="Sem contato"
@@ -1812,7 +1865,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             icon={Mail}
             tone={metrics.semContato ? 'warning' : 'success'}
             onClick={() => setQuickFilter('sem_contato')}
-            className="min-h-[132px]"
+            className="min-h-[118px]"
           />
             </>
           ) : (
@@ -1823,7 +1876,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                 detail="Documentos disponíveis no catálogo"
                 icon={ClipboardCheck}
                 tone="success"
-                className="min-h-[132px]"
+                className="min-h-[118px]"
               />
               <MetricTile
                 title="Sem checklist"
@@ -1832,7 +1885,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                 icon={FileQuestion}
                 tone={metrics.semChecklist ? 'warning' : 'success'}
                 onClick={() => setQuickFilter('sem_checklist')}
-                className="min-h-[132px]"
+                className="min-h-[118px]"
               />
             </>
           )}
@@ -1842,7 +1895,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             detail={`de ${formatNumber(rows.length)} cliente(s) ativos`}
             icon={Users}
             tone="muted"
-            className="min-h-[132px]"
+            className="min-h-[118px]"
           />
         </div>
       </SurfacePanel>
@@ -1878,7 +1931,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className={classNames('grid gap-3', isCatalogMode ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)_minmax(260px,0.9fr)]' : 'lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)_minmax(260px,0.9fr)]')}>
+        <div className={classNames('grid gap-3', isCatalogMode ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)]' : 'lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)]')}>
           <label className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
             <span className="block">Cliente, CNPJ ou razão social</span>
             <div className="relative mt-2">
@@ -1922,13 +1975,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             emptyLabel="Todos"
           />
 
-          <ChecklistDropdownSelect
-            label="Visualização"
-            value={viewMode}
-            options={CHECKLIST_VIEW_OPTIONS}
-            onChange={setViewMode}
-            includeBlank={false}
-          />
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
