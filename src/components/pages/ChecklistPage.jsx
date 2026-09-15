@@ -545,8 +545,9 @@ function ChecklistBatchApplyPanel({
             </StatusBadge>
           </div>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-gray-300">
-            A aplicação em lote cria a base padrão somente para clientes filtrados que estão sem checklist.
-            Clientes que já possuem itens configurados não serão alterados, preservando ajustes individuais.
+            {targetCount > 0
+              ? 'A aplicação em lote cria a base padrão somente para clientes filtrados que estão sem checklist. Clientes que já possuem itens configurados não serão alterados, preservando ajustes individuais.'
+              : 'Nenhum cliente filtrado está sem checklist no momento. Se quiser aplicar o padrão para outro grupo, ajuste os filtros acima.'}
           </p>
         </div>
 
@@ -555,6 +556,36 @@ function ChecklistBatchApplyPanel({
         </div>
       </div>
     </SurfacePanel>
+  );
+}
+
+
+function ChecklistWorkflowGuide() {
+  const steps = [
+    { title: '1. Filtre a carteira', detail: 'Escolha competência, responsável e situação do checklist.' },
+    { title: '2. Revise o cliente', detail: 'Abra o card para ajustar itens, contato e status.' },
+    { title: '3. Envie e acompanhe', detail: 'Dispare o lembrete e confira o histórico de envios.' },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm dark:border-blue-400/20 dark:bg-blue-500/10">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-black text-blue-900 dark:text-blue-100">Fluxo sugerido para cobrança</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-blue-800/80 dark:text-blue-100/80">
+            Use os filtros rápidos para priorizar a rotina e abra somente os clientes que precisam de ação.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
+          {steps.map((step) => (
+            <div key={step.title} className="rounded-xl border border-blue-200/75 bg-white/80 px-3 py-2 dark:border-blue-400/20 dark:bg-slate-950/25">
+              <p className="text-xs font-black text-blue-900 dark:text-blue-100">{step.title}</p>
+              <p className="mt-1 text-[11px] font-semibold leading-5 text-blue-700/85 dark:text-blue-100/75">{step.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1055,9 +1086,9 @@ function ClientChecklistDetails({
                 size="sm"
                 variant="primary"
                 onClick={() => onSaveClientItems(client, selectedItemIds)}
-                disabled={catalogLoading || savingConfig}
+                disabled={catalogLoading || savingConfig || selectedCount === 0}
               >
-                {savingConfig ? 'Salvando...' : 'Salvar itens'}
+                {savingConfig ? 'Salvando...' : selectedCount === 0 ? 'Selecione itens' : 'Salvar itens'}
               </ActionButton>
             </div>
           </div>
@@ -1413,6 +1444,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     return baseFilteredRows;
   }, [baseFilteredRows, contactsByClient, quickFilter]);
 
+  const activeQuickFilterLabel = CHECKLIST_QUICK_FILTERS.find((option) => option.value === quickFilter)?.label ?? 'Todos';
+
   const batchDefaultTargets = useMemo(
     () => filteredRows.filter((row) => toNumber(row.total_itens) === 0),
     [filteredRows],
@@ -1759,25 +1792,28 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           <MetricTile
             title="Com pendências"
             value={formatNumber(metrics.comPendencias)}
-            detail={`${formatNumber(metrics.totalPendencias)} documento(s) pendente(s)`}
+            detail={`${formatNumber(metrics.totalPendencias)} documento(s) pendente(s) · clicar para filtrar`}
             icon={AlertTriangle}
             tone={metrics.comPendencias ? 'warning' : 'success'}
+            onClick={() => setQuickFilter('pendencias')}
             className="min-h-[132px]"
           />
           <MetricTile
             title="Concluídos"
             value={formatNumber(metrics.concluidos)}
-            detail="Clientes sem pendências na competência"
+            detail="Clientes sem pendências · clicar para filtrar"
             icon={FileCheck2}
             tone="success"
+            onClick={() => setQuickFilter('concluidos')}
             className="min-h-[132px]"
           />
           <MetricTile
             title="Sem contato"
             value={formatNumber(metrics.semContato)}
-            detail="Clientes sem e-mail salvo"
+            detail="Clientes sem e-mail salvo · clicar para filtrar"
             icon={Mail}
             tone={metrics.semContato ? 'warning' : 'success'}
+            onClick={() => setQuickFilter('sem_contato')}
             className="min-h-[132px]"
           />
           <MetricTile
@@ -1790,6 +1826,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           />
         </div>
       </SurfacePanel>
+
+      <ChecklistWorkflowGuide />
 
       <ChecklistCatalogManager
         items={catalogItems}
@@ -1924,7 +1962,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
       <SurfacePanel
         title="Clientes"
-        description={`${formatNumber(filteredRows.length)} cliente(s) conforme os filtros aplicados.`}
+        description={`${formatNumber(filteredRows.length)} cliente(s) em "${activeQuickFilterLabel}" conforme os filtros aplicados.`}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
         <div className="space-y-3">
@@ -1939,8 +1977,13 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
               <ClipboardCheck className="text-slate-300 dark:text-gray-600" size={40} aria-hidden="true" />
               <p className="text-base font-bold text-slate-800 dark:text-gray-100">Nenhum cliente encontrado.</p>
               <p className="max-w-md text-sm font-medium leading-6 text-slate-500 dark:text-gray-300">
-                Ajuste os filtros para visualizar a carteira desta competência.
+                Não há clientes para o acompanhamento rápido "{activeQuickFilterLabel}" com os filtros atuais. Ajuste a busca, o responsável ou volte para "Todos".
               </p>
+              {quickFilter !== 'todos' ? (
+                <ActionButton type="button" size="sm" variant="secondary" onClick={() => setQuickFilter('todos')}>
+                  Ver todos os clientes filtrados
+                </ActionButton>
+              ) : null}
             </div>
           ) : null}
 
