@@ -89,7 +89,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
-const CATALOG_PREVIEW_LIMIT = 8;
+const CATALOG_PREVIEW_LIMIT = 6;
 const CLIENT_CATALOG_PREVIEW_LIMIT = 4;
 
 const CHECKLIST_QUICK_FILTERS = [
