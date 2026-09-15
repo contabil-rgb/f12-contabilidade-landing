@@ -476,6 +476,60 @@ function getNextCatalogOrder(items = []) {
   return maxOrder + 10;
 }
 
+
+function ChecklistBatchApplyPanel({
+  filteredCount,
+  targetCount,
+  catalogCount,
+  applying,
+  catalogLoading,
+  onApply,
+}) {
+  const disabled = applying || catalogLoading || targetCount === 0 || catalogCount === 0;
+
+  return (
+    <SurfacePanel
+      title="Aplicação em lote"
+      description="Use os itens ativos do catálogo como checklist padrão para clientes que ainda não possuem itens vinculados."
+      right={(
+        <ActionButton type="button" variant="primary" onClick={onApply} disabled={disabled}>
+          {applying ? (
+            <RefreshCcw size={16} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <ClipboardCheck size={16} aria-hidden="true" />
+          )}
+          {applying ? 'Aplicando...' : 'Aplicar checklist padrão'}
+        </ActionButton>
+      )}
+      bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge toneClass="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200" size="md">
+              {formatNumber(targetCount)} sem checklist
+            </StatusBadge>
+            <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200" size="md">
+              {formatNumber(filteredCount)} cliente(s) filtrado(s)
+            </StatusBadge>
+            <StatusBadge toneClass="border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200" size="md">
+              {formatNumber(catalogCount)} item(ns) do catálogo
+            </StatusBadge>
+          </div>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-gray-300">
+            A aplicação em lote cria a base padrão somente para clientes filtrados que estão sem checklist.
+            Clientes que já possuem itens configurados não serão alterados, preservando ajustes individuais.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm font-semibold leading-6 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100 lg:max-w-sm">
+          Revise os filtros antes de aplicar. A ação usa a carteira visível na tela e não duplica itens em clientes já configurados.
+        </div>
+      </div>
+    </SurfacePanel>
+  );
+}
+
 function ChecklistCatalogManager({
   items,
   loading,
@@ -1069,6 +1123,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [contactsError, setContactsError] = useState('');
   const [savingContactId, setSavingContactId] = useState('');
   const [sendingReminderId, setSendingReminderId] = useState('');
+  const [applyingDefaultChecklist, setApplyingDefaultChecklist] = useState(false);
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1257,6 +1312,11 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [responsavel, rows, search]);
 
+  const batchDefaultTargets = useMemo(
+    () => filteredRows.filter((row) => toNumber(row.total_itens) === 0),
+    [filteredRows],
+  );
+
   const metrics = useMemo(() => {
     const comChecklist = rows.filter((row) => row.total_itens > 0).length;
     const comPendencias = rows.filter((row) => row.qtd_pendentes > 0).length;
@@ -1401,6 +1461,60 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       });
     } finally {
       setSavingConfigId('');
+    }
+  }
+
+  async function handleApplyDefaultChecklistToFiltered() {
+    if (applyingDefaultChecklist || catalogLoading || !catalogItems.length || !batchDefaultTargets.length) return;
+
+    const confirmed = window.confirm(
+      `Aplicar o checklist padrão com ${formatNumber(catalogItems.length)} item(ns) para ${formatNumber(batchDefaultTargets.length)} cliente(s) filtrado(s) que ainda estão sem checklist? Clientes já configurados não serão alterados.`,
+    );
+    if (!confirmed) return;
+
+    const payload = catalogItems.map((item, index) => ({
+      item_id: item.id,
+      ordem: toNumber(item.ordem, index + 1),
+      ativo: true,
+    }));
+
+    setApplyingDefaultChecklist(true);
+    setToast(null);
+
+    const failures = [];
+    try {
+      for (const row of batchDefaultTargets) {
+        try {
+          await salvarChecklistClienteItens(row.cliente_id, payload);
+        } catch (err) {
+          failures.push({
+            nome: row.nome,
+            message: err instanceof Error ? err.message : 'Erro desconhecido.',
+          });
+        }
+      }
+
+      await loadResumo({ silent: true });
+      if (expandedClientId) {
+        await loadClientDetails(expandedClientId, { force: true });
+      }
+
+      const successCount = batchDefaultTargets.length - failures.length;
+      if (failures.length) {
+        setToast({
+          tone: successCount > 0 ? 'warning' : 'danger',
+          title: successCount > 0 ? 'Aplicação parcial' : 'Checklist não aplicado',
+          message: `${formatNumber(successCount)} cliente(s) atualizado(s). ${formatNumber(failures.length)} cliente(s) não puderam ser atualizados. Primeiro erro: ${failures[0]?.nome}: ${failures[0]?.message}`,
+        });
+      } else {
+        setToast({
+          tone: 'success',
+          title: 'Checklist padrão aplicado',
+          message: `${formatNumber(successCount)} cliente(s) receberam ${formatNumber(payload.length)} item(ns) padrão do catálogo.`,
+        });
+      }
+    } finally {
+      setApplyingDefaultChecklist(false);
     }
   }
 
@@ -1632,6 +1746,15 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           />
         </div>
       </SurfacePanel>
+
+      <ChecklistBatchApplyPanel
+        filteredCount={filteredRows.length}
+        targetCount={batchDefaultTargets.length}
+        catalogCount={catalogItems.length}
+        applying={applyingDefaultChecklist}
+        catalogLoading={catalogLoading}
+        onApply={handleApplyDefaultChecklistToFiltered}
+      />
 
       {error ? (
         <AlertBanner tone="danger" title="Erro ao carregar checklist">
