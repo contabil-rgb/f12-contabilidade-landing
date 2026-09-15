@@ -90,6 +90,7 @@ const STATUS_OPTIONS = [
 
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
 const CATALOG_PREVIEW_LIMIT = 8;
+const CLIENT_CATALOG_PREVIEW_LIMIT = 4;
 
 const CHECKLIST_QUICK_FILTERS = [
   { value: 'todos', label: 'Todos', description: 'Carteira filtrada' },
@@ -939,6 +940,7 @@ function ClientChecklistDetails({
     [detail?.itens],
   );
   const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [showAllClientItems, setShowAllClientItems] = useState(false);
 
   useEffect(() => {
     setSelectedItemIds(linkedIdsKey ? linkedIdsKey.split('|') : []);
@@ -946,10 +948,23 @@ function ClientChecklistDetails({
 
   const selectedSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const selectedCount = selectedItemIds.length;
+  const hasHiddenClientItems = catalogItems.length > CLIENT_CATALOG_PREVIEW_LIMIT;
+  const visibleClientCatalogItems = showAllClientItems ? catalogItems : catalogItems.slice(0, CLIENT_CATALOG_PREVIEW_LIMIT);
+  const hiddenClientItemsCount = Math.max(catalogItems.length - CLIENT_CATALOG_PREVIEW_LIMIT, 0);
   const savingConfig = savingConfigId === client?.id;
   const isCatalogMode = mode === 'catalog';
   const showCatalogConfiguration = isCatalogMode;
   const showOperationalControls = !isCatalogMode;
+
+  useEffect(() => {
+    if (!hasHiddenClientItems && showAllClientItems) {
+      setShowAllClientItems(false);
+    }
+  }, [hasHiddenClientItems, showAllClientItems]);
+
+  useEffect(() => {
+    setShowAllClientItems(false);
+  }, [client?.id]);
 
   function toggleCatalogItem(itemId) {
     setSelectedItemIds((current) => (
@@ -1062,8 +1077,9 @@ function ClientChecklistDetails({
           ) : null}
 
           {!catalogLoading && !catalogError && catalogItems.length > 0 ? (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {catalogItems.map((item) => {
+            <>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {visibleClientCatalogItems.map((item) => {
                 const checked = selectedSet.has(item.id);
                 return (
                   <label
@@ -1086,8 +1102,27 @@ function ClientChecklistDetails({
                     <span className="min-w-0 truncate leading-5" title={item.descricao}>{item.descricao}</span>
                   </label>
                 );
-              })}
-            </div>
+                })}
+              </div>
+
+              {hasHiddenClientItems ? (
+                <div className="mt-4 flex justify-end">
+                  <ActionButton
+                    type="button"
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => setShowAllClientItems((current) => !current)}
+                  >
+                    {showAllClientItems ? 'Mostrar menos' : `Mostrar mais (${formatNumber(hiddenClientItemsCount)})`}
+                    <ChevronDown
+                      size={16}
+                      className={classNames('transition-transform', showAllClientItems ? 'rotate-180' : '')}
+                      aria-hidden="true"
+                    />
+                  </ActionButton>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
         ) : null}
