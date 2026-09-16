@@ -1065,6 +1065,7 @@ function ClientChecklistDetails({
   detail,
   ano,
   mes,
+  yearOptions = [],
   contact,
   catalogItems,
   catalogLoading,
@@ -1081,6 +1082,7 @@ function ClientChecklistDetails({
   onSaveContact,
   onSendReminder,
   onStatusChange,
+  onCompetenceChange,
 }) {
   const linkedIdsKey = useMemo(
     () => (detail?.itens ?? []).map((vinculo) => vinculo.item_id || vinculo.item?.id).filter(Boolean).join('|'),
@@ -1284,6 +1286,40 @@ function ClientChecklistDetails({
 
   return (
     <div className="space-y-4">
+      {showOperationalControls ? (
+        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
+                <CalendarDays size={18} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900 dark:text-white">Competência do cliente</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                  Escolha o mês e ano para consultar pendências e atualizar os status deste cliente.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
+              <ChecklistDropdownSelect
+                label="Mês"
+                value={mes}
+                options={MONTH_OPTIONS}
+                onChange={(value) => onCompetenceChange(client, { mes: Number(value), ano })}
+                includeBlank={false}
+              />
+              <ChecklistDropdownSelect
+                label="Ano"
+                value={ano}
+                options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
+                onChange={(value) => onCompetenceChange(client, { mes, ano: Number(value) })}
+                includeBlank={false}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className={classNames('grid gap-4', showOperationalControls && showCatalogConfiguration ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : '')}>
         {showOperationalControls ? (
           <ChecklistContactReminder
@@ -1542,6 +1578,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
   const [expandedClientId, setExpandedClientId] = useState('');
+  const [clientCompetences, setClientCompetences] = useState({});
   const [visibleClientLimit, setVisibleClientLimit] = useState(CLIENT_LIST_PAGE_SIZE);
   const [detailsByClient, setDetailsByClient] = useState({});
   const [busyKey, setBusyKey] = useState('');
@@ -1571,6 +1608,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     setVisibleClientLimit(CLIENT_LIST_PAGE_SIZE);
     setExpandedClientId('');
   }, [ano, mes, quickFilter, responsavel, search, viewMode]);
+
+  useEffect(() => {
+    setClientCompetences({});
+  }, [ano, mes]);
 
   useEffect(() => {
     if (!toast || toast.tone === 'danger') return undefined;
@@ -1816,29 +1857,39 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     return { comChecklist, comPendencias, concluidos, semChecklist, semContato, totalPendencias };
   }, [contactsByClient, rows]);
 
-  async function loadClientDetails(clienteId, { force = false } = {}) {
+  function getClientCompetence(clienteId) {
+    return clientCompetences[clienteId] ?? { ano, mes };
+  }
+
+  async function loadClientDetails(clienteId, { force = false, competence } = {}) {
     if (!clienteId) return;
-    if (!force && detailsByClient[clienteId]?.itens) return;
+    const selectedCompetence = competence ?? getClientCompetence(clienteId);
+    const selectedAno = toNumber(selectedCompetence.ano, ano);
+    const selectedMes = toNumber(selectedCompetence.mes, mes);
+    const cachedDetail = detailsByClient[clienteId];
+    if (!force && cachedDetail?.itens && cachedDetail.ano === selectedAno && cachedDetail.mes === selectedMes) return;
 
     setDetailsByClient((current) => ({
       ...current,
-      [clienteId]: { ...(current[clienteId] ?? {}), loading: true, error: '' },
+      [clienteId]: { ...(current[clienteId] ?? {}), loading: true, error: '', ano: selectedAno, mes: selectedMes },
     }));
 
     try {
       const [itens, itensPersonalizados, statusRows, statusPersonalizados, pendencias, envios] = await Promise.all([
         listarChecklistClienteItens(clienteId),
         listarChecklistClienteItensPersonalizados(clienteId),
-        listarChecklistStatus({ clienteId, ano, mes }),
-        listarChecklistStatusPersonalizados({ clienteId, ano, mes }),
-        listarChecklistPendencias({ clienteId, ano, mes }),
-        listarChecklistEnvios({ clienteId, ano, mes, limite: 20 }),
+        listarChecklistStatus({ clienteId, ano: selectedAno, mes: selectedMes }),
+        listarChecklistStatusPersonalizados({ clienteId, ano: selectedAno, mes: selectedMes }),
+        listarChecklistPendencias({ clienteId, ano: selectedAno, mes: selectedMes }),
+        listarChecklistEnvios({ clienteId, ano: selectedAno, mes: selectedMes, limite: 20 }),
       ]);
       setDetailsByClient((current) => ({
         ...current,
         [clienteId]: {
           loading: false,
           error: '',
+          ano: selectedAno,
+          mes: selectedMes,
           itens,
           itensPersonalizados,
           statusRows,
@@ -1864,7 +1915,28 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   function toggleClient(clienteId) {
     const nextId = expandedClientId === clienteId ? '' : clienteId;
     setExpandedClientId(nextId);
-    if (nextId) loadClientDetails(nextId);
+    if (nextId) {
+      const initialCompetenceForClient = getClientCompetence(nextId);
+      setClientCompetences((current) => ({
+        ...current,
+        [nextId]: current[nextId] ?? { ano, mes },
+      }));
+      loadClientDetails(nextId, { competence: initialCompetenceForClient });
+    }
+  }
+
+  function handleClientCompetenceChange(client, nextCompetence) {
+    if (!client?.id) return;
+    const selectedCompetence = {
+      ano: toNumber(nextCompetence.ano, ano),
+      mes: toNumber(nextCompetence.mes, mes),
+    };
+
+    setClientCompetences((current) => ({
+      ...current,
+      [client.id]: selectedCompetence,
+    }));
+    loadClientDetails(client.id, { force: true, competence: selectedCompetence });
   }
 
   function clearChecklistFilters() {
@@ -1883,6 +1955,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       : (vinculo.item_id || vinculo.item?.id);
     if (!client?.id || !itemId) return;
 
+    const competence = getClientCompetence(client.id);
+    const statusAno = toNumber(competence.ano, ano);
+    const statusMes = toNumber(competence.mes, mes);
     const rowBusyKey = `${client.id}:${isPersonalizado ? 'personalizado' : 'catalogo'}:${itemId}`;
     setBusyKey(rowBusyKey);
     setToast(null);
@@ -1892,15 +1967,15 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         ? await salvarChecklistStatusPersonalizado({
           cliente_id: client.id,
           item_personalizado_id: itemId,
-          ano,
-          mes,
+          ano: statusAno,
+          mes: statusMes,
           status: nextStatus,
         })
         : await salvarChecklistStatus({
           cliente_id: client.id,
           item_id: itemId,
-          ano,
-          mes,
+          ano: statusAno,
+          mes: statusMes,
           status: nextStatus,
         });
 
@@ -1943,7 +2018,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         loadResumo({ silent: true }),
         loadClientDetails(client.id, { force: true }),
       ]);
-      setToast({ tone: 'success', title: 'Status atualizado', message: `${getClientName(client)} foi atualizado para a competência selecionada.` });
+      setToast({ tone: 'success', title: 'Status atualizado', message: `${getClientName(client)} foi atualizado para ${getMonthLabel(statusMes)}/${statusAno}.` });
     } catch (err) {
       setToast({ tone: 'danger', title: 'Erro ao salvar status', message: err instanceof Error ? err.message : 'Não foi possível salvar o status.' });
     } finally {
@@ -2159,9 +2234,12 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const destinatario = String(values.email ?? '').trim();
     const cc = String(values.cc ?? '').trim();
     const assinatura = getClientResponsibleSignature(client, responsavelCatalogo);
-    const assunto = buildReminderSubject(client, ano, mes);
-    const texto = buildReminderText(client, ano, mes, pendencias, assinatura.nome);
-    const html = buildReminderHtml(client, ano, mes, pendencias, assinatura.url, assinatura.nome);
+    const competence = getClientCompetence(client.id);
+    const reminderAno = toNumber(competence.ano, ano);
+    const reminderMes = toNumber(competence.mes, mes);
+    const assunto = buildReminderSubject(client, reminderAno, reminderMes);
+    const texto = buildReminderText(client, reminderAno, reminderMes, pendencias, assinatura.nome);
+    const html = buildReminderHtml(client, reminderAno, reminderMes, pendencias, assinatura.url, assinatura.nome);
 
     if (!destinatario || !pendencias.length) return;
 
@@ -2191,7 +2269,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           razao_social: client.razao_social ?? '',
           nome_identificacao: getClientName(client),
         },
-        competencia: { ano, mes, descricao: `${getMonthLabel(mes)}/${ano}` },
+        competencia: { ano: reminderAno, mes: reminderMes, descricao: `${getMonthLabel(reminderMes)}/${reminderAno}` },
         pendencias: pendencias.map((pendencia) => ({
           item_id: pendencia.item_id,
           descricao: pendencia.item_descricao,
@@ -2201,7 +2279,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       const emailResendId = sent && typeof sent === 'object' ? String(sent.id ?? '') : '';
       await registrarChecklistEnvio({
         cliente_id: client.id,
-        competencias: [{ ano, mes }],
+        competencias: [{ ano: reminderAno, mes: reminderMes }],
         destinatario,
         cc,
         assunto,
@@ -2213,7 +2291,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       setToast({
         tone: 'success',
         title: 'Lembrete enviado',
-        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s).`,
+        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s) de ${getMonthLabel(reminderMes)}/${reminderAno}.`,
       });
     } catch (err) {
       setToast({
@@ -2543,6 +2621,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             const completionTone = getCompletionTone(row.percentual_concluido);
             const hasContact = Boolean(contactsByClient[row.cliente_id]?.email);
             const progressWidth = Math.max(0, Math.min(100, row.percentual_concluido));
+            const rowCompetence = getClientCompetence(row.cliente_id);
 
             return (
               <div
@@ -2658,8 +2737,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       mode={isCatalogMode ? 'catalog' : 'checklist'}
                       client={row.client}
                       detail={detailsByClient[row.cliente_id]}
-                      ano={ano}
-                      mes={mes}
+                      ano={toNumber(rowCompetence.ano, ano)}
+                      mes={toNumber(rowCompetence.mes, mes)}
+                      yearOptions={yearOptions}
                       contact={contactsByClient[row.cliente_id]}
                       catalogItems={catalogItems}
                       catalogLoading={catalogLoading}
@@ -2676,6 +2756,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       onSaveContact={handleSaveContact}
                       onSendReminder={handleSendReminder}
                       onStatusChange={handleStatusChange}
+                      onCompetenceChange={handleClientCompetenceChange}
                     />
                   </div>
                 ) : null}
