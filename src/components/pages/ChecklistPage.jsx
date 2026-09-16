@@ -505,34 +505,82 @@ function getNextCatalogOrder(items = []) {
 }
 
 
-function ChecklistBatchApplyPanel({
+function ChecklistBatchApplyModal({
+  open,
   filteredCount,
   targetCount,
   catalogCount,
+  items = [],
   applying,
   catalogLoading,
   onApply,
+  onClose,
 }) {
-  const disabled = applying || catalogLoading || targetCount === 0 || catalogCount === 0;
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
 
-  return (
-    <SurfacePanel
-      title="Aplicação em lote"
-      description="Use os itens ativos do catálogo como checklist padrão para clientes que ainda não possuem itens vinculados."
-      right={(
-        <ActionButton type="button" variant="primary" onClick={onApply} disabled={disabled}>
-          {applying ? (
-            <RefreshCcw size={16} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <ClipboardCheck size={16} aria-hidden="true" />
-          )}
-          {applying ? 'Aplicando...' : 'Aplicar checklist padrão'}
-        </ActionButton>
-      )}
-      bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
+  useEffect(() => {
+    if (open) {
+      setSelectedItemIds(items.map((item) => item.id).filter(Boolean));
+    }
+  }, [open, items]);
+
+  const selectedSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const selectedItems = useMemo(() => items.filter((item) => selectedSet.has(item.id)), [items, selectedSet]);
+  const disabled = applying || catalogLoading || targetCount === 0 || selectedItems.length === 0;
+
+  function toggleItem(itemId) {
+    setSelectedItemIds((current) => (
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    ));
+  }
+
+  function selectAllItems() {
+    setSelectedItemIds(items.map((item) => item.id).filter(Boolean));
+  }
+
+  function clearSelectedItems() {
+    setSelectedItemIds([]);
+  }
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !applying) {
+          onClose();
+        }
+      }}
     >
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-apply-title"
+        className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-950"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p id="batch-apply-title" className="text-lg font-black text-slate-900 dark:text-white">Aplicação em lote</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500 dark:text-gray-400">
+              Use os itens ativos do catálogo como checklist padrão para clientes que ainda não possuem itens vinculados.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={applying}
+            className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900 dark:hover:text-white"
+            aria-label="Fechar aplicação em lote"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
           <div className="flex flex-wrap gap-2">
             <StatusBadge toneClass="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200" size="md">
               {formatNumber(targetCount)} sem checklist
@@ -541,21 +589,91 @@ function ChecklistBatchApplyPanel({
               {formatNumber(filteredCount)} cliente(s) filtrado(s)
             </StatusBadge>
             <StatusBadge toneClass="border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200" size="md">
-              {formatNumber(catalogCount)} item(ns) do catálogo
+              {formatNumber(selectedItems.length)} de {formatNumber(catalogCount)} item(ns) selecionado(s)
             </StatusBadge>
           </div>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-gray-300">
             {targetCount > 0
-              ? 'A aplicação em lote cria a base padrão somente para clientes filtrados que estão sem checklist. Clientes que já possuem itens configurados não serão alterados, preservando ajustes individuais.'
-              : 'Nenhum cliente filtrado está sem checklist no momento. Se quiser aplicar o padrão para outro grupo, ajuste os filtros acima.'}
+              ? `Serão considerados apenas os ${formatNumber(targetCount)} cliente(s) filtrado(s) que estão sem checklist. Clientes já configurados não serão alterados.`
+              : 'Nenhum cliente filtrado está sem checklist no momento. Se quiser aplicar o padrão para outro grupo, ajuste os filtros antes de abrir esta ação.'}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm font-semibold leading-6 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100 lg:max-w-sm">
-          Revise os filtros antes de aplicar. A ação usa a carteira visível na tela e não duplica itens em clientes já configurados.
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-slate-900 dark:text-white">Itens que serão aplicados</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                Selecione quais documentos do catálogo entram na aplicação em lote.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <StatusBadge toneClass="border-slate-300 bg-white text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                {formatNumber(selectedItems.length)} de {formatNumber(catalogCount)} selecionado(s)
+              </StatusBadge>
+              <ActionButton type="button" size="sm" variant="subtle" onClick={selectAllItems} disabled={applying || !items.length || selectedItems.length === items.length}>
+                Marcar todos
+              </ActionButton>
+              <ActionButton type="button" size="sm" variant="subtle" onClick={clearSelectedItems} disabled={applying || selectedItems.length === 0}>
+                Limpar seleção
+              </ActionButton>
+            </div>
+          </div>
+
+          {selectedItems.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/75 p-3 text-sm font-semibold text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+              Selecione pelo menos um item do catálogo para liberar a aplicação em lote.
+            </div>
+          ) : null}
+
+          <div className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            {items.map((item) => {
+              const checked = selectedSet.has(item.id);
+              return (
+                <label
+                  key={item.id}
+                  className={classNames(
+                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    checked
+                      ? 'border-blue-400/70 bg-blue-50 text-blue-900 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-100'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-200 dark:hover:border-blue-500/50',
+                    applying ? 'pointer-events-none opacity-70' : '',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={applying}
+                    onChange={() => toggleItem(item.id)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="min-w-0 truncate leading-5" title={item.descricao}>{item.descricao}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm font-semibold leading-6 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+          Revise os filtros antes de aplicar. A ação usa somente os clientes filtrados na tela e não duplica itens em clientes já configurados.
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ActionButton type="button" variant="subtle" onClick={onClose} disabled={applying}>
+            Cancelar
+          </ActionButton>
+          <ActionButton type="button" variant="primary" onClick={() => onApply(selectedItems)} disabled={disabled}>
+            {applying ? (
+              <RefreshCcw size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <ClipboardCheck size={16} aria-hidden="true" />
+            )}
+            {applying ? 'Aplicando...' : 'Aplicar checklist padrão'}
+          </ActionButton>
         </div>
       </div>
-    </SurfacePanel>
+    </div>,
+    document.body,
   );
 }
 
@@ -631,6 +749,7 @@ function ChecklistCatalogManager({
   onCancel,
   onDelete,
   onRefresh,
+  onOpenBatchApply,
 }) {
   const [showAllCatalogItems, setShowAllCatalogItems] = useState(false);
   const editing = Boolean(form.id);
@@ -650,10 +769,16 @@ function ChecklistCatalogManager({
       title="Catálogo de documentos"
       description="Gerencie os documentos disponíveis para vincular ao checklist dos clientes."
       right={(
-        <ActionButton type="button" variant="secondary" onClick={onRefresh} disabled={loading}>
-          <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
-          Atualizar catálogo
-        </ActionButton>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton type="button" variant="secondary" onClick={onOpenBatchApply}>
+            <ClipboardCheck size={16} aria-hidden="true" />
+            Aplicação em lote
+          </ActionButton>
+          <ActionButton type="button" variant="secondary" onClick={onRefresh} disabled={loading}>
+            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+            Atualizar catálogo
+          </ActionButton>
+        </div>
       )}
       bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
     >
@@ -1429,6 +1554,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [savingContactId, setSavingContactId] = useState('');
   const [sendingReminderId, setSendingReminderId] = useState('');
   const [applyingDefaultChecklist, setApplyingDefaultChecklist] = useState(false);
+  const [showBatchApplyModal, setShowBatchApplyModal] = useState(false);
   const [personalItemBusyKey, setPersonalItemBusyKey] = useState('');
   const [viewMode, setViewMode] = useState('checklist');
   const isCatalogMode = viewMode === 'catalog';
@@ -1912,15 +2038,16 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     }
   }
 
-  async function handleApplyDefaultChecklistToFiltered() {
-    if (applyingDefaultChecklist || catalogLoading || !catalogItems.length || !batchDefaultTargets.length) return;
+  async function handleApplyDefaultChecklistToFiltered(selectedCatalogItems = catalogItems) {
+    const itemsToApply = (selectedCatalogItems ?? []).filter((item) => item?.id);
+    if (applyingDefaultChecklist || catalogLoading || !itemsToApply.length || !batchDefaultTargets.length) return;
 
     const confirmed = window.confirm(
-      `Aplicar o checklist padrão com ${formatNumber(catalogItems.length)} item(ns) para ${formatNumber(batchDefaultTargets.length)} cliente(s) filtrado(s) que ainda estão sem checklist? Clientes já configurados não serão alterados.`,
+      `Aplicar ${formatNumber(itemsToApply.length)} item(ns) selecionado(s) para ${formatNumber(batchDefaultTargets.length)} cliente(s) filtrado(s) que ainda estão sem checklist? Clientes já configurados não serão alterados.`,
     );
     if (!confirmed) return;
 
-    const payload = catalogItems.map((item, index) => ({
+    const payload = itemsToApply.map((item, index) => ({
       item_id: item.id,
       ordem: toNumber(item.ordem, index + 1),
       ativo: true,
@@ -1948,6 +2075,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       }
 
       const successCount = batchDefaultTargets.length - failures.length;
+      setShowBatchApplyModal(false);
       if (failures.length) {
         setToast({
           tone: successCount > 0 ? 'warning' : 'danger',
@@ -2225,8 +2353,21 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           onCancel={() => resetCatalogForm()}
           onDelete={handleDeleteCatalogItem}
           onRefresh={loadCatalogItems}
+          onOpenBatchApply={() => setShowBatchApplyModal(true)}
         />
       ) : null}
+
+      <ChecklistBatchApplyModal
+        open={isCatalogMode && showBatchApplyModal}
+        filteredCount={filteredRows.length}
+        targetCount={batchDefaultTargets.length}
+        catalogCount={catalogItems.length}
+        items={catalogItems}
+        applying={applyingDefaultChecklist}
+        catalogLoading={catalogLoading}
+        onApply={handleApplyDefaultChecklistToFiltered}
+        onClose={() => setShowBatchApplyModal(false)}
+      />
 
       <SurfacePanel
         title={isCatalogMode ? 'Filtros do catálogo' : 'Filtros do checklist'}
@@ -2324,17 +2465,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           </div>
         </div>
       </SurfacePanel>
-
-      {isCatalogMode ? (
-        <ChecklistBatchApplyPanel
-          filteredCount={filteredRows.length}
-          targetCount={batchDefaultTargets.length}
-          catalogCount={catalogItems.length}
-          applying={applyingDefaultChecklist}
-          catalogLoading={catalogLoading}
-          onApply={handleApplyDefaultChecklistToFiltered}
-        />
-      ) : null}
 
       {error ? (
         <AlertBanner tone="danger" title="Erro ao carregar checklist">
