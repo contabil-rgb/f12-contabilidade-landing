@@ -1565,6 +1565,16 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     setExpandedClientId('');
   }, [viewMode]);
 
+  useEffect(() => {
+    if (!toast || toast.tone === 'danger') return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setToast(null);
+    }, 6000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return Array.from({ length: 5 }, (_, index) => currentYear - 2 + index);
@@ -2338,37 +2348,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         </div>
       </SurfacePanel>
 
-      {isCatalogMode ? <CatalogWorkflowGuide /> : <ChecklistWorkflowGuide />}
-
-      {isCatalogMode ? (
-        <ChecklistCatalogManager
-          items={catalogItems}
-          loading={catalogLoading}
-          error={catalogError}
-          form={catalogForm}
-          busyId={catalogBusyId}
-          onFormChange={setCatalogForm}
-          onSubmit={handleSaveCatalogItem}
-          onEdit={handleEditCatalogItem}
-          onCancel={() => resetCatalogForm()}
-          onDelete={handleDeleteCatalogItem}
-          onRefresh={loadCatalogItems}
-          onOpenBatchApply={() => setShowBatchApplyModal(true)}
-        />
-      ) : null}
-
-      <ChecklistBatchApplyModal
-        open={isCatalogMode && showBatchApplyModal}
-        filteredCount={filteredRows.length}
-        targetCount={batchDefaultTargets.length}
-        catalogCount={catalogItems.length}
-        items={catalogItems}
-        applying={applyingDefaultChecklist}
-        catalogLoading={catalogLoading}
-        onApply={handleApplyDefaultChecklistToFiltered}
-        onClose={() => setShowBatchApplyModal(false)}
-      />
-
       <SurfacePanel
         title={isCatalogMode ? 'Filtros do catálogo' : 'Filtros do checklist'}
         description={isCatalogMode
@@ -2465,6 +2444,37 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           </div>
         </div>
       </SurfacePanel>
+
+      {isCatalogMode ? <CatalogWorkflowGuide /> : <ChecklistWorkflowGuide />}
+
+      {isCatalogMode ? (
+        <ChecklistCatalogManager
+          items={catalogItems}
+          loading={catalogLoading}
+          error={catalogError}
+          form={catalogForm}
+          busyId={catalogBusyId}
+          onFormChange={setCatalogForm}
+          onSubmit={handleSaveCatalogItem}
+          onEdit={handleEditCatalogItem}
+          onCancel={() => resetCatalogForm()}
+          onDelete={handleDeleteCatalogItem}
+          onRefresh={loadCatalogItems}
+          onOpenBatchApply={() => setShowBatchApplyModal(true)}
+        />
+      ) : null}
+
+      <ChecklistBatchApplyModal
+        open={isCatalogMode && showBatchApplyModal}
+        filteredCount={filteredRows.length}
+        targetCount={batchDefaultTargets.length}
+        catalogCount={catalogItems.length}
+        items={catalogItems}
+        applying={applyingDefaultChecklist}
+        catalogLoading={catalogLoading}
+        onApply={handleApplyDefaultChecklistToFiltered}
+        onClose={() => setShowBatchApplyModal(false)}
+      />
 
       {error ? (
         <AlertBanner tone="danger" title="Erro ao carregar checklist">
