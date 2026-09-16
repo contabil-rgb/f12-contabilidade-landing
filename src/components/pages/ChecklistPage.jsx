@@ -1940,12 +1940,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   }
 
   function clearChecklistFilters() {
-    const currentCompetence = getCurrentCompetence();
     setSearch('');
     setResponsavel('');
     setQuickFilter('todos');
-    setMes(currentCompetence.mes);
-    setAno(currentCompetence.ano);
   }
 
   async function handleStatusChange(client, vinculo, nextStatus) {
@@ -2445,7 +2442,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         title={isCatalogMode ? 'Filtros do catálogo' : 'Filtros do checklist'}
         description={isCatalogMode
           ? 'Refine a carteira antes de configurar os documentos aplicáveis aos clientes.'
-          : 'Escolha a competência e refine a carteira antes de revisar pendências ou enviar lembretes.'}
+          : 'Refine a carteira antes de abrir um cliente e consultar a competência desejada.'}
         right={(
           <ActionButton type="button" variant="secondary" onClick={clearChecklistFilters}>
             <RefreshCcw size={16} aria-hidden="true" />
@@ -2454,7 +2451,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         )}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className={classNames('grid gap-3', isCatalogMode ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)]' : 'lg:grid-cols-[minmax(0,1.35fr)_170px_140px_minmax(220px,0.9fr)]')}>
+        <div className={classNames('grid gap-3', isCatalogMode ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)]' : 'lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.9fr)]')}>
           <label className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
             <span className="block">Cliente, CNPJ ou razão social</span>
             <div className="relative mt-2">
@@ -2468,26 +2465,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
               />
             </div>
           </label>
-
-          {!isCatalogMode ? (
-            <>
-              <ChecklistDropdownSelect
-                label="Mês"
-                value={mes}
-                options={MONTH_OPTIONS}
-                onChange={(value) => setMes(Number(value))}
-                includeBlank={false}
-              />
-
-              <ChecklistDropdownSelect
-                label="Ano"
-                value={ano}
-                options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
-                onChange={(value) => setAno(Number(value))}
-                includeBlank={false}
-              />
-            </>
-          ) : null}
 
           <ChecklistDropdownSelect
             label="Responsável"
@@ -2505,7 +2482,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Acompanhamento rápido</p>
               <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
-                {isCatalogMode ? 'Filtre clientes por configuração do checklist.' : 'Filtre a carteira pela situação do checklist na competência selecionada.'}
+                {isCatalogMode ? 'Filtre clientes por configuração do checklist.' : 'Filtre a carteira pela situação atual do checklist. A competência é escolhida dentro do cliente.'}
               </p>
             </div>
             <p className="text-xs font-bold text-slate-500 dark:text-gray-400">
