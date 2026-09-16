@@ -99,6 +99,7 @@ const STATUS_OPTIONS = [
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
 const CATALOG_PREVIEW_LIMIT = 6;
 const CLIENT_CATALOG_PREVIEW_LIMIT = 4;
+const CLIENT_LIST_PAGE_SIZE = 5;
 
 const CHECKLIST_QUICK_FILTERS = [
   { value: 'todos', label: 'Todos', description: 'Carteira filtrada' },
@@ -1541,6 +1542,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
   const [expandedClientId, setExpandedClientId] = useState('');
+  const [visibleClientLimit, setVisibleClientLimit] = useState(CLIENT_LIST_PAGE_SIZE);
   const [detailsByClient, setDetailsByClient] = useState({});
   const [busyKey, setBusyKey] = useState('');
   const [catalogItems, setCatalogItems] = useState([]);
@@ -1564,6 +1566,11 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     setQuickFilter('todos');
     setExpandedClientId('');
   }, [viewMode]);
+
+  useEffect(() => {
+    setVisibleClientLimit(CLIENT_LIST_PAGE_SIZE);
+    setExpandedClientId('');
+  }, [ano, mes, quickFilter, responsavel, search, viewMode]);
 
   useEffect(() => {
     if (!toast || toast.tone === 'danger') return undefined;
@@ -1785,6 +1792,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   }, [baseFilteredRows, contactsByClient, quickFilter]);
 
   const activeQuickFilterLabel = quickFilterOptions.find((option) => option.value === quickFilter)?.label ?? 'Todos';
+
+  const visibleRows = useMemo(() => filteredRows.slice(0, visibleClientLimit), [filteredRows, visibleClientLimit]);
+  const hiddenRowsCount = Math.max(filteredRows.length - visibleRows.length, 0);
+  const nextRowsCount = Math.min(CLIENT_LIST_PAGE_SIZE, hiddenRowsCount);
+  const hasExpandedClientHidden = expandedClientId
+    ? !filteredRows.slice(0, CLIENT_LIST_PAGE_SIZE).some((row) => row.cliente_id === expandedClientId)
+    : false;
+
 
   const batchDefaultTargets = useMemo(
     () => filteredRows.filter((row) => toNumber(row.total_itens) === 0),
@@ -2523,7 +2538,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             </div>
           ) : null}
 
-          {filteredRows.map((row) => {
+          {visibleRows.map((row) => {
             const expanded = expandedClientId === row.cliente_id;
             const completionTone = getCompletionTone(row.percentual_concluido);
             const hasContact = Boolean(contactsByClient[row.cliente_id]?.email);
@@ -2667,6 +2682,41 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
               </div>
             );
           })}
+
+          {!loadingResumo && filteredRows.length > CLIENT_LIST_PAGE_SIZE ? (
+            <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-800 dark:bg-gray-900/45 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-slate-600 dark:text-gray-300">
+                Mostrando {formatNumber(visibleRows.length)} de {formatNumber(filteredRows.length)} cliente(s).
+              </p>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                {hiddenRowsCount > 0 ? (
+                  <ActionButton
+                    type="button"
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => setVisibleClientLimit((current) => Math.min(current + CLIENT_LIST_PAGE_SIZE, filteredRows.length))}
+                  >
+                    Mostrar mais ({formatNumber(nextRowsCount)})
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </ActionButton>
+                ) : null}
+                {visibleClientLimit > CLIENT_LIST_PAGE_SIZE ? (
+                  <ActionButton
+                    type="button"
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => {
+                      setVisibleClientLimit(CLIENT_LIST_PAGE_SIZE);
+                      if (hasExpandedClientHidden) setExpandedClientId('');
+                    }}
+                  >
+                    Mostrar menos
+                    <ChevronDown size={16} className="rotate-180" aria-hidden="true" />
+                  </ActionButton>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </SurfacePanel>
     </div>
