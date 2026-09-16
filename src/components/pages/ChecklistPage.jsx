@@ -16,6 +16,7 @@ import {
   Send,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import AlertBanner from '../ui/AlertBanner';
@@ -961,6 +962,7 @@ function ClientChecklistDetails({
   );
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [showAllClientItems, setShowAllClientItems] = useState(false);
+  const [showPersonalItemModal, setShowPersonalItemModal] = useState(false);
   const [personalItemDescription, setPersonalItemDescription] = useState('');
 
   useEffect(() => {
@@ -1007,6 +1009,8 @@ function ClientChecklistDetails({
   const hasHiddenClientItems = catalogItems.length > CLIENT_CATALOG_PREVIEW_LIMIT;
   const visibleClientCatalogItems = showAllClientItems ? catalogItems : catalogItems.slice(0, CLIENT_CATALOG_PREVIEW_LIMIT);
   const hiddenClientItemsCount = Math.max(catalogItems.length - CLIENT_CATALOG_PREVIEW_LIMIT, 0);
+  const personalClientItems = detail?.itensPersonalizados ?? [];
+  const hasVisibleClientItems = catalogItems.length > 0 || personalClientItems.length > 0;
   const savingConfig = savingConfigId === client?.id;
   const isCatalogMode = mode === 'catalog';
   const showCatalogConfiguration = isCatalogMode;
@@ -1020,6 +1024,7 @@ function ClientChecklistDetails({
 
   useEffect(() => {
     setShowAllClientItems(false);
+    setShowPersonalItemModal(false);
     setPersonalItemDescription('');
   }, [client?.id]);
 
@@ -1051,8 +1056,84 @@ function ClientChecklistDetails({
 
     if (saved) {
       setPersonalItemDescription('');
+      setShowPersonalItemModal(false);
     }
   }
+
+  const personalItemModal = showPersonalItemModal && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4"
+        role="presentation"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !personalItemBusyKey) {
+            setShowPersonalItemModal(false);
+          }
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="personal-client-document-title"
+          className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-950"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p id="personal-client-document-title" className="text-base font-black text-slate-900 dark:text-white">Documento específico do cliente</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                Cadastre um documento exclusivo deste cliente. Ele não entra no cadastro padrão de documentos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPersonalItemModal(false)}
+              disabled={Boolean(personalItemBusyKey)}
+              className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-900 dark:hover:text-white"
+              aria-label="Fechar"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+
+          <form className="mt-4 space-y-4" onSubmit={handlePersonalItemSubmit}>
+            <label className="block">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Nome do documento</span>
+              <input
+                type="text"
+                value={personalItemDescription}
+                onChange={(event) => setPersonalItemDescription(event.target.value)}
+                placeholder="Ex.: Relatório específico solicitado para este cliente"
+                className="input-shell mt-2 w-full"
+                disabled={Boolean(personalItemBusyKey)}
+                autoFocus
+              />
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <ActionButton
+                type="button"
+                size="sm"
+                variant="subtle"
+                onClick={() => setShowPersonalItemModal(false)}
+                disabled={Boolean(personalItemBusyKey)}
+              >
+                Cancelar
+              </ActionButton>
+              <ActionButton
+                type="submit"
+                size="sm"
+                variant="primary"
+                disabled={!personalItemDescription.trim() || Boolean(personalItemBusyKey)}
+              >
+                {personalItemBusyKey === `new:${client?.id}` ? 'Salvando...' : 'Adicionar'}
+              </ActionButton>
+            </div>
+          </form>
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
 
   if (!detail || detail.loading) {
     return (
@@ -1119,6 +1200,18 @@ function ClientChecklistDetails({
               <ActionButton
                 type="button"
                 size="sm"
+                variant="subtle"
+                onClick={() => setShowPersonalItemModal(true)}
+                disabled={catalogLoading || Boolean(personalItemBusyKey)}
+                aria-label="Adicionar documento específico do cliente"
+                title="Adicionar documento específico"
+                className="!px-3"
+              >
+                <Plus size={16} aria-hidden="true" />
+              </ActionButton>
+              <ActionButton
+                type="button"
+                size="sm"
                 variant="primary"
                 onClick={() => onSaveClientItems(client, selectedItemIds)}
                 disabled={catalogLoading || savingConfig || selectedCount === 0}
@@ -1148,7 +1241,7 @@ function ClientChecklistDetails({
             </div>
           ) : null}
 
-          {!catalogLoading && !catalogError && catalogItems.length > 0 ? (
+          {!catalogLoading && !catalogError && hasVisibleClientItems ? (
             <>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {visibleClientCatalogItems.map((item) => {
@@ -1175,6 +1268,41 @@ function ClientChecklistDetails({
                   </label>
                 );
                 })}
+
+                {personalClientItems.map((item) => {
+                  const busy = personalItemBusyKey === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 rounded-xl border border-blue-400/50 bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-950 dark:border-blue-400/35 dark:bg-blue-500/10 dark:text-blue-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked
+                        readOnly
+                        disabled
+                        className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500 disabled:opacity-80"
+                        aria-label="Documento específico aplicado ao cliente"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate leading-5" title={item.descricao}>{item.descricao}</p>
+                        <span className="mt-1 inline-flex rounded-full border border-blue-300/70 bg-white/75 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-blue-700 dark:border-blue-300/30 dark:bg-blue-950/40 dark:text-blue-200">
+                          Específico deste cliente
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onDeletePersonalItem(client, item)}
+                        disabled={Boolean(personalItemBusyKey)}
+                        className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200 dark:hover:border-red-300/40"
+                        title={busy ? 'Removendo...' : 'Remover documento específico'}
+                        aria-label={busy ? 'Removendo documento específico' : 'Remover documento específico'}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {hasHiddenClientItems ? (
@@ -1199,74 +1327,9 @@ function ClientChecklistDetails({
         </div>
         ) : null}
 
-        {showCatalogConfiguration ? (
-          <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
-            <div className="flex min-w-0 gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
-                <Plus size={18} aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-white">Documento específico do cliente</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                  Cadastre um documento exclusivo deste cliente. Ele não entra no cadastro padrão de documentos.
-                </p>
-              </div>
-            </div>
-
-            <form className="mt-4 flex flex-col gap-2 lg:flex-row" onSubmit={handlePersonalItemSubmit}>
-              <input
-                type="text"
-                value={personalItemDescription}
-                onChange={(event) => setPersonalItemDescription(event.target.value)}
-                placeholder="Ex.: Relatório específico solicitado para este cliente"
-                className="input-shell lg:flex-1"
-                disabled={Boolean(personalItemBusyKey)}
-              />
-              <ActionButton
-                type="submit"
-                size="sm"
-                variant="primary"
-                disabled={!personalItemDescription.trim() || Boolean(personalItemBusyKey)}
-              >
-                {personalItemBusyKey === `new:${client?.id}` ? 'Salvando...' : 'Adicionar'}
-              </ActionButton>
-            </form>
-
-            {(detail?.itensPersonalizados ?? []).length ? (
-              <div className="mt-4 space-y-2">
-                {(detail.itensPersonalizados ?? []).map((item) => {
-                  const busy = personalItemBusyKey === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm font-semibold dark:border-gray-800 dark:bg-gray-950/30 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-slate-900 dark:text-white" title={item.descricao}>{item.descricao}</p>
-                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-200">Específico deste cliente</p>
-                      </div>
-                      <ActionButton
-                        type="button"
-                        size="sm"
-                        variant="danger"
-                        onClick={() => onDeletePersonalItem(client, item)}
-                        disabled={Boolean(personalItemBusyKey)}
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                        {busy ? 'Removendo...' : 'Remover'}
-                      </ActionButton>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
-                Nenhum documento específico cadastrado para este cliente.
-              </div>
-            )}
-          </div>
-        ) : null}
       </div>
+
+      {personalItemModal}
 
       {!configuredItems.length ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-gray-700 dark:bg-gray-900/45 dark:text-gray-300">
