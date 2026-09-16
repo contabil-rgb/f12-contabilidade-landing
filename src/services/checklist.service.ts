@@ -29,10 +29,33 @@ export type ChecklistClienteItem = {
   item?: ChecklistItem | null;
 };
 
+export type ChecklistClienteItemPersonalizado = {
+  id: string;
+  cliente_id: string;
+  descricao: string;
+  ordem: number;
+  ativo: boolean;
+  criado_por: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
 export type ChecklistStatusRow = {
   id: string;
   cliente_id: string;
   item_id: string;
+  ano: number;
+  mes: number;
+  status: ChecklistStatus;
+  atualizado_por: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type ChecklistStatusPersonalizadoRow = {
+  id: string;
+  cliente_id: string;
+  item_personalizado_id: string;
   ano: number;
   mes: number;
   status: ChecklistStatus;
@@ -84,6 +107,8 @@ export type ChecklistPendencia = {
   status_atualizado_por_nome: string;
   email: string;
   cc: string;
+  item_tipo: string;
+  item_personalizado_id: string;
 };
 
 export type ChecklistResumo = {
@@ -163,11 +188,38 @@ function normalizeClienteItem(row: Record<string, unknown>): ChecklistClienteIte
   };
 }
 
+function normalizeClienteItemPersonalizado(row: Record<string, unknown>): ChecklistClienteItemPersonalizado {
+  return {
+    id: text(row.id),
+    cliente_id: text(row.cliente_id),
+    descricao: text(row.descricao),
+    ordem: numberValue(row.ordem),
+    ativo: row.ativo !== false,
+    criado_por: text(row.criado_por),
+    criado_em: text(row.criado_em),
+    atualizado_em: text(row.atualizado_em),
+  };
+}
+
 function normalizeStatusRow(row: Record<string, unknown>): ChecklistStatusRow {
   return {
     id: text(row.id),
     cliente_id: text(row.cliente_id),
     item_id: text(row.item_id),
+    ano: numberValue(row.ano),
+    mes: numberValue(row.mes),
+    status: normalizeStatus(row.status),
+    atualizado_por: text(row.atualizado_por),
+    criado_em: text(row.criado_em),
+    atualizado_em: text(row.atualizado_em),
+  };
+}
+
+function normalizeStatusPersonalizadoRow(row: Record<string, unknown>): ChecklistStatusPersonalizadoRow {
+  return {
+    id: text(row.id),
+    cliente_id: text(row.cliente_id),
+    item_personalizado_id: text(row.item_personalizado_id),
     ano: numberValue(row.ano),
     mes: numberValue(row.mes),
     status: normalizeStatus(row.status),
@@ -225,6 +277,8 @@ function normalizePendencia(row: Record<string, unknown>): ChecklistPendencia {
     status_atualizado_por_nome: text(row.status_atualizado_por_nome),
     email: text(row.email),
     cc: text(row.cc),
+    item_tipo: text(row.item_tipo),
+    item_personalizado_id: text(row.item_personalizado_id),
   };
 }
 
@@ -329,6 +383,51 @@ export async function salvarChecklistClienteItens(clienteId: string, itens: unkn
   return (data ?? []).map((row) => normalizeClienteItem(row as Record<string, unknown>));
 }
 
+export async function listarChecklistClienteItensPersonalizados(clienteId: string, { incluirInativos = false } = {}) {
+  let query = supabase
+    .from('checklist_clientes_itens_personalizados')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .order('ordem', { ascending: true })
+    .order('criado_em', { ascending: true });
+
+  if (!incluirInativos) {
+    query = query.eq('ativo', true);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Não foi possível carregar itens personalizados do cliente: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => normalizeClienteItemPersonalizado(row as Record<string, unknown>));
+}
+
+export async function salvarChecklistClienteItemPersonalizado(item: Record<string, unknown>) {
+  const { data, error } = await supabase.rpc('salvar_checklist_cliente_item_personalizado_portal', {
+    p_item: item,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível salvar item personalizado do checklist: ${error.message}`);
+  }
+
+  return normalizeClienteItemPersonalizado(firstRow(data) as Record<string, unknown>);
+}
+
+export async function excluirChecklistClienteItemPersonalizado(itemId: string) {
+  const { data, error } = await supabase.rpc('excluir_checklist_cliente_item_personalizado_portal', {
+    p_item_id: itemId,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível remover item personalizado do checklist: ${error.message}`);
+  }
+
+  return normalizeClienteItemPersonalizado(firstRow(data) as Record<string, unknown>);
+}
+
 export async function listarChecklistStatus({ clienteId, ano, mes }: { clienteId?: string; ano?: number; mes?: number } = {}) {
   let query = supabase
     .from('checklist_status')
@@ -359,6 +458,38 @@ export async function salvarChecklistStatus(status: Record<string, unknown>) {
   }
 
   return normalizeStatusRow(firstRow(data) as Record<string, unknown>);
+}
+
+export async function listarChecklistStatusPersonalizados({ clienteId, ano, mes }: { clienteId?: string; ano?: number; mes?: number } = {}) {
+  let query = supabase
+    .from('checklist_status_personalizados')
+    .select('*')
+    .order('ano', { ascending: false })
+    .order('mes', { ascending: false });
+
+  if (clienteId) query = query.eq('cliente_id', clienteId);
+  if (ano) query = query.eq('ano', ano);
+  if (mes) query = query.eq('mes', mes);
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Não foi possível carregar status dos itens personalizados do checklist: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => normalizeStatusPersonalizadoRow(row as Record<string, unknown>));
+}
+
+export async function salvarChecklistStatusPersonalizado(status: Record<string, unknown>) {
+  const { data, error } = await supabase.rpc('salvar_checklist_status_personalizado_portal', {
+    p_status: status,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível salvar status do item personalizado do checklist: ${error.message}`);
+  }
+
+  return normalizeStatusPersonalizadoRow(firstRow(data) as Record<string, unknown>);
 }
 
 export async function salvarChecklistStatusLote(statuses: unknown[]) {
@@ -498,3 +629,6 @@ export async function enviarChecklistLembretes(payload: Record<string, unknown>)
 
   return data;
 }
+
+
+

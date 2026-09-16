@@ -8,11 +8,13 @@ import {
   ClipboardCheck,
   FileCheck2,
   FileQuestion,
+  Plus,
   ListChecks,
   Mail,
   RefreshCcw,
   Search,
   Send,
+  Trash2,
   Users,
 } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
@@ -26,19 +28,24 @@ import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
 import {
   CHECKLIST_STATUS,
   listarChecklistClienteItens,
+  listarChecklistClienteItensPersonalizados,
   listarChecklistContatos,
   listarChecklistEnvios,
   listarChecklistItens,
   listarChecklistPendencias,
   listarChecklistResumo,
   listarChecklistStatus,
+  listarChecklistStatusPersonalizados,
   registrarChecklistEnvio,
   enviarChecklistLembretes,
   excluirChecklistItem,
+  excluirChecklistClienteItemPersonalizado,
   salvarChecklistClienteItens,
+  salvarChecklistClienteItemPersonalizado,
   salvarChecklistContato,
   salvarChecklistItem,
   salvarChecklistStatus,
+  salvarChecklistStatusPersonalizado,
 } from '../../services/checklist.service';
 import { gerarUrlPublicaAssinaturaResponsavel } from '../../services/assinaturas-responsaveis.service';
 
@@ -160,8 +167,8 @@ function getClientResponsibleSignature(client, responsavelCatalogo = []) {
   };
 }
 
-function buildStatusMap(statusRows = []) {
-  return Object.fromEntries(statusRows.map((row) => [row.item_id, row]));
+function buildStatusMap(statusRows = [], key = 'item_id') {
+  return Object.fromEntries(statusRows.map((row) => [row[key], row]).filter(([itemId]) => Boolean(itemId)));
 }
 
 function getCompletionTone(percentual) {
@@ -939,8 +946,11 @@ function ClientChecklistDetails({
   savingConfigId,
   savingContactId,
   sendingReminderId,
+  personalItemBusyKey,
   onReload,
   onSaveClientItems,
+  onSavePersonalItem,
+  onDeletePersonalItem,
   onSaveContact,
   onSendReminder,
   onStatusChange,
@@ -951,10 +961,46 @@ function ClientChecklistDetails({
   );
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [showAllClientItems, setShowAllClientItems] = useState(false);
+  const [personalItemDescription, setPersonalItemDescription] = useState('');
 
   useEffect(() => {
     setSelectedItemIds(linkedIdsKey ? linkedIdsKey.split('|') : []);
   }, [linkedIdsKey]);
+
+  const configuredItems = useMemo(() => {
+    const standardItems = (detail?.itens ?? []).map((vinculo) => {
+      const item = vinculo.item;
+      const itemId = vinculo.item_id || item?.id;
+      return {
+        key: `catalogo:${itemId}`,
+        id: itemId,
+        tipo: 'catalogo',
+        descricao: item?.descricao || 'Item sem descrição',
+        ordem: toNumber(vinculo.ordem),
+        criado_em: vinculo.criado_em,
+        vinculo,
+      };
+    }).filter((item) => Boolean(item.id));
+
+    const personalItems = (detail?.itensPersonalizados ?? []).map((item) => ({
+      key: `personalizado:${item.id}`,
+      id: item.id,
+      item_personalizado_id: item.id,
+      tipo: 'personalizado',
+      descricao: item.descricao || 'Item sem descrição',
+      ordem: toNumber(item.ordem),
+      criado_em: item.criado_em,
+      vinculo: {
+        ...item,
+        item_tipo: 'personalizado',
+        item_personalizado_id: item.id,
+      },
+    }));
+
+    return [...standardItems, ...personalItems].sort((a, b) => (
+      a.ordem - b.ordem || String(a.descricao).localeCompare(String(b.descricao), 'pt-BR')
+    ));
+  }, [detail?.itens, detail?.itensPersonalizados]);
 
   const selectedSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const selectedCount = selectedItemIds.length;
@@ -974,6 +1020,7 @@ function ClientChecklistDetails({
 
   useEffect(() => {
     setShowAllClientItems(false);
+    setPersonalItemDescription('');
   }, [client?.id]);
 
   function toggleCatalogItem(itemId) {
@@ -990,6 +1037,21 @@ function ClientChecklistDetails({
 
   function clearCatalogItems() {
     setSelectedItemIds([]);
+  }
+
+  async function handlePersonalItemSubmit(event) {
+    event.preventDefault();
+    const descricao = personalItemDescription.trim();
+    if (!descricao) return;
+
+    const saved = await onSavePersonalItem(client, {
+      descricao,
+      ordem: (detail?.itensPersonalizados?.length ?? 0) + 1,
+    });
+
+    if (saved) {
+      setPersonalItemDescription('');
+    }
   }
 
   if (!detail || detail.loading) {
@@ -1136,9 +1198,77 @@ function ClientChecklistDetails({
           ) : null}
         </div>
         ) : null}
+
+        {showCatalogConfiguration ? (
+          <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
+            <div className="flex min-w-0 gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
+                <Plus size={18} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black text-slate-900 dark:text-white">Documento específico do cliente</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                  Cadastre um documento exclusivo deste cliente. Ele não entra no cadastro padrão de documentos.
+                </p>
+              </div>
+            </div>
+
+            <form className="mt-4 flex flex-col gap-2 lg:flex-row" onSubmit={handlePersonalItemSubmit}>
+              <input
+                type="text"
+                value={personalItemDescription}
+                onChange={(event) => setPersonalItemDescription(event.target.value)}
+                placeholder="Ex.: Relatório específico solicitado para este cliente"
+                className="input-shell lg:flex-1"
+                disabled={Boolean(personalItemBusyKey)}
+              />
+              <ActionButton
+                type="submit"
+                size="sm"
+                variant="primary"
+                disabled={!personalItemDescription.trim() || Boolean(personalItemBusyKey)}
+              >
+                {personalItemBusyKey === `new:${client?.id}` ? 'Salvando...' : 'Adicionar'}
+              </ActionButton>
+            </form>
+
+            {(detail?.itensPersonalizados ?? []).length ? (
+              <div className="mt-4 space-y-2">
+                {(detail.itensPersonalizados ?? []).map((item) => {
+                  const busy = personalItemBusyKey === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm font-semibold dark:border-gray-800 dark:bg-gray-950/30 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-slate-900 dark:text-white" title={item.descricao}>{item.descricao}</p>
+                        <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-200">Específico deste cliente</p>
+                      </div>
+                      <ActionButton
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        onClick={() => onDeletePersonalItem(client, item)}
+                        disabled={Boolean(personalItemBusyKey)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        {busy ? 'Removendo...' : 'Remover'}
+                      </ActionButton>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm font-semibold text-slate-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-300">
+                Nenhum documento específico cadastrado para este cliente.
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
-      {!detail.itens?.length ? (
+      {!configuredItems.length ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 dark:border-gray-700 dark:bg-gray-900/45 dark:text-gray-300">
           <div className="flex items-start gap-3">
             <FileQuestion size={20} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
@@ -1147,7 +1277,7 @@ function ClientChecklistDetails({
               <p className="mt-1 font-medium leading-6">
                 {isCatalogMode
                   ? 'Selecione os documentos acima e clique em salvar para montar o checklist deste cliente.'
-                  : 'Configure os documentos aplicáveis na aba Catálogo de Documentos para acompanhar pendências deste cliente.'}
+                  : 'Configure os documentos aplicáveis na página Cadastro de documentos para acompanhar pendências deste cliente.'}
               </p>
             </div>
           </div>
@@ -1166,21 +1296,29 @@ function ClientChecklistDetails({
             headers={['Item', 'Status', 'Alterar']}
             minWidth="min-w-[560px]"
             tableClassName="checklist-status-table"
-            hasRows={detail.itens.length > 0}
+            hasRows={configuredItems.length > 0}
           >
             <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-              {detail.itens.map((vinculo) => {
-                const item = vinculo.item;
-                const itemId = vinculo.item_id || item?.id;
-                const statusRow = detail.statusByItem?.[itemId];
+              {configuredItems.map((entry) => {
+                const itemId = entry.id;
+                const statusRow = entry.tipo === 'personalizado'
+                  ? detail.statusPersonalizadoByItem?.[itemId]
+                  : detail.statusByItem?.[itemId];
                 const currentStatus = statusRow?.status || CHECKLIST_STATUS.PENDENTE;
                 const statusMeta = STATUS_BY_VALUE[currentStatus] || STATUS_BY_VALUE[CHECKLIST_STATUS.PENDENTE];
-                const rowBusyKey = `${client.id}:${itemId}`;
+                const rowBusyKey = `${client.id}:${entry.tipo}:${itemId}`;
 
                 return (
-                  <tr key={vinculo.id || itemId}>
+                  <tr key={entry.key}>
                     <td className="table-cell table-cell-compact">
-                      <p className="max-w-[260px] truncate font-black text-slate-900 dark:text-white sm:max-w-[360px] lg:max-w-[440px]" title={item?.descricao || 'Item sem descrição'}>{item?.descricao || 'Item sem descrição'}</p>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <p className="max-w-[260px] truncate font-black text-slate-900 dark:text-white sm:max-w-[360px] lg:max-w-[440px]" title={entry.descricao}>{entry.descricao}</p>
+                        {entry.tipo === 'personalizado' ? (
+                          <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
+                            Específico do cliente
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="table-cell table-cell-compact whitespace-nowrap">
                       <StatusBadge toneClass={statusMeta.tone} className="whitespace-nowrap">{statusMeta.shortLabel || statusMeta.label}</StatusBadge>
@@ -1189,7 +1327,7 @@ function ClientChecklistDetails({
                       <ChecklistStatusButtons
                         currentStatus={currentStatus}
                         disabled={busyKey === rowBusyKey}
-                        onChange={(nextStatus) => onStatusChange(client, vinculo, nextStatus)}
+                        onChange={(nextStatus) => onStatusChange(client, entry.vinculo, nextStatus)}
                       />
                     </td>
                   </tr>
@@ -1228,6 +1366,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [savingContactId, setSavingContactId] = useState('');
   const [sendingReminderId, setSendingReminderId] = useState('');
   const [applyingDefaultChecklist, setApplyingDefaultChecklist] = useState(false);
+  const [personalItemBusyKey, setPersonalItemBusyKey] = useState('');
   const [viewMode, setViewMode] = useState('checklist');
   const isCatalogMode = viewMode === 'catalog';
   const quickFilterOptions = isCatalogMode ? CATALOG_QUICK_FILTERS : CHECKLIST_QUICK_FILTERS;
@@ -1473,9 +1612,11 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     }));
 
     try {
-      const [itens, statusRows, pendencias, envios] = await Promise.all([
+      const [itens, itensPersonalizados, statusRows, statusPersonalizados, pendencias, envios] = await Promise.all([
         listarChecklistClienteItens(clienteId),
+        listarChecklistClienteItensPersonalizados(clienteId),
         listarChecklistStatus({ clienteId, ano, mes }),
+        listarChecklistStatusPersonalizados({ clienteId, ano, mes }),
         listarChecklistPendencias({ clienteId, ano, mes }),
         listarChecklistEnvios({ clienteId, ano, mes, limite: 20 }),
       ]);
@@ -1485,10 +1626,13 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           loading: false,
           error: '',
           itens,
+          itensPersonalizados,
           statusRows,
+          statusPersonalizados,
           pendencias,
           envios,
           statusByItem: buildStatusMap(statusRows),
+          statusPersonalizadoByItem: buildStatusMap(statusPersonalizados, 'item_personalizado_id'),
         },
       }));
     } catch (err) {
@@ -1519,24 +1663,52 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   }
 
   async function handleStatusChange(client, vinculo, nextStatus) {
-    const itemId = vinculo.item_id || vinculo.item?.id;
+    const isPersonalizado = vinculo.item_tipo === 'personalizado';
+    const itemId = isPersonalizado
+      ? (vinculo.item_personalizado_id || vinculo.id)
+      : (vinculo.item_id || vinculo.item?.id);
     if (!client?.id || !itemId) return;
 
-    const rowBusyKey = `${client.id}:${itemId}`;
+    const rowBusyKey = `${client.id}:${isPersonalizado ? 'personalizado' : 'catalogo'}:${itemId}`;
     setBusyKey(rowBusyKey);
     setToast(null);
 
     try {
-      const saved = await salvarChecklistStatus({
-        cliente_id: client.id,
-        item_id: itemId,
-        ano,
-        mes,
-        status: nextStatus,
-      });
+      const saved = isPersonalizado
+        ? await salvarChecklistStatusPersonalizado({
+          cliente_id: client.id,
+          item_personalizado_id: itemId,
+          ano,
+          mes,
+          status: nextStatus,
+        })
+        : await salvarChecklistStatus({
+          cliente_id: client.id,
+          item_id: itemId,
+          ano,
+          mes,
+          status: nextStatus,
+        });
 
       setDetailsByClient((current) => {
         const detail = current[client.id] ?? {};
+        if (isPersonalizado) {
+          return {
+            ...current,
+            [client.id]: {
+              ...detail,
+              statusPersonalizados: [
+                ...(detail.statusPersonalizados ?? []).filter((row) => row.item_personalizado_id !== itemId),
+                saved,
+              ],
+              statusPersonalizadoByItem: {
+                ...(detail.statusPersonalizadoByItem ?? {}),
+                [itemId]: saved,
+              },
+            },
+          };
+        }
+
         return {
           ...current,
           [client.id]: {
@@ -1599,6 +1771,81 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       });
     } finally {
       setSavingConfigId('');
+    }
+  }
+
+  async function handleSavePersonalItem(client, values) {
+    if (!client?.id) return null;
+
+    const descricao = String(values?.descricao ?? '').trim();
+    if (!descricao) {
+      setToast({ tone: 'danger', title: 'Descrição obrigatória', message: 'Informe a descrição do documento específico.' });
+      return null;
+    }
+
+    setPersonalItemBusyKey(`new:${client.id}`);
+    setToast(null);
+
+    try {
+      const detail = detailsByClient[client.id] ?? {};
+      const saved = await salvarChecklistClienteItemPersonalizado({
+        cliente_id: client.id,
+        descricao,
+        ordem: values?.ordem ?? ((detail.itensPersonalizados?.length ?? 0) + 1),
+        ativo: true,
+      });
+
+      await Promise.all([
+        loadClientDetails(client.id, { force: true }),
+        loadResumo({ silent: true }),
+      ]);
+
+      setToast({
+        tone: 'success',
+        title: 'Documento específico salvo',
+        message: `${saved.descricao} foi adicionado somente para ${getClientName(client)}.`,
+      });
+      return saved;
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao salvar documento específico',
+        message: err instanceof Error ? err.message : 'Não foi possível salvar o documento específico deste cliente.',
+      });
+      return null;
+    } finally {
+      setPersonalItemBusyKey('');
+    }
+  }
+
+  async function handleDeletePersonalItem(client, item) {
+    if (!client?.id || !item?.id) return;
+    const confirmed = window.confirm(`Remover o documento específico "${item.descricao}" deste cliente?`);
+    if (!confirmed) return;
+
+    setPersonalItemBusyKey(item.id);
+    setToast(null);
+
+    try {
+      await excluirChecklistClienteItemPersonalizado(item.id);
+      await Promise.all([
+        loadClientDetails(client.id, { force: true }),
+        loadResumo({ silent: true }),
+      ]);
+
+      setToast({
+        tone: 'success',
+        title: 'Documento específico removido',
+        message: `${item.descricao} foi removido do checklist de ${getClientName(client)}.`,
+      });
+    } catch (err) {
+      setToast({
+        tone: 'danger',
+        title: 'Erro ao remover documento específico',
+        message: err instanceof Error ? err.message : 'Não foi possível remover o documento específico deste cliente.',
+      });
+    } finally {
+      setPersonalItemBusyKey('');
     }
   }
 
@@ -2203,8 +2450,11 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       savingConfigId={savingConfigId}
                       savingContactId={savingContactId}
                       sendingReminderId={sendingReminderId}
+                      personalItemBusyKey={personalItemBusyKey}
                       onReload={(clienteId) => loadClientDetails(clienteId, { force: true })}
                       onSaveClientItems={handleSaveClientItems}
+                      onSavePersonalItem={handleSavePersonalItem}
+                      onDeletePersonalItem={handleDeletePersonalItem}
                       onSaveContact={handleSaveContact}
                       onSendReminder={handleSendReminder}
                       onStatusChange={handleStatusChange}
@@ -2219,3 +2469,4 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     </div>
   );
 }
+
