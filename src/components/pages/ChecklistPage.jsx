@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -73,28 +73,24 @@ const STATUS_OPTIONS = [
     label: 'Pendente',
     shortLabel: 'Pendente',
     tone: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200',
-    button: 'border-amber-300/70 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:bg-amber-400/20',
   },
   {
     value: CHECKLIST_STATUS.OK,
     label: 'Recebido',
     shortLabel: 'OK',
     tone: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200',
-    button: 'border-emerald-300/70 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200 dark:hover:bg-emerald-400/20',
   },
   {
     value: CHECKLIST_STATUS.NA,
     label: 'Não aplicável',
     shortLabel: 'N/A',
     tone: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-600 dark:bg-gray-700/60 dark:text-gray-200',
-    button: 'border-slate-300/70 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:border-gray-600 dark:bg-gray-700/60 dark:text-gray-200 dark:hover:bg-gray-700',
   },
   {
     value: CHECKLIST_STATUS.ERP,
     label: 'ERP',
     shortLabel: 'ERP',
     tone: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200',
-    button: 'border-sky-300/70 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200 dark:hover:bg-sky-400/20',
   },
 ];
 
@@ -121,7 +117,7 @@ const CHECKLIST_VIEW_OPTIONS = [
   {
     value: 'checklist',
     label: 'Acompanhamento dos documentos',
-    description: 'Controle pendências, contatos e lembretes por competência.',
+    description: 'Acompanhe os documentos por mês, ajuste status e envie lembretes.',
     icon: ListChecks,
   },
   {
@@ -175,37 +171,31 @@ function buildStatusMap(statusRows = [], key = 'item_id') {
   return Object.fromEntries(statusRows.map((row) => [row[key], row]).filter(([itemId]) => Boolean(itemId)));
 }
 
+function summarizeClientDetail(detail) {
+  const statuses = [
+    ...(detail.itens ?? []).map((item) => detail.statusByItem?.[item.item_id || item.item?.id]?.status),
+    ...(detail.itensPersonalizados ?? []).map((item) => detail.statusPersonalizadoByItem?.[item.id]?.status),
+  ];
+  const totalItens = statuses.length;
+  const qtdOk = statuses.filter((status) => status === CHECKLIST_STATUS.OK).length;
+  const qtdNaoAplicavel = statuses.filter((status) => status === CHECKLIST_STATUS.NA).length;
+  const qtdErp = statuses.filter((status) => status === CHECKLIST_STATUS.ERP).length;
+  const qtdConcluidos = qtdOk + qtdNaoAplicavel + qtdErp;
+
+  return {
+    total_itens: totalItens,
+    qtd_ok: qtdOk,
+    qtd_nao_aplicavel: qtdNaoAplicavel,
+    qtd_erp: qtdErp,
+    qtd_pendentes: totalItens - qtdConcluidos,
+    percentual_concluido: totalItens ? Math.round((qtdConcluidos / totalItens) * 10000) / 100 : 0,
+  };
+}
+
 function getCompletionTone(percentual) {
   if (percentual >= 100) return 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200';
   if (percentual >= 50) return 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200';
   return 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200';
-}
-
-function ChecklistStatusButtons({ currentStatus, disabled, onChange }) {
-  return (
-    <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
-      {STATUS_OPTIONS.map((status) => {
-        const active = currentStatus === status.value;
-        return (
-          <button
-            key={status.value}
-            type="button"
-            disabled={disabled || active}
-            onClick={() => onChange(status.value)}
-            className={classNames(
-              'rounded-lg border px-2.5 py-1.5 text-center text-[11px] font-black leading-none transition disabled:cursor-not-allowed sm:px-3 sm:text-xs',
-              active
-                ? status.button
-                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-slate-950 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-500/60 dark:hover:text-white',
-              disabled && !active ? 'opacity-60' : '',
-            )}
-          >
-            {status.shortLabel}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 function useChecklistFloatingDropdown(open, containerRef) {
@@ -504,12 +494,70 @@ function buildReminderHtml(pendencias, assinaturaUrl = '', assinaturaNome = '') 
   `;
 }
 
-function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle, onYearChange }) {
+function ClientYearOverview({ client, items, year, monthFilter, yearOptions, open, onToggle, onYearChange, onMonthFilterChange, onStatusChange, onSummaryChange }) {
+  const clientId = client?.id;
   const [statusRows, setStatusRows] = useState([]);
   const [personalStatusRows, setPersonalStatusRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [loadedOverview, setLoadedOverview] = useState(null);
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [savingCell, setSavingCell] = useState(false);
+  const cellTriggerRef = useRef(null);
+  const selectedYearRef = useRef(year);
+  selectedYearRef.current = year;
+  const { menuRef, menuStyle } = useChecklistFloatingDropdown(Boolean(selectedCell), cellTriggerRef);
+
+  useEffect(() => {
+    setSelectedCell(null);
+  }, [clientId, year, monthFilter, open]);
+
+  useEffect(() => {
+    if (!selectedCell) return undefined;
+    function handlePointerDown(event) {
+      if (!cellTriggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+        setSelectedCell(null);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setSelectedCell(null);
+        cellTriggerRef.current?.focus();
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuRef, selectedCell]);
+
+  useEffect(() => {
+    if (selectedCell && menuStyle && !menuRef.current?.contains(document.activeElement)) {
+      menuRef.current?.querySelector('[role="menuitemradio"]')?.focus();
+    }
+  }, [menuRef, selectedCell, menuStyle]);
+
+  async function saveSelectedStatus(nextStatus) {
+    if (!selectedCell || savingCell) return;
+    const { item, month } = selectedCell;
+    const selectedYear = year;
+    setSavingCell(true);
+    const saved = await onStatusChange(client, item.vinculo, nextStatus, { ano: selectedYear, mes: month });
+    if (saved && selectedYearRef.current === selectedYear) {
+      const updateRows = (rows) => [
+        ...rows.filter((row) => (item.tipo === 'personalizado' ? row.item_personalizado_id : row.item_id) !== item.id || row.mes !== month),
+        saved,
+      ];
+      if (item.tipo === 'personalizado') setPersonalStatusRows(updateRows);
+      else setStatusRows(updateRows);
+      cellTriggerRef.current?.focus();
+      setSelectedCell(null);
+    }
+    setSavingCell(false);
+  }
 
   useEffect(() => {
     if (!open || !clientId) return undefined;
@@ -524,6 +572,7 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
       if (!active) return;
       setStatusRows(standard);
       setPersonalStatusRows(personal);
+      setLoadedOverview({ clientId, year });
     }).catch((err) => {
       if (active) setError(err instanceof Error ? err.message : 'Não foi possível carregar a visão anual.');
     }).finally(() => {
@@ -546,20 +595,45 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
   const recordedMonths = new Set([...statusRows, ...personalStatusRows].map((row) => row.mes));
   function isVisibleMonth(month) {
     const monthIndex = year * 12 + month;
-    return monthIndex <= currentMonthIndex && (monthIndex >= currentMonthIndex - 12 || recordedMonths.has(month));
+    return recordedMonths.has(month) || (monthIndex <= currentMonthIndex && monthIndex >= currentMonthIndex - 12);
   }
   function getYearStatus(item, month) {
     const monthIndex = year * 12 + month;
-    if (monthIndex > currentMonthIndex) return null;
     const recordedStatus = statusByItemAndMonth.get(`${item.tipo}:${item.id}:${month}`);
     if (recordedStatus) return recordedStatus;
-    return monthIndex >= currentMonthIndex - 12 ? CHECKLIST_STATUS.PENDENTE : null;
+    return monthIndex <= currentMonthIndex && monthIndex >= currentMonthIndex - 12 ? CHECKLIST_STATUS.PENDENTE : null;
   }
   const pendingByMonth = Object.fromEntries(MONTH_OPTIONS.map(({ value }) => [
     value,
     items.filter((item) => getYearStatus(item, value) === CHECKLIST_STATUS.PENDENTE).length,
   ]));
-  const totalPending = Object.values(pendingByMonth).reduce((sum, count) => sum + count, 0);
+  const visibleMonths = monthFilter === 'todos'
+    ? MONTH_OPTIONS
+    : MONTH_OPTIONS.filter(({ value }) => value === Number(monthFilter));
+  const visiblePending = visibleMonths.reduce((sum, { value }) => sum + pendingByMonth[value], 0);
+  const pendingPeriod = monthFilter === 'todos' ? String(year) : `${getMonthLabel(Number(monthFilter))}/${year}`;
+  const assessedStatuses = visibleMonths.flatMap(({ value }) => items
+    .map((item) => getYearStatus(item, value))
+    .filter(Boolean));
+  const assessedCount = assessedStatuses.length;
+  const completedCount = assessedStatuses.filter((status) => status !== CHECKLIST_STATUS.PENDENTE).length;
+  const completionPercent = assessedCount ? Math.round((completedCount / assessedCount) * 10000) / 100 : null;
+  const summaryReady = loadedOverview?.clientId === clientId && loadedOverview?.year === year && !loading && !error;
+
+  useEffect(() => {
+    if (!clientId) return;
+    onSummaryChange(clientId, {
+      year,
+      monthFilter,
+      periodLabel: monthFilter === 'todos' ? String(year) : `${SHORT_MONTH_LABELS[Number(monthFilter) - 1]}/${year}`,
+      total_itens: items.length,
+      total_avaliacoes: summaryReady ? assessedCount : 0,
+      qtd_pendentes: summaryReady ? visiblePending : 0,
+      percentual_concluido: summaryReady ? completionPercent : null,
+      loading: !summaryReady && !error,
+      error: Boolean(error),
+    });
+  }, [assessedCount, clientId, completionPercent, error, items.length, monthFilter, onSummaryChange, summaryReady, visiblePending, year]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
@@ -569,12 +643,12 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
             <CalendarDays size={18} aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-black text-slate-900 dark:text-white">Visão anual dos documentos</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">Veja o status de cada documento em todos os meses do ano.</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white">Acompanhamento dos documentos</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">Acompanhe o ano inteiro ou selecione um mês para consultar e alterar os status.</p>
           </div>
         </div>
         <ActionButton type="button" size="sm" variant="subtle" onClick={onToggle} aria-expanded={open}>
-          {open ? 'Ocultar visão anual' : 'Ver visão anual'}
+          {open ? 'Ocultar acompanhamento' : 'Mostrar acompanhamento'}
           <ChevronDown size={16} className={classNames('transition-transform', open && 'rotate-180')} aria-hidden="true" />
         </ActionButton>
       </div>
@@ -582,7 +656,15 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
       {open ? (
         <div className="mt-4 space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="w-36">
+            <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-[180px_140px]">
+              <ChecklistDropdownSelect
+                label="Mostrar"
+                value={monthFilter}
+                options={[{ value: 'todos', label: 'Todos os meses' }, ...MONTH_OPTIONS]}
+                onChange={onMonthFilterChange}
+                includeBlank={false}
+                searchable={false}
+              />
               <ChecklistDropdownSelect
                 label="Ano"
                 value={year}
@@ -591,14 +673,14 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
                 includeBlank={false}
               />
             </div>
-            {!loading && !error ? (
+            {summaryReady ? (
               <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-                {formatNumber(totalPending)} pendência(s) em {year}
+                {assessedCount ? `${formatNumber(visiblePending)} pendência(s) em ${pendingPeriod}` : `Sem status em ${pendingPeriod}`}
               </StatusBadge>
             ) : null}
           </div>
 
-          {loading ? <p className="text-sm font-semibold text-slate-500 dark:text-gray-400">Carregando status do ano...</p> : null}
+          {!summaryReady && !error ? <p className="text-sm font-semibold text-slate-500 dark:text-gray-400">Carregando status do ano...</p> : null}
           {error ? (
             <AlertBanner tone="danger" title="Não foi possível carregar a visão anual">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -608,12 +690,12 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
             </AlertBanner>
           ) : null}
 
-          {!loading && !error ? (
+          {summaryReady ? (
             <>
               <DataTableShell
-                headers={['Documento', ...SHORT_MONTH_LABELS]}
-                minWidth="min-w-[1440px]"
-                tableClassName="checklist-year-table"
+                headers={['Documento', ...visibleMonths.map(({ value }) => SHORT_MONTH_LABELS[value - 1])]}
+                minWidth={monthFilter === 'todos' ? 'min-w-[1440px]' : 'min-w-[400px]'}
+                tableClassName={classNames('checklist-year-table', monthFilter !== 'todos' && 'checklist-year-table-single')}
                 hasRows={items.length > 0}
               >
                 <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
@@ -623,16 +705,34 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
                         <p className="truncate font-bold text-slate-900 dark:text-white" title={item.descricao}>{item.descricao}</p>
                         {item.tipo === 'personalizado' ? <span className="text-[10px] font-bold text-blue-700 dark:text-blue-200">Específico deste cliente</span> : null}
                       </td>
-                      {MONTH_OPTIONS.map(({ value }) => {
+                      {visibleMonths.map(({ value }) => {
                         const status = getYearStatus(item, value);
                         const statusMeta = status ? STATUS_BY_VALUE[status] : null;
+                        const cellSelected = selectedCell?.item.key === item.key && selectedCell.month === value;
                         return (
                           <td key={value} className="table-cell table-cell-compact text-center">
-                            {statusMeta ? (
-                              <span className={classNames('inline-flex min-w-[56px] justify-center rounded-md border px-1.5 py-1 text-[11px] font-black', statusMeta.tone)} title={`${getMonthLabel(value)}/${year}: ${statusMeta.label}`}>
-                                {statusMeta.shortLabel}
-                              </span>
-                            ) : <span className="text-slate-400 dark:text-gray-600" title="Sem status disponível">—</span>}
+                            <button
+                                type="button"
+                                aria-label={`Alterar ${item.descricao} em ${getMonthLabel(value)}/${year}. Status: ${statusMeta?.label ?? 'sem registro'}`}
+                                aria-haspopup="menu"
+                                aria-expanded={cellSelected}
+                                disabled={savingCell}
+                                onClick={(event) => {
+                                  if (cellSelected) {
+                                    setSelectedCell(null);
+                                  } else {
+                                    cellTriggerRef.current = event.currentTarget;
+                                    setSelectedCell({ item, month: value });
+                                  }
+                                }}
+                                className={classNames(
+                                  'inline-flex min-w-[56px] justify-center rounded-md border px-1.5 py-1 text-[11px] font-black transition hover:ring-2 hover:ring-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-60',
+                                  statusMeta?.tone ?? 'border-slate-200 text-slate-400 dark:border-gray-700 dark:text-gray-500',
+                                  cellSelected && 'ring-2 ring-blue-500',
+                                )}
+                              >
+                                {statusMeta?.shortLabel ?? '—'}
+                            </button>
                           </td>
                         );
                       })}
@@ -641,7 +741,7 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
                   {items.length ? (
                     <tr className="bg-slate-50/80 dark:bg-gray-900/55">
                       <th scope="row" className="table-cell table-cell-compact text-left text-xs font-black text-slate-700 dark:text-gray-200">Pendências por mês</th>
-                      {MONTH_OPTIONS.map(({ value }) => (
+                      {visibleMonths.map(({ value }) => (
                         <td key={value} className="table-cell table-cell-compact text-center text-xs font-black text-amber-700 dark:text-amber-200">
                           {isVisibleMonth(value) ? formatNumber(pendingByMonth[value]) : '—'}
                         </td>
@@ -650,10 +750,22 @@ function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle
                   ) : null}
                 </tbody>
               </DataTableShell>
-              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Nos últimos 12 meses e no mês atual, itens sem status registrado aparecem como pendentes. Meses futuros e meses antigos sem registro ficam em branco.</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em qualquer mês para registrar ou alterar um status. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
             </>
           ) : null}
         </div>
+      ) : null}
+      {selectedCell && typeof document !== 'undefined' ? createPortal(
+        <div ref={menuRef} role="menu" aria-label={`Status de ${selectedCell.item.descricao} em ${getMonthLabel(selectedCell.month)}/${year}`} style={menuStyle ?? { visibility: 'hidden' }} className="dropdown-menu-shell overflow-soft normal-case ring-1 ring-slate-900/5 dark:ring-white/5">
+          <p className="border-b border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:text-gray-300">{getMonthLabel(selectedCell.month)}/{year} · Escolha o status</p>
+          {STATUS_OPTIONS.map((option) => (
+            <button key={option.value} type="button" role="menuitemradio" aria-checked={getYearStatus(selectedCell.item, selectedCell.month) === option.value} disabled={savingCell} onClick={() => saveSelectedStatus(option.value)} className="dropdown-option flex w-full items-center justify-between gap-2 disabled:cursor-wait disabled:opacity-60">
+              <span>{option.label}</span>
+              {getYearStatus(selectedCell.item, selectedCell.month) === option.value ? <Check size={15} aria-hidden="true" /> : null}
+            </button>
+          ))}
+        </div>,
+        document.body,
       ) : null}
     </div>
   );
@@ -840,8 +952,8 @@ function ChecklistBatchApplyModal({
 
 function ChecklistWorkflowGuide() {
   const steps = [
-    { title: '1. Filtre a carteira', detail: 'Escolha competência, responsável e situação do checklist.' },
-    { title: '2. Revise o cliente', detail: 'Abra o card para ajustar itens, contato e status.' },
+    { title: '1. Filtre a carteira', detail: 'Escolha cliente, responsável e situação do checklist.' },
+    { title: '2. Revise o cliente', detail: 'Abra o card para acompanhar e alterar os status por mês.' },
     { title: '3. Envie o lembrete', detail: 'Dispare a cobrança dos itens pendentes da competência.' },
   ];
 
@@ -1131,9 +1243,9 @@ function ChecklistContactReminder({
             <Mail size={18} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900 dark:text-white">Contatos e lembretes</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white">Contatos e lembrete manual</p>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-              Informe os destinatários do checklist e envie o lembrete dos itens pendentes da competência {getMonthLabel(mes)}/{ano}.
+              O envio manual cobra somente os itens pendentes de {getMonthLabel(mes)}/{ano}. O filtro da tabela não altera este período.
             </p>
           </div>
         </div>
@@ -1141,7 +1253,7 @@ function ChecklistContactReminder({
           ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
           : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'}
         >
-          {formatNumber(pendingCount)} pendência(s)
+          {formatNumber(pendingCount)} pendência(s) neste mês
         </StatusBadge>
       </div>
 
@@ -1229,7 +1341,6 @@ function ClientChecklistDetails({
   catalogItems,
   catalogLoading,
   catalogError,
-  busyKey,
   savingConfigId,
   savingContactId,
   sendingReminderId,
@@ -1242,6 +1353,9 @@ function ClientChecklistDetails({
   onSendReminder,
   onStatusChange,
   onCompetenceChange,
+  onOverviewSummaryChange,
+  overviewSelection,
+  onOverviewSelectionChange,
 }) {
   const linkedIdsKey = useMemo(
     () => (detail?.itens ?? []).map((vinculo) => vinculo.item_id || vinculo.item?.id).filter(Boolean).join('|'),
@@ -1249,8 +1363,9 @@ function ClientChecklistDetails({
   );
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [showAllClientItems, setShowAllClientItems] = useState(false);
-  const [showYearOverview, setShowYearOverview] = useState(false);
-  const [overviewYear, setOverviewYear] = useState(ano);
+  const [showYearOverview, setShowYearOverview] = useState(true);
+  const overviewYear = overviewSelection?.year ?? ano;
+  const overviewMonth = overviewSelection?.monthFilter ?? 'todos';
   const [showPersonalItemModal, setShowPersonalItemModal] = useState(false);
   const [personalItemDescription, setPersonalItemDescription] = useState('');
 
@@ -1313,8 +1428,7 @@ function ClientChecklistDetails({
 
   useEffect(() => {
     setShowAllClientItems(false);
-    setShowYearOverview(false);
-    setOverviewYear(ano);
+    setShowYearOverview(true);
     setShowPersonalItemModal(false);
     setPersonalItemDescription('');
   }, [client?.id]);
@@ -1449,17 +1563,33 @@ function ClientChecklistDetails({
 
   return (
     <div className="space-y-4">
+      {showOperationalControls && configuredItems.length > 0 ? (
+        <ClientYearOverview
+          client={client}
+          items={configuredItems}
+          year={overviewYear}
+          monthFilter={overviewMonth}
+          yearOptions={yearOptions}
+          open={showYearOverview}
+          onToggle={() => setShowYearOverview((current) => !current)}
+          onYearChange={(year) => onOverviewSelectionChange(client.id, { year, monthFilter: overviewMonth })}
+          onMonthFilterChange={(monthFilter) => onOverviewSelectionChange(client.id, { year: overviewYear, monthFilter })}
+          onStatusChange={onStatusChange}
+          onSummaryChange={onOverviewSummaryChange}
+        />
+      ) : null}
+
       {showOperationalControls ? (
         <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex min-w-0 gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
-                <CalendarDays size={18} aria-hidden="true" />
+                <Mail size={18} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-white">Competência do cliente</p>
+                <p className="text-sm font-black text-slate-900 dark:text-white">Competência do lembrete</p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                  Escolha o mês e ano para consultar pendências e atualizar os status deste cliente.
+                  Defina o mês e ano das pendências para o envio manual. O filtro do acompanhamento é independente.
                 </p>
               </div>
             </div>
@@ -1481,21 +1611,6 @@ function ClientChecklistDetails({
             </div>
           </div>
         </div>
-      ) : null}
-
-      {showOperationalControls && configuredItems.length > 0 ? (
-        <ClientYearOverview
-          clientId={client.id}
-          items={configuredItems}
-          year={overviewYear}
-          yearOptions={yearOptions}
-          open={showYearOverview}
-          onToggle={() => {
-            if (!showYearOverview) setOverviewYear(ano);
-            setShowYearOverview((current) => !current);
-          }}
-          onYearChange={setOverviewYear}
-        />
       ) : null}
 
       <div className={classNames('grid gap-4', showOperationalControls && showCatalogConfiguration ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : '')}>
@@ -1685,60 +1800,6 @@ function ClientChecklistDetails({
             </div>
           </div>
         </div>
-      ) : showOperationalControls ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
-          <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-black text-slate-900 dark:text-white">Acompanhamento da competência</p>
-              <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">
-                Atualize o status de cada item para {getMonthLabel(mes)}/{ano}.
-              </p>
-            </div>
-          </div>
-          <DataTableShell
-            headers={['Item', 'Status', 'Alterar']}
-            minWidth="min-w-[560px]"
-            tableClassName="checklist-status-table"
-            hasRows={configuredItems.length > 0}
-          >
-            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-              {configuredItems.map((entry) => {
-                const itemId = entry.id;
-                const statusRow = entry.tipo === 'personalizado'
-                  ? detail.statusPersonalizadoByItem?.[itemId]
-                  : detail.statusByItem?.[itemId];
-                const currentStatus = statusRow?.status || CHECKLIST_STATUS.PENDENTE;
-                const statusMeta = STATUS_BY_VALUE[currentStatus] || STATUS_BY_VALUE[CHECKLIST_STATUS.PENDENTE];
-                const rowBusyKey = `${client.id}:${entry.tipo}:${itemId}`;
-
-                return (
-                  <tr key={entry.key}>
-                    <td className="table-cell table-cell-compact">
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <p className="max-w-[260px] truncate font-black text-slate-900 dark:text-white sm:max-w-[360px] lg:max-w-[440px]" title={entry.descricao}>{entry.descricao}</p>
-                        {entry.tipo === 'personalizado' ? (
-                          <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
-                            Específico do cliente
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="table-cell table-cell-compact whitespace-nowrap">
-                      <StatusBadge toneClass={statusMeta.tone} className="whitespace-nowrap">{statusMeta.shortLabel || statusMeta.label}</StatusBadge>
-                    </td>
-                    <td className="table-cell table-cell-compact">
-                      <ChecklistStatusButtons
-                        currentStatus={currentStatus}
-                        disabled={busyKey === rowBusyKey}
-                        onChange={(nextStatus) => onStatusChange(client, entry.vinculo, nextStatus)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </DataTableShell>
-        </div>
       ) : null}
     </div>
   );
@@ -1759,7 +1820,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [clientCompetences, setClientCompetences] = useState({});
   const [visibleClientLimit, setVisibleClientLimit] = useState(CLIENT_LIST_PAGE_SIZE);
   const [detailsByClient, setDetailsByClient] = useState({});
-  const [busyKey, setBusyKey] = useState('');
+  const [overviewSummariesByClient, setOverviewSummariesByClient] = useState({});
+  const [overviewSelectionsByClient, setOverviewSelectionsByClient] = useState({});
+  const detailRequestIds = useRef({});
   const [catalogItems, setCatalogItems] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
@@ -1777,9 +1840,23 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const isCatalogMode = viewMode === 'catalog';
   const quickFilterOptions = isCatalogMode ? CATALOG_QUICK_FILTERS : CHECKLIST_QUICK_FILTERS;
 
+  const handleOverviewSummaryChange = useCallback((clientId, summary) => {
+    setOverviewSummariesByClient((current) => {
+      const previous = current[clientId];
+      if (previous && Object.keys(summary).every((key) => previous[key] === summary[key])) return current;
+      return { ...current, [clientId]: summary };
+    });
+  }, []);
+
+  const handleOverviewSelectionChange = useCallback((clientId, selection) => {
+    setOverviewSelectionsByClient((current) => ({ ...current, [clientId]: selection }));
+  }, []);
+
   useEffect(() => {
     setQuickFilter('todos');
     setExpandedClientId('');
+    setOverviewSummariesByClient({});
+    setOverviewSelectionsByClient({});
   }, [viewMode]);
 
   useEffect(() => {
@@ -2012,7 +2089,39 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
   const activeQuickFilterLabel = quickFilterOptions.find((option) => option.value === quickFilter)?.label ?? 'Todos';
 
-  const visibleRows = useMemo(() => filteredRows.slice(0, visibleClientLimit), [filteredRows, visibleClientLimit]);
+  const visibleRows = useMemo(() => filteredRows.slice(0, visibleClientLimit).map((row) => {
+    const competence = clientCompetences[row.cliente_id] ?? { ano, mes };
+    const detail = detailsByClient[row.cliente_id];
+    const usesOverview = !isCatalogMode && row.total_itens > 0
+      && (expandedClientId === row.cliente_id || Boolean(overviewSummariesByClient[row.cliente_id]));
+    const overview = usesOverview ? overviewSummariesByClient[row.cliente_id] : null;
+    if (usesOverview) {
+      const summaryPending = !overview || overview.loading || overview.error;
+      return {
+        ...row,
+        ...(overview && !summaryPending ? overview : {}),
+        summaryPending,
+        summaryError: Boolean(overview?.error),
+        summaryEmpty: Boolean(overview && !summaryPending && overview.total_avaliacoes === 0),
+        summaryPeriod: overview?.periodLabel ?? String(ano),
+        summaryPeriodType: overview?.monthFilter ?? 'todos',
+      };
+    }
+    const matchesCompetence = detail?.ano === competence.ano && detail?.mes === competence.mes;
+    const detailReady = matchesCompetence && !detail.loading && !detail.error
+      && Array.isArray(detail.itens) && Array.isArray(detail.itensPersonalizados);
+    const differentCompetence = competence.ano !== ano || competence.mes !== mes;
+
+    return {
+      ...row,
+      ...(detailReady ? summarizeClientDetail(detail) : {}),
+      summaryPending: (matchesCompetence && detail?.loading) || (differentCompetence && !detailReady),
+      summaryError: differentCompetence && Boolean(detail?.error),
+      summaryEmpty: false,
+      summaryPeriod: `${SHORT_MONTH_LABELS[competence.mes - 1]}/${competence.ano}`,
+      summaryPeriodType: 'mes',
+    };
+  }), [ano, clientCompetences, detailsByClient, expandedClientId, filteredRows, isCatalogMode, mes, overviewSummariesByClient, visibleClientLimit]);
   const hiddenRowsCount = Math.max(filteredRows.length - visibleRows.length, 0);
   const nextRowsCount = Math.min(CLIENT_LIST_PAGE_SIZE, hiddenRowsCount);
   const hasExpandedClientHidden = expandedClientId
@@ -2045,7 +2154,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const selectedAno = toNumber(selectedCompetence.ano, ano);
     const selectedMes = toNumber(selectedCompetence.mes, mes);
     const cachedDetail = detailsByClient[clienteId];
-    if (!force && cachedDetail?.itens && cachedDetail.ano === selectedAno && cachedDetail.mes === selectedMes) return;
+    if (!force && !cachedDetail?.loading && cachedDetail?.itens && cachedDetail.ano === selectedAno && cachedDetail.mes === selectedMes) return;
+    const requestId = (detailRequestIds.current[clienteId] ?? 0) + 1;
+    detailRequestIds.current[clienteId] = requestId;
 
     setDetailsByClient((current) => ({
       ...current,
@@ -2061,6 +2172,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         listarChecklistPendencias({ clienteId, ano: selectedAno, mes: selectedMes }),
         listarChecklistEnvios({ clienteId, ano: selectedAno, mes: selectedMes, limite: 20 }),
       ]);
+      if (detailRequestIds.current[clienteId] !== requestId) return;
       setDetailsByClient((current) => ({
         ...current,
         [clienteId]: {
@@ -2079,6 +2191,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         },
       }));
     } catch (err) {
+      if (detailRequestIds.current[clienteId] !== requestId) return;
       setDetailsByClient((current) => ({
         ...current,
         [clienteId]: {
@@ -2123,18 +2236,19 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     setQuickFilter('todos');
   }
 
-  async function handleStatusChange(client, vinculo, nextStatus) {
+  async function handleStatusChange(client, vinculo, nextStatus, requestedCompetence) {
     const isPersonalizado = vinculo.item_tipo === 'personalizado';
     const itemId = isPersonalizado
       ? (vinculo.item_personalizado_id || vinculo.id)
       : (vinculo.item_id || vinculo.item?.id);
     if (!client?.id || !itemId) return;
 
-    const competence = getClientCompetence(client.id);
+    const selectedCompetence = getClientCompetence(client.id);
+    const competence = requestedCompetence ?? selectedCompetence;
     const statusAno = toNumber(competence.ano, ano);
     const statusMes = toNumber(competence.mes, mes);
-    const rowBusyKey = `${client.id}:${isPersonalizado ? 'personalizado' : 'catalogo'}:${itemId}`;
-    setBusyKey(rowBusyKey);
+    const isSelectedCompetence = statusAno === toNumber(selectedCompetence.ano, ano)
+      && statusMes === toNumber(selectedCompetence.mes, mes);
     setToast(null);
 
     try {
@@ -2154,7 +2268,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           status: nextStatus,
         });
 
-      setDetailsByClient((current) => {
+      if (isSelectedCompetence) setDetailsByClient((current) => {
         const detail = current[client.id] ?? {};
         if (isPersonalizado) {
           return {
@@ -2191,13 +2305,13 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
       await Promise.all([
         loadResumo({ silent: true }),
-        loadClientDetails(client.id, { force: true }),
+        ...(isSelectedCompetence ? [loadClientDetails(client.id, { force: true, competence: selectedCompetence })] : []),
       ]);
       setToast({ tone: 'success', title: 'Status atualizado', message: `${getClientName(client)} foi atualizado para ${getMonthLabel(statusMes)}/${statusAno}.` });
+      return saved;
     } catch (err) {
       setToast({ tone: 'danger', title: 'Erro ao salvar status', message: err instanceof Error ? err.message : 'Não foi possível salvar o status.' });
-    } finally {
-      setBusyKey('');
+      return null;
     }
   }
 
@@ -2773,9 +2887,12 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
           {visibleRows.map((row) => {
             const expanded = expandedClientId === row.cliente_id;
-            const completionTone = getCompletionTone(row.percentual_concluido);
+            const hasMeasuredProgress = !row.summaryPending && !row.summaryEmpty;
+            const completionTone = !hasMeasuredProgress
+              ? 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+              : getCompletionTone(row.percentual_concluido);
             const hasContact = Boolean(contactsByClient[row.cliente_id]?.email);
-            const progressWidth = Math.max(0, Math.min(100, row.percentual_concluido));
+            const progressWidth = hasMeasuredProgress ? Math.max(0, Math.min(100, row.percentual_concluido)) : 0;
             const rowCompetence = getClientCompetence(row.cliente_id);
 
             return (
@@ -2794,14 +2911,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                   <div className="flex min-w-0 gap-3">
                     <span className={classNames(
                       'mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-black',
-                      row.percentual_concluido >= 100
+                      hasMeasuredProgress && row.percentual_concluido >= 100
                         ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'
                         : row.qtd_pendentes > 0
                           ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
                           : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200',
                     )}
                     >
-                      {row.percentual_concluido >= 100 ? <Check size={18} aria-hidden="true" /> : <FileQuestion size={18} aria-hidden="true" />}
+                      {hasMeasuredProgress && row.percentual_concluido >= 100 ? <Check size={18} aria-hidden="true" /> : <FileQuestion size={18} aria-hidden="true" />}
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -2813,6 +2930,11 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                               : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'}
                           >
                             {hasContact ? 'Contato salvo' : 'Sem contato'}
+                          </StatusBadge>
+                        ) : null}
+                        {!isCatalogMode ? (
+                          <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200">
+                            {row.summaryPeriodType === 'todos' ? `Ano ${row.summaryPeriod}` : row.summaryPeriod}
                           </StatusBadge>
                         ) : null}
                       </div>
@@ -2827,7 +2949,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                     {!isCatalogMode ? (
                       <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
                         <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Progresso</p>
-                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.percentual_concluido)}%</p>
+                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{row.summaryPending ? (row.summaryError ? 'Indisponível' : 'Carregando...') : row.summaryEmpty ? 'Sem status' : `${formatNumber(row.percentual_concluido)}%`}</p>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-800">
                           <div
                             className={classNames(
@@ -2846,7 +2968,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                     <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/30">
                       <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-gray-500">Itens</p>
                       <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatNumber(row.total_itens)}</p>
-                      <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">documento(s)</p>
+                      <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-gray-400">documento(s){row.summaryPeriodType === 'todos' && !row.summaryPending ? ` · ${formatNumber(row.total_avaliacoes)} controles mensais` : ''}</p>
                     </div>
                     {isCatalogMode ? (
                       <div className={classNames(
@@ -2871,14 +2993,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                     ) : (
                       <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-400/20 dark:bg-amber-400/10">
                         <p className="text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências</p>
-                        <p className="mt-1 text-sm font-black text-amber-800 dark:text-amber-100">{formatNumber(row.qtd_pendentes)}</p>
-                        <p className="mt-1 text-[11px] font-bold text-amber-700/80 dark:text-amber-200/80">em aberto</p>
+                        <p className="mt-1 text-sm font-black text-amber-800 dark:text-amber-100">{row.summaryPending ? (row.summaryError ? '—' : '...') : formatNumber(row.qtd_pendentes)}</p>
+                        <p className="mt-1 text-[11px] font-bold text-amber-700/80 dark:text-amber-200/80">{row.summaryEmpty ? 'sem status no período' : `em aberto em ${row.summaryPeriod}`}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                    <StatusBadge toneClass={isCatalogMode ? (row.total_itens > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200') : completionTone}>{isCatalogMode ? (row.total_itens > 0 ? 'Configurado' : 'Sem checklist') : `${formatNumber(row.percentual_concluido)}% concluído`}</StatusBadge>
+                    <StatusBadge toneClass={isCatalogMode ? (row.total_itens > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200') : completionTone}>{isCatalogMode ? (row.total_itens > 0 ? 'Configurado' : 'Sem checklist') : row.summaryPending ? (row.summaryError ? 'Indisponível' : 'Carregando...') : row.summaryEmpty ? 'Sem status' : `${formatNumber(row.percentual_concluido)}% concluído`}</StatusBadge>
                     <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                       {expanded ? 'Ocultar' : 'Abrir'}
                       <ChevronDown size={14} className={classNames('transition', expanded && 'rotate-180')} aria-hidden="true" />
@@ -2899,7 +3021,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       catalogItems={catalogItems}
                       catalogLoading={catalogLoading}
                       catalogError={catalogError}
-                      busyKey={busyKey}
                       savingConfigId={savingConfigId}
                       savingContactId={savingContactId}
                       sendingReminderId={sendingReminderId}
@@ -2912,6 +3033,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       onSendReminder={handleSendReminder}
                       onStatusChange={handleStatusChange}
                       onCompetenceChange={handleClientCompetenceChange}
+                      onOverviewSummaryChange={handleOverviewSummaryChange}
+                      overviewSelection={overviewSelectionsByClient[row.cliente_id]}
+                      onOverviewSelectionChange={handleOverviewSelectionChange}
                     />
                   </div>
                 ) : null}

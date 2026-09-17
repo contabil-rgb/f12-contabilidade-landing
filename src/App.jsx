@@ -195,7 +195,7 @@ const PAGE_DESCRIPTIONS = {
   clientes: 'Controle dos clientes, competências e obrigações',
   reinf: 'Preparação e envio da distribuição de lucro ao setor fiscal',
   ecd: 'Controle das obrigações anuais e responsáveis',
-  checklist: 'Acompanhamento mensal dos documentos dos clientes',
+  checklist: 'Acompanhamento dos documentos dos clientes por mês e ano',
   relatorios: 'Relatórios operacionais e exportação',
   usuarios: 'Gestão dos usuários do portal',
   historico: 'Rastreabilidade das alterações da base',

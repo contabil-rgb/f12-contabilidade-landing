@@ -1127,6 +1127,13 @@
     }
   }
 
+  .checklist-year-table-single .table-head-cell:first-child,
+  .checklist-year-table-single tbody tr > :first-child {
+    width: calc(100% - 150px);
+    min-width: 250px;
+    max-width: none;
+  }
+
   .base-clients-table {
     table-layout: fixed;
   }
