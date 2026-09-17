@@ -1078,6 +1078,55 @@
     width: 28%;
   }
 
+  .checklist-year-table {
+    table-layout: fixed;
+  }
+
+  .checklist-year-table .table-head-cell:first-child,
+  .checklist-year-table tbody tr > :first-child {
+    position: sticky;
+    left: 0;
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+    z-index: 2;
+    box-shadow: 1px 0 0 rgba(148, 163, 184, 0.4);
+  }
+
+  .checklist-year-table .table-head-cell:first-child {
+    z-index: 3;
+    background: #eef4fb;
+  }
+
+  .checklist-year-table tbody tr > :first-child {
+    background: #fff;
+  }
+
+  .checklist-year-table tbody tr:last-child > :first-child {
+    background: #f8fafc;
+  }
+
+  .dark .checklist-year-table .table-head-cell:first-child {
+    background: #070d18;
+  }
+
+  .dark .checklist-year-table tbody tr > :first-child {
+    background: #111827;
+  }
+
+  .dark .checklist-year-table tbody tr:last-child > :first-child {
+    background: #1f2937;
+  }
+
+  @media (max-width: 640px) {
+    .checklist-year-table .table-head-cell:first-child,
+    .checklist-year-table tbody tr > :first-child {
+      width: 190px;
+      min-width: 190px;
+      max-width: 190px;
+    }
+  }
+
   .base-clients-table {
     table-layout: fixed;
   }

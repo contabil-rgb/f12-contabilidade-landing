@@ -65,6 +65,8 @@ const MONTH_OPTIONS = [
   { value: 12, label: 'Dezembro' },
 ];
 
+const SHORT_MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 const STATUS_OPTIONS = [
   {
     value: CHECKLIST_STATUS.PENDENTE,
@@ -462,26 +464,28 @@ function buildReminderSubject(client, ano, mes) {
   return `Checklist de documentos - ${getMonthLabel(mes)}/${ano} - ${getClientName(client)}`;
 }
 
-function buildReminderText(client, ano, mes, pendencias, assinaturaNome = '') {
-  const itens = pendencias.map((pendencia) => `- ${pendencia.item_descricao}`).join('\n');
+function buildReminderText(pendencias, assinaturaNome = '') {
+  const itens = pendencias.map((pendencia, index) => `• ${index + 1}) ${pendencia.item_descricao}`).join('\n');
   return [
-    'Olá!',
+    'Olá! Tudo bem?',
     '',
-    `Identificamos documentos pendentes no checklist da competência ${getMonthLabel(mes)}/${ano} da empresa ${getClientName(client)}.`,
+    'Segue lembrete das documentações pendentes para fechamento contábil do período:',
     '',
-    'Documentos pendentes:',
     itens,
     '',
-    'Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.',
+    'Qualquer dúvida, estamos à disposição.',
+    '',
+    'Por favor, confirme o recebimento deste e-mail.',
     '',
     'Atenciosamente,',
+    '',
     assinaturaNome || 'F12 Contabilidade',
   ].join('\n');
 }
 
-function buildReminderHtml(client, ano, mes, pendencias, assinaturaUrl = '', assinaturaNome = '') {
+function buildReminderHtml(pendencias, assinaturaUrl = '', assinaturaNome = '') {
   const itens = pendencias
-    .map((pendencia) => `<li>${escapeHtml(pendencia.item_descricao)}</li>`)
+    .map((pendencia, index) => `<li>${index + 1}) ${escapeHtml(pendencia.item_descricao)}</li>`)
     .join('');
   const assinaturaHtml = assinaturaUrl
     ? `<div style="margin-top:18px;"><img src="${escapeHtml(assinaturaUrl)}" alt="${escapeHtml(assinaturaNome || 'Assinatura digital')}" style="max-width:520px;width:100%;height:auto;display:block;border:0;" /></div>`
@@ -489,15 +493,170 @@ function buildReminderHtml(client, ano, mes, pendencias, assinaturaUrl = '', ass
 
   return `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
-      <p>Olá!</p>
-      <p>Identificamos documentos pendentes no checklist da competência <strong>${escapeHtml(getMonthLabel(mes))}/${escapeHtml(ano)}</strong> da empresa <strong>${escapeHtml(getClientName(client))}</strong>.</p>
-      <p><strong>Documentos pendentes:</strong></p>
+      <p>Olá! Tudo bem?</p>
+      <p>Segue lembrete das documentações pendentes para fechamento contábil do período:</p>
       <ul>${itens}</ul>
-      <p>Por favor, envie os documentos pendentes para darmos continuidade ao atendimento contábil.</p>
+      <p><strong>Qualquer dúvida, estamos à disposição.</strong></p>
+      <p><strong>Por favor, confirme o recebimento deste e-mail.</strong></p>
       <p>Atenciosamente,</p>
       ${assinaturaHtml}
     </div>
   `;
+}
+
+function ClientYearOverview({ clientId, items, year, yearOptions, open, onToggle, onYearChange }) {
+  const [statusRows, setStatusRows] = useState([]);
+  const [personalStatusRows, setPersonalStatusRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!open || !clientId) return undefined;
+
+    let active = true;
+    setLoading(true);
+    setError('');
+    Promise.all([
+      listarChecklistStatus({ clienteId: clientId, ano: year }),
+      listarChecklistStatusPersonalizados({ clienteId: clientId, ano: year }),
+    ]).then(([standard, personal]) => {
+      if (!active) return;
+      setStatusRows(standard);
+      setPersonalStatusRows(personal);
+    }).catch((err) => {
+      if (active) setError(err instanceof Error ? err.message : 'Não foi possível carregar a visão anual.');
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [clientId, open, reloadKey, year]);
+
+  const statusByItemAndMonth = useMemo(() => {
+    const rows = [
+      ...statusRows.map((row) => [`catalogo:${row.item_id}:${row.mes}`, row.status]),
+      ...personalStatusRows.map((row) => [`personalizado:${row.item_personalizado_id}:${row.mes}`, row.status]),
+    ];
+    return new Map(rows);
+  }, [personalStatusRows, statusRows]);
+
+  const currentCompetence = getCurrentCompetence();
+  const currentMonthIndex = currentCompetence.ano * 12 + currentCompetence.mes;
+  const recordedMonths = new Set([...statusRows, ...personalStatusRows].map((row) => row.mes));
+  function isVisibleMonth(month) {
+    const monthIndex = year * 12 + month;
+    return monthIndex <= currentMonthIndex && (monthIndex >= currentMonthIndex - 12 || recordedMonths.has(month));
+  }
+  function getYearStatus(item, month) {
+    const monthIndex = year * 12 + month;
+    if (monthIndex > currentMonthIndex) return null;
+    const recordedStatus = statusByItemAndMonth.get(`${item.tipo}:${item.id}:${month}`);
+    if (recordedStatus) return recordedStatus;
+    return monthIndex >= currentMonthIndex - 12 ? CHECKLIST_STATUS.PENDENTE : null;
+  }
+  const pendingByMonth = Object.fromEntries(MONTH_OPTIONS.map(({ value }) => [
+    value,
+    items.filter((item) => getYearStatus(item, value) === CHECKLIST_STATUS.PENDENTE).length,
+  ]));
+  const totalPending = Object.values(pendingByMonth).reduce((sum, count) => sum + count, 0);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-200">
+            <CalendarDays size={18} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">Visão anual dos documentos</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">Veja o status de cada documento em todos os meses do ano.</p>
+          </div>
+        </div>
+        <ActionButton type="button" size="sm" variant="subtle" onClick={onToggle} aria-expanded={open}>
+          {open ? 'Ocultar visão anual' : 'Ver visão anual'}
+          <ChevronDown size={16} className={classNames('transition-transform', open && 'rotate-180')} aria-hidden="true" />
+        </ActionButton>
+      </div>
+
+      {open ? (
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="w-36">
+              <ChecklistDropdownSelect
+                label="Ano"
+                value={year}
+                options={yearOptions.map((option) => ({ value: option, label: String(option) }))}
+                onChange={(value) => onYearChange(Number(value))}
+                includeBlank={false}
+              />
+            </div>
+            {!loading && !error ? (
+              <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+                {formatNumber(totalPending)} pendência(s) em {year}
+              </StatusBadge>
+            ) : null}
+          </div>
+
+          {loading ? <p className="text-sm font-semibold text-slate-500 dark:text-gray-400">Carregando status do ano...</p> : null}
+          {error ? (
+            <AlertBanner tone="danger" title="Não foi possível carregar a visão anual">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>{error}</span>
+                <ActionButton type="button" size="sm" onClick={() => setReloadKey((current) => current + 1)}>Tentar novamente</ActionButton>
+              </div>
+            </AlertBanner>
+          ) : null}
+
+          {!loading && !error ? (
+            <>
+              <DataTableShell
+                headers={['Documento', ...SHORT_MONTH_LABELS]}
+                minWidth="min-w-[1440px]"
+                tableClassName="checklist-year-table"
+                hasRows={items.length > 0}
+              >
+                <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+                  {items.map((item) => (
+                    <tr key={item.key}>
+                      <td className="table-cell table-cell-compact">
+                        <p className="truncate font-bold text-slate-900 dark:text-white" title={item.descricao}>{item.descricao}</p>
+                        {item.tipo === 'personalizado' ? <span className="text-[10px] font-bold text-blue-700 dark:text-blue-200">Específico deste cliente</span> : null}
+                      </td>
+                      {MONTH_OPTIONS.map(({ value }) => {
+                        const status = getYearStatus(item, value);
+                        const statusMeta = status ? STATUS_BY_VALUE[status] : null;
+                        return (
+                          <td key={value} className="table-cell table-cell-compact text-center">
+                            {statusMeta ? (
+                              <span className={classNames('inline-flex min-w-[56px] justify-center rounded-md border px-1.5 py-1 text-[11px] font-black', statusMeta.tone)} title={`${getMonthLabel(value)}/${year}: ${statusMeta.label}`}>
+                                {statusMeta.shortLabel}
+                              </span>
+                            ) : <span className="text-slate-400 dark:text-gray-600" title="Sem status disponível">—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {items.length ? (
+                    <tr className="bg-slate-50/80 dark:bg-gray-900/55">
+                      <th scope="row" className="table-cell table-cell-compact text-left text-xs font-black text-slate-700 dark:text-gray-200">Pendências por mês</th>
+                      {MONTH_OPTIONS.map(({ value }) => (
+                        <td key={value} className="table-cell table-cell-compact text-center text-xs font-black text-amber-700 dark:text-amber-200">
+                          {isVisibleMonth(value) ? formatNumber(pendingByMonth[value]) : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  ) : null}
+                </tbody>
+              </DataTableShell>
+              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Nos últimos 12 meses e no mês atual, itens sem status registrado aparecem como pendentes. Meses futuros e meses antigos sem registro ficam em branco.</p>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function getNextCatalogOrder(items = []) {
@@ -1090,6 +1249,8 @@ function ClientChecklistDetails({
   );
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [showAllClientItems, setShowAllClientItems] = useState(false);
+  const [showYearOverview, setShowYearOverview] = useState(false);
+  const [overviewYear, setOverviewYear] = useState(ano);
   const [showPersonalItemModal, setShowPersonalItemModal] = useState(false);
   const [personalItemDescription, setPersonalItemDescription] = useState('');
 
@@ -1152,6 +1313,8 @@ function ClientChecklistDetails({
 
   useEffect(() => {
     setShowAllClientItems(false);
+    setShowYearOverview(false);
+    setOverviewYear(ano);
     setShowPersonalItemModal(false);
     setPersonalItemDescription('');
   }, [client?.id]);
@@ -1318,6 +1481,21 @@ function ClientChecklistDetails({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {showOperationalControls && configuredItems.length > 0 ? (
+        <ClientYearOverview
+          clientId={client.id}
+          items={configuredItems}
+          year={overviewYear}
+          yearOptions={yearOptions}
+          open={showYearOverview}
+          onToggle={() => {
+            if (!showYearOverview) setOverviewYear(ano);
+            setShowYearOverview((current) => !current);
+          }}
+          onYearChange={setOverviewYear}
+        />
       ) : null}
 
       <div className={classNames('grid gap-4', showOperationalControls && showCatalogConfiguration ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : '')}>
@@ -2235,8 +2413,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const reminderAno = toNumber(competence.ano, ano);
     const reminderMes = toNumber(competence.mes, mes);
     const assunto = buildReminderSubject(client, reminderAno, reminderMes);
-    const texto = buildReminderText(client, reminderAno, reminderMes, pendencias, assinatura.nome);
-    const html = buildReminderHtml(client, reminderAno, reminderMes, pendencias, assinatura.url, assinatura.nome);
+    const texto = buildReminderText(pendencias, assinatura.nome);
+    const html = buildReminderHtml(pendencias, assinatura.url, assinatura.nome);
 
     if (!destinatario || !pendencias.length) return;
 
