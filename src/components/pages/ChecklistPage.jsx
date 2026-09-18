@@ -95,6 +95,13 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_BY_VALUE = Object.fromEntries(STATUS_OPTIONS.map((status) => [status.value, status]));
+const STATUS_CYCLE = STATUS_OPTIONS.map((status) => status.value);
+
+function getNextChecklistStatus(status) {
+  const index = STATUS_CYCLE.indexOf(status);
+  return index < 0 ? STATUS_CYCLE[0] : STATUS_CYCLE[(index + 1) % STATUS_CYCLE.length];
+}
+
 const CATALOG_PREVIEW_LIMIT = 6;
 const CLIENT_CATALOG_PREVIEW_LIMIT = 4;
 const CLIENT_LIST_PAGE_SIZE = 5;
@@ -552,66 +559,38 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [loadedOverview, setLoadedOverview] = useState(null);
-  const [selectedCell, setSelectedCell] = useState(null);
-  const [savingCell, setSavingCell] = useState(false);
+  const [savingCellKey, setSavingCellKey] = useState('');
   const [showAnnualPreview, setShowAnnualPreview] = useState(false);
-  const cellTriggerRef = useRef(null);
+  const saveInFlightRef = useRef(false);
+  const selectedClientRef = useRef(clientId);
+  selectedClientRef.current = clientId;
   const selectedYearRef = useRef(year);
   selectedYearRef.current = year;
-  const { menuRef, menuStyle } = useChecklistFloatingDropdown(Boolean(selectedCell), cellTriggerRef);
-
-  useEffect(() => {
-    setSelectedCell(null);
-  }, [clientId, year, monthFilter, open]);
 
   useEffect(() => {
     setShowAnnualPreview(false);
   }, [clientId]);
 
-  useEffect(() => {
-    if (!selectedCell) return undefined;
-    function handlePointerDown(event) {
-      if (!cellTriggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
-        setSelectedCell(null);
-      }
-    }
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        setSelectedCell(null);
-        cellTriggerRef.current?.focus();
-      }
-    }
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [menuRef, selectedCell]);
-
-  useEffect(() => {
-    if (selectedCell && menuStyle && !menuRef.current?.contains(document.activeElement)) {
-      menuRef.current?.querySelector('[role="menuitemradio"]')?.focus();
-    }
-  }, [menuRef, selectedCell, menuStyle]);
-
-  async function saveSelectedStatus(nextStatus) {
-    if (!selectedCell || savingCell) return;
-    const { item, month } = selectedCell;
+  async function advanceStatus(item, month, currentStatus) {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     const selectedYear = year;
-    setSavingCell(true);
-    const saved = await onStatusChange(client, item.vinculo, nextStatus, { ano: selectedYear, mes: month });
-    if (saved && selectedYearRef.current === selectedYear) {
-      const updateRows = (rows) => [
-        ...rows.filter((row) => (item.tipo === 'personalizado' ? row.item_personalizado_id : row.item_id) !== item.id || row.mes !== month),
-        saved,
-      ];
-      if (item.tipo === 'personalizado') setPersonalStatusRows(updateRows);
-      else setStatusRows(updateRows);
-      cellTriggerRef.current?.focus();
-      setSelectedCell(null);
+    const selectedClientId = clientId;
+    setSavingCellKey(`${item.key}:${month}`);
+    try {
+      const saved = await onStatusChange(client, item.vinculo, getNextChecklistStatus(currentStatus), { ano: selectedYear, mes: month });
+      if (saved && selectedYearRef.current === selectedYear && selectedClientRef.current === selectedClientId) {
+        const updateRows = (rows) => [
+          ...rows.filter((row) => (item.tipo === 'personalizado' ? row.item_personalizado_id : row.item_id) !== item.id || row.mes !== month),
+          saved,
+        ];
+        if (item.tipo === 'personalizado') setPersonalStatusRows(updateRows);
+        else setStatusRows(updateRows);
+      }
+    } finally {
+      saveInFlightRef.current = false;
+      setSavingCellKey('');
     }
-    setSavingCell(false);
   }
 
   useEffect(() => {
@@ -769,27 +748,20 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
                       {visibleMonths.map(({ value }) => {
                         const status = getYearStatus(item, value);
                         const statusMeta = status ? STATUS_BY_VALUE[status] : null;
-                        const cellSelected = selectedCell?.item.key === item.key && selectedCell.month === value;
+                        const nextStatus = getNextChecklistStatus(status);
+                        const nextStatusLabel = STATUS_BY_VALUE[nextStatus].label;
+                        const cellSaving = savingCellKey === `${item.key}:${value}`;
                         return (
                           <td key={value} className="table-cell table-cell-compact text-center">
                             <button
                                 type="button"
-                                aria-label={`Alterar ${item.descricao} em ${getMonthLabel(value)}/${year}. Status: ${statusMeta?.label ?? 'sem registro'}`}
-                                aria-haspopup="menu"
-                                aria-expanded={cellSelected}
-                                disabled={savingCell}
-                                onClick={(event) => {
-                                  if (cellSelected) {
-                                    setSelectedCell(null);
-                                  } else {
-                                    cellTriggerRef.current = event.currentTarget;
-                                    setSelectedCell({ item, month: value });
-                                  }
-                                }}
+                                aria-label={`${item.descricao} em ${getMonthLabel(value)}/${year}. Status: ${statusMeta?.label ?? 'sem registro'}. Clique para ${nextStatusLabel}.`}
+                                aria-busy={cellSaving}
+                                disabled={Boolean(savingCellKey)}
+                                onClick={() => advanceStatus(item, value, status)}
                                 className={classNames(
                                   'inline-flex min-w-[56px] justify-center rounded-md border px-1.5 py-1 text-[11px] font-black transition hover:ring-2 hover:ring-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-60',
                                   statusMeta?.tone ?? 'border-slate-200 text-slate-400 dark:border-gray-700 dark:text-gray-500',
-                                  cellSelected && 'ring-2 ring-blue-500',
                                 )}
                               >
                                 {statusMeta?.shortLabel ?? '—'}
@@ -811,7 +783,7 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
                   ) : null}
                 </tbody>
               </DataTableShell>
-              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em qualquer mês para registrar ou alterar um status. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em um status para avançar: Pendente → OK → N/A → ERP → Pendente. Células sem registro começam em Pendente. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
               {monthFilter === 'todos' && items.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex justify-end">
@@ -864,18 +836,6 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
             </>
           ) : null}
         </div>
-      ) : null}
-      {selectedCell && typeof document !== 'undefined' ? createPortal(
-        <div ref={menuRef} role="menu" aria-label={`Status de ${selectedCell.item.descricao} em ${getMonthLabel(selectedCell.month)}/${year}`} style={menuStyle ?? { visibility: 'hidden' }} className="dropdown-menu-shell overflow-soft normal-case ring-1 ring-slate-900/5 dark:ring-white/5">
-          <p className="border-b border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 dark:border-gray-700 dark:text-gray-300">{getMonthLabel(selectedCell.month)}/{year} · Escolha o status</p>
-          {STATUS_OPTIONS.map((option) => (
-            <button key={option.value} type="button" role="menuitemradio" aria-checked={getYearStatus(selectedCell.item, selectedCell.month) === option.value} disabled={savingCell} onClick={() => saveSelectedStatus(option.value)} className="dropdown-option flex w-full items-center justify-between gap-2 disabled:cursor-wait disabled:opacity-60">
-              <span>{option.label}</span>
-              {getYearStatus(selectedCell.item, selectedCell.month) === option.value ? <Check size={15} aria-hidden="true" /> : null}
-            </button>
-          ))}
-        </div>,
-        document.body,
       ) : null}
     </div>
   );
