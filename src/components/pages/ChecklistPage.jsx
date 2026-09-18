@@ -494,6 +494,56 @@ function buildReminderHtml(pendencias, assinaturaUrl = '', assinaturaNome = '') 
   `;
 }
 
+function buildAnnualReminderSubject(client, year, groups) {
+  const firstMonth = getMonthLabel(groups[0].month);
+  const lastMonth = getMonthLabel(groups[groups.length - 1].month);
+  const period = groups.length === 1 ? `${firstMonth}/${year}` : `${firstMonth} até ${lastMonth}/${year}`;
+  return `Lembrete Contábil - ${period} - ${getClientName(client)}`;
+}
+
+function buildAnnualReminderText(groups, year, assinaturaNome = '') {
+  const sections = groups.map(({ month, pendingItems }) => [
+    `${getMonthLabel(month)}/${year}:`,
+    ...pendingItems.map((item, index) => `• ${index + 1}) ${item.descricao}`),
+  ].join('\n')).join('\n\n');
+  return [
+    'Olá! Tudo bem?',
+    '',
+    'Segue lembrete das documentações pendentes para fechamento contábil do período:',
+    '',
+    sections,
+    '',
+    'Qualquer dúvida, estamos à disposição.',
+    '',
+    'Por favor, confirme o recebimento deste e-mail.',
+    '',
+    'Atenciosamente,',
+    '',
+    assinaturaNome || 'F12 Contabilidade',
+  ].join('\n');
+}
+
+function buildAnnualReminderHtml(groups, year, assinaturaUrl = '', assinaturaNome = '') {
+  const sections = groups.map(({ month, pendingItems }) => `
+    <h3 style="margin:20px 0 6px;font-size:15px;">${escapeHtml(getMonthLabel(month))}/${year}</h3>
+    <ul>${pendingItems.map((item, index) => `<li>${index + 1}) ${escapeHtml(item.descricao)}</li>`).join('')}</ul>
+  `).join('');
+  const assinaturaHtml = assinaturaUrl
+    ? `<div style="margin-top:18px;"><img src="${escapeHtml(assinaturaUrl)}" alt="${escapeHtml(assinaturaNome || 'Assinatura digital')}" style="max-width:520px;width:100%;height:auto;display:block;border:0;" /></div>`
+    : `<p>${escapeHtml(assinaturaNome || 'F12 Contabilidade')}</p>`;
+  return `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
+      <p>Olá! Tudo bem?</p>
+      <p>Segue lembrete das documentações pendentes para fechamento contábil do período:</p>
+      ${sections}
+      <p><strong>Qualquer dúvida, estamos à disposição.</strong></p>
+      <p><strong>Por favor, confirme o recebimento deste e-mail.</strong></p>
+      <p>Atenciosamente,</p>
+      ${assinaturaHtml}
+    </div>
+  `;
+}
+
 function ClientYearOverview({ client, items, year, monthFilter, yearOptions, open, onToggle, onYearChange, onMonthFilterChange, onStatusChange, onSummaryChange }) {
   const clientId = client?.id;
   const [statusRows, setStatusRows] = useState([]);
@@ -607,6 +657,11 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
     value,
     items.filter((item) => getYearStatus(item, value) === CHECKLIST_STATUS.PENDENTE).length,
   ]));
+  const annualPendingGroups = useMemo(() => MONTH_OPTIONS.map(({ value, label }) => ({
+    month: value,
+    label,
+    pendingItems: items.filter((item) => getYearStatus(item, value) === CHECKLIST_STATUS.PENDENTE),
+  })).filter((group) => group.pendingItems.length > 0), [currentMonthIndex, items, statusByItemAndMonth, year]);
   const visibleMonths = monthFilter === 'todos'
     ? MONTH_OPTIONS
     : MONTH_OPTIONS.filter(({ value }) => value === Number(monthFilter));
@@ -629,11 +684,12 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
       total_itens: items.length,
       total_avaliacoes: summaryReady ? assessedCount : 0,
       qtd_pendentes: summaryReady ? visiblePending : 0,
+      pendingGroups: summaryReady ? annualPendingGroups : [],
       percentual_concluido: summaryReady ? completionPercent : null,
       loading: !summaryReady && !error,
       error: Boolean(error),
     });
-  }, [assessedCount, clientId, completionPercent, error, items.length, monthFilter, onSummaryChange, summaryReady, visiblePending, year]);
+  }, [annualPendingGroups, assessedCount, clientId, completionPercent, error, items.length, monthFilter, onSummaryChange, summaryReady, visiblePending, year]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
@@ -751,6 +807,45 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
                 </tbody>
               </DataTableShell>
               <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em qualquer mês para registrar ou alterar um status. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
+              {monthFilter === 'todos' && items.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-700 dark:bg-gray-950/35">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-900 dark:text-white">Prévia das pendências do ano</p>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                        Consulte os documentos por mês. O envio manual usará exatamente os meses e itens desta prévia.
+                      </p>
+                    </div>
+                    <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+                      {formatNumber(visiblePending)} pendência(s) · {formatNumber(annualPendingGroups.length)} mês(es)
+                    </StatusBadge>
+                  </div>
+                  {annualPendingGroups.length > 0 ? (
+                    <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                      {annualPendingGroups.map(({ month, label, pendingItems }) => (
+                        <details key={month} className="rounded-xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900/70">
+                          <summary className="cursor-pointer px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-gray-100">
+                            {label}/{year} · {formatNumber(pendingItems.length)} pendência(s)
+                          </summary>
+                          <ul className="space-y-2 border-t border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 dark:border-gray-700 dark:text-gray-200">
+                            {pendingItems.map((item) => (
+                              <li key={item.key} className="flex gap-2">
+                                <span className="text-amber-600 dark:text-amber-300" aria-hidden="true">•</span>
+                                <span>
+                                  {item.descricao}
+                                  {item.tipo === 'personalizado' ? <span className="ml-1 text-blue-700 dark:text-blue-200">· Específico deste cliente</span> : null}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-gray-400">Nenhuma pendência nos meses com status disponível neste ano.</p>
+                  )}
+                </div>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -1186,8 +1281,12 @@ function ChecklistContactReminder({
   client,
   ano,
   mes,
+  annualMode,
+  overviewYear,
+  reminderGroups,
+  reminderPreviewReady,
+  signatureName,
   contact,
-  pendencias,
   savingContactId,
   sendingReminderId,
   onSaveContact,
@@ -1196,6 +1295,7 @@ function ChecklistContactReminder({
   const [email, setEmail] = useState('');
   const [cc, setCc] = useState('');
   const [localError, setLocalError] = useState('');
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
 
   useEffect(() => {
     setEmail(contact?.email ?? '');
@@ -1206,7 +1306,18 @@ function ChecklistContactReminder({
   const saving = savingContactId === client?.id;
   const sending = sendingReminderId === client?.id;
   const hasEmail = String(email ?? '').trim().length > 0;
-  const pendingCount = pendencias.length;
+  const pendingCount = reminderGroups.reduce((total, group) => total + group.pendingItems.length, 0);
+  const singleMonthItems = reminderGroups[0]?.pendingItems ?? [];
+  const subject = pendingCount > 0
+    ? (annualMode ? buildAnnualReminderSubject(client, overviewYear, reminderGroups) : buildReminderSubject(client, ano, mes))
+    : '';
+  const previewText = annualMode
+    ? buildAnnualReminderText(reminderGroups, overviewYear, signatureName)
+    : buildReminderText(singleMonthItems.map((item) => ({ item_descricao: item.descricao })), signatureName);
+
+  useEffect(() => {
+    setShowEmailPreview(false);
+  }, [ano, mes, annualMode, overviewYear, reminderGroups]);
 
   function validateContact() {
     if (email && !isValidEmailList(email)) {
@@ -1232,7 +1343,8 @@ function ChecklistContactReminder({
       setLocalError('Informe e salve o e-mail principal antes de enviar o lembrete.');
       return;
     }
-    onSendReminder(client, { email, cc });
+    if (!reminderPreviewReady || pendingCount === 0) return;
+    setShowEmailPreview(true);
   }
 
   return (
@@ -1243,9 +1355,16 @@ function ChecklistContactReminder({
             <Mail size={18} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900 dark:text-white">Contatos e lembrete manual</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-black text-slate-900 dark:text-white">Contatos e lembrete manual</p>
+              <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200">
+                {annualMode ? `Ano ${overviewYear} · todos os meses` : `${getMonthLabel(mes)}/${ano}`}
+              </StatusBadge>
+            </div>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-              O envio manual cobra somente os itens pendentes de {getMonthLabel(mes)}/{ano}. O filtro da tabela não altera este período.
+              {annualMode
+                ? `O envio reunirá as pendências de ${formatNumber(reminderGroups.length)} mês(es) de ${overviewYear}, conforme a prévia anual acima.`
+                : `O envio cobrará os itens pendentes de ${getMonthLabel(mes)}/${ano}, selecionado na tabela acima.`}
             </p>
           </div>
         </div>
@@ -1253,7 +1372,7 @@ function ChecklistContactReminder({
           ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'
           : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'}
         >
-          {formatNumber(pendingCount)} pendência(s) neste mês
+          {reminderPreviewReady ? `${formatNumber(pendingCount)} pendência(s)${annualMode ? ' no ano' : ' neste mês'}` : 'Carregando pendências...'}
         </StatusBadge>
       </div>
 
@@ -1289,10 +1408,10 @@ function ChecklistContactReminder({
             size="sm"
             variant="primary"
             onClick={handleSend}
-            disabled={saving || sending || !hasEmail || pendingCount === 0}
+            disabled={saving || sending || !hasEmail || !reminderPreviewReady || pendingCount === 0}
           >
             <Send size={14} aria-hidden="true" />
-            {sending ? 'Enviando...' : 'Enviar lembrete'}
+            {sending ? 'Enviando...' : 'Revisar e enviar'}
           </ActionButton>
         </div>
       </div>
@@ -1303,28 +1422,40 @@ function ChecklistContactReminder({
         </p>
       ) : null}
 
-      {pendingCount === 0 ? (
+      {!reminderPreviewReady ? (
+        <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-gray-400">Carregando a prévia da tabela antes do envio...</p>
+      ) : pendingCount === 0 ? (
         <p className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
-          Não há pendências para esta competência.
+          Não há pendências para o período selecionado.
         </p>
       ) : (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/20 dark:bg-amber-400/10">
           <p className="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências que serão enviadas</p>
-          <ul className="mt-2 space-y-1 text-sm font-semibold text-slate-700 dark:text-gray-200">
-            {pendencias.slice(0, 8).map((pendencia) => (
-              <li key={pendencia.item_id} className="flex gap-2">
-                <span className="text-amber-500">•</span>
-                <span>{pendencia.item_descricao}</span>
-              </li>
-            ))}
-          </ul>
-          {pendencias.length > 8 ? (
-            <p className="mt-2 text-xs font-bold text-slate-500 dark:text-gray-400">
-              + {formatNumber(pendencias.length - 8)} pendência(s)
-            </p>
-          ) : null}
+          <p className="mt-2 text-xs font-semibold text-slate-700 dark:text-gray-200">
+            {annualMode
+              ? reminderGroups.map((group) => `${getMonthLabel(group.month)}/${overviewYear}: ${formatNumber(group.pendingItems.length)}`).join(' · ')
+              : `${getMonthLabel(mes)}/${ano}: ${formatNumber(pendingCount)} documento(s)`}
+          </p>
         </div>
       )}
+
+      {showEmailPreview && typeof document !== 'undefined' ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="checklist-email-preview-title" className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            <h3 id="checklist-email-preview-title" className="text-lg font-black text-slate-900 dark:text-white">Revisar lembrete antes do envio</h3>
+            <p className="mt-3 text-xs font-bold text-slate-500 dark:text-gray-400">Para: {email}{cc ? ` · Cópia: ${cc}` : ''}</p>
+            <p className="mt-2 text-sm font-bold text-slate-800 dark:text-gray-100">Assunto: {subject}</p>
+            <pre className="mt-4 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-800 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-100">{previewText}</pre>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <ActionButton type="button" variant="subtle" onClick={() => setShowEmailPreview(false)}>Cancelar</ActionButton>
+              <ActionButton type="button" variant="primary" onClick={() => { setShowEmailPreview(false); onSendReminder(client, { email, cc }); }}>
+                <Send size={14} aria-hidden="true" /> Confirmar e enviar
+              </ActionButton>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
 
     </div>
   );
@@ -1336,6 +1467,7 @@ function ClientChecklistDetails({
   detail,
   ano,
   mes,
+  responsavelCatalogo,
   yearOptions = [],
   contact,
   catalogItems,
@@ -1352,9 +1484,9 @@ function ClientChecklistDetails({
   onSaveContact,
   onSendReminder,
   onStatusChange,
-  onCompetenceChange,
   onOverviewSummaryChange,
   overviewSelection,
+  overviewSummary,
   onOverviewSelectionChange,
 }) {
   const linkedIdsKey = useMemo(
@@ -1366,6 +1498,13 @@ function ClientChecklistDetails({
   const [showYearOverview, setShowYearOverview] = useState(true);
   const overviewYear = overviewSelection?.year ?? ano;
   const overviewMonth = overviewSelection?.monthFilter ?? 'todos';
+  const annualMode = overviewMonth === 'todos';
+  const reminderPreviewReady = overviewSummary?.year === overviewYear
+    && overviewSummary?.monthFilter === overviewMonth
+    && !overviewSummary?.loading && !overviewSummary?.error;
+  const reminderGroups = useMemo(() => reminderPreviewReady
+    ? (overviewSummary.pendingGroups ?? []).filter((group) => annualMode || group.month === Number(overviewMonth))
+    : [], [annualMode, overviewMonth, overviewSummary?.pendingGroups, reminderPreviewReady]);
   const [showPersonalItemModal, setShowPersonalItemModal] = useState(false);
   const [personalItemDescription, setPersonalItemDescription] = useState('');
 
@@ -1579,48 +1718,18 @@ function ClientChecklistDetails({
         />
       ) : null}
 
-      {showOperationalControls ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900/70">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex min-w-0 gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-200">
-                <Mail size={18} aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-white">Competência do lembrete</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                  Defina o mês e ano das pendências para o envio manual. O filtro do acompanhamento é independente.
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:w-[360px]">
-              <ChecklistDropdownSelect
-                label="Mês"
-                value={mes}
-                options={MONTH_OPTIONS}
-                onChange={(value) => onCompetenceChange(client, { mes: Number(value), ano })}
-                includeBlank={false}
-              />
-              <ChecklistDropdownSelect
-                label="Ano"
-                value={ano}
-                options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
-                onChange={(value) => onCompetenceChange(client, { mes, ano: Number(value) })}
-                includeBlank={false}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className={classNames('grid gap-4', showOperationalControls && showCatalogConfiguration ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : '')}>
         {showOperationalControls ? (
           <ChecklistContactReminder
             client={client}
             ano={ano}
             mes={mes}
+            annualMode={annualMode}
+            overviewYear={overviewYear}
+            reminderGroups={reminderGroups}
+            reminderPreviewReady={reminderPreviewReady}
+            signatureName={getClientResponsibleSignature(client, responsavelCatalogo).nome}
             contact={contact}
-            pendencias={detail.pendencias ?? []}
             savingContactId={savingContactId}
             sendingReminderId={sendingReminderId}
             onSaveContact={onSaveContact}
@@ -1846,10 +1955,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       if (previous && Object.keys(summary).every((key) => previous[key] === summary[key])) return current;
       return { ...current, [clientId]: summary };
     });
-  }, []);
-
-  const handleOverviewSelectionChange = useCallback((clientId, selection) => {
-    setOverviewSelectionsByClient((current) => ({ ...current, [clientId]: selection }));
   }, []);
 
   useEffect(() => {
@@ -2145,6 +2250,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   }, [contactsByClient, rows]);
 
   function getClientCompetence(clienteId) {
+    const overviewSelection = overviewSelectionsByClient[clienteId];
+    if (overviewSelection?.monthFilter && overviewSelection.monthFilter !== 'todos') {
+      return { ano: toNumber(overviewSelection.year, ano), mes: toNumber(overviewSelection.monthFilter, mes) };
+    }
     return clientCompetences[clienteId] ?? { ano, mes };
   }
 
@@ -2216,18 +2325,20 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     }
   }
 
-  function handleClientCompetenceChange(client, nextCompetence) {
-    if (!client?.id) return;
-    const selectedCompetence = {
-      ano: toNumber(nextCompetence.ano, ano),
-      mes: toNumber(nextCompetence.mes, mes),
+  function handleOverviewSelectionChange(clientId, selection) {
+    if (!clientId) return;
+    const nextSelection = {
+      year: toNumber(selection.year, ano),
+      monthFilter: selection.monthFilter,
     };
-
-    setClientCompetences((current) => ({
-      ...current,
-      [client.id]: selectedCompetence,
-    }));
-    loadClientDetails(client.id, { force: true, competence: selectedCompetence });
+    const nextCompetence = nextSelection.monthFilter === 'todos'
+      ? (clientCompetences[clientId] ?? { ano, mes })
+      : { ano: nextSelection.year, mes: toNumber(nextSelection.monthFilter, mes) };
+    setOverviewSelectionsByClient((current) => ({ ...current, [clientId]: nextSelection }));
+    const currentDetail = detailsByClient[clientId];
+    if (currentDetail?.ano !== nextCompetence.ano || currentDetail?.mes !== nextCompetence.mes) {
+      loadClientDetails(clientId, { force: true, competence: nextCompetence });
+    }
   }
 
   function clearChecklistFilters() {
@@ -2518,17 +2629,36 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   async function handleSendReminder(client, values) {
     if (!client?.id) return;
 
-    const detail = detailsByClient[client.id] ?? {};
-    const pendencias = detail.pendencias ?? [];
+    const summary = overviewSummariesByClient[client.id];
+    const selection = overviewSelectionsByClient[client.id] ?? { year: summary?.year ?? ano, monthFilter: 'todos' };
+    const reminderAno = toNumber(selection.year, ano);
+    const annualMode = selection.monthFilter === 'todos';
+    const reminderMes = annualMode ? null : toNumber(selection.monthFilter, mes);
+    if (!summary || summary.loading || summary.error || summary.year !== reminderAno || summary.monthFilter !== selection.monthFilter) {
+      setToast({ tone: 'danger', title: 'Prévia ainda não carregada', message: 'Aguarde as pendências da tabela antes de enviar o lembrete.' });
+      return;
+    }
+    const reminderGroups = (summary.pendingGroups ?? []).filter((group) => annualMode || group.month === reminderMes);
+    const pendencias = reminderGroups.flatMap((group) => group.pendingItems.map((item) => ({
+      item_id: item.id,
+      item_tipo: item.tipo,
+      descricao: item.descricao,
+      ano: reminderAno,
+      mes: group.month,
+    })));
     const destinatario = String(values.email ?? '').trim();
     const cc = String(values.cc ?? '').trim();
     const assinatura = getClientResponsibleSignature(client, responsavelCatalogo);
-    const competence = getClientCompetence(client.id);
-    const reminderAno = toNumber(competence.ano, ano);
-    const reminderMes = toNumber(competence.mes, mes);
-    const assunto = buildReminderSubject(client, reminderAno, reminderMes);
-    const texto = buildReminderText(pendencias, assinatura.nome);
-    const html = buildReminderHtml(pendencias, assinatura.url, assinatura.nome);
+    const assunto = annualMode
+      ? (reminderGroups.length ? buildAnnualReminderSubject(client, reminderAno, reminderGroups) : '')
+      : buildReminderSubject(client, reminderAno, reminderMes);
+    const singleMonthPendencias = reminderGroups[0]?.pendingItems.map((item) => ({ item_descricao: item.descricao })) ?? [];
+    const texto = annualMode
+      ? buildAnnualReminderText(reminderGroups, reminderAno, assinatura.nome)
+      : buildReminderText(singleMonthPendencias, assinatura.nome);
+    const html = annualMode
+      ? buildAnnualReminderHtml(reminderGroups, reminderAno, assinatura.url, assinatura.nome)
+      : buildReminderHtml(singleMonthPendencias, assinatura.url, assinatura.nome);
 
     if (!destinatario || !pendencias.length) return;
 
@@ -2558,17 +2688,15 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           razao_social: client.razao_social ?? '',
           nome_identificacao: getClientName(client),
         },
-        competencia: { ano: reminderAno, mes: reminderMes, descricao: `${getMonthLabel(reminderMes)}/${reminderAno}` },
-        pendencias: pendencias.map((pendencia) => ({
-          item_id: pendencia.item_id,
-          descricao: pendencia.item_descricao,
-        })),
+        competencia: { ano: reminderAno, mes: reminderMes, descricao: annualMode ? `Pendências de ${reminderAno}` : `${getMonthLabel(reminderMes)}/${reminderAno}` },
+        competencias: reminderGroups.map((group) => ({ ano: reminderAno, mes: group.month })),
+        pendencias,
       });
 
       const emailResendId = sent && typeof sent === 'object' ? String(sent.id ?? '') : '';
       await registrarChecklistEnvio({
         cliente_id: client.id,
-        competencias: [{ ano: reminderAno, mes: reminderMes }],
+        competencias: reminderGroups.map((group) => ({ ano: reminderAno, mes: group.month })),
         destinatario,
         cc,
         assunto,
@@ -2580,7 +2708,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       setToast({
         tone: 'success',
         title: 'Lembrete enviado',
-        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s) de ${getMonthLabel(reminderMes)}/${reminderAno}.`,
+        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s) de ${formatNumber(reminderGroups.length)} mês(es) de ${reminderAno}.`,
       });
     } catch (err) {
       setToast({
@@ -3016,6 +3144,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       detail={detailsByClient[row.cliente_id]}
                       ano={toNumber(rowCompetence.ano, ano)}
                       mes={toNumber(rowCompetence.mes, mes)}
+                      responsavelCatalogo={responsavelCatalogo}
                       yearOptions={yearOptions}
                       contact={contactsByClient[row.cliente_id]}
                       catalogItems={catalogItems}
@@ -3032,9 +3161,9 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       onSaveContact={handleSaveContact}
                       onSendReminder={handleSendReminder}
                       onStatusChange={handleStatusChange}
-                      onCompetenceChange={handleClientCompetenceChange}
                       onOverviewSummaryChange={handleOverviewSummaryChange}
                       overviewSelection={overviewSelectionsByClient[row.cliente_id]}
+                      overviewSummary={overviewSummariesByClient[row.cliente_id]}
                       onOverviewSelectionChange={handleOverviewSelectionChange}
                     />
                   </div>
