@@ -16,10 +16,13 @@ export function TableScrollArea({ children, className = '', topClassName = '' })
     const updateMetrics = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        setScrollMetrics({
-          scrollWidth: tableScroll.scrollWidth,
-          clientWidth: tableScroll.clientWidth,
-        });
+        const scrollWidth = tableScroll.scrollWidth;
+        const clientWidth = tableScroll.clientWidth;
+        setScrollMetrics((previous) => (
+          previous.scrollWidth === scrollWidth && previous.clientWidth === clientWidth
+            ? previous
+            : { scrollWidth, clientWidth }
+        ));
       });
     };
 
@@ -35,23 +38,29 @@ export function TableScrollArea({ children, className = '', topClassName = '' })
       }
     };
 
-    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    const observeContent = () => {
+      observer.disconnect();
+      observer.observe(tableScroll);
+      Array.from(tableScroll.children).forEach((child) => observer.observe(child));
+      updateMetrics();
+    };
+    const childObserver = new MutationObserver(observeContent);
+    childObserver.observe(tableScroll, { childList: true });
+    observeContent();
     tableScroll.addEventListener('scroll', syncFromTable, { passive: true });
     topScroll.addEventListener('scroll', syncFromTop, { passive: true });
     window.addEventListener('resize', updateMetrics);
 
-    const observer = new ResizeObserver(updateMetrics);
-    observer.observe(tableScroll);
-    Array.from(tableScroll.children).forEach((child) => observer.observe(child));
-
     return () => {
       cancelAnimationFrame(frame);
+      childObserver.disconnect();
       observer.disconnect();
       tableScroll.removeEventListener('scroll', syncFromTable);
       topScroll.removeEventListener('scroll', syncFromTop);
       window.removeEventListener('resize', updateMetrics);
     };
-  }, [children]);
+  }, []);
 
   const hasHorizontalScroll = scrollMetrics.scrollWidth > scrollMetrics.clientWidth + 1;
 

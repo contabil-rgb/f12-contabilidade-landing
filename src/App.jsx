@@ -3972,7 +3972,7 @@ function AppShell({
         </div>
       </aside>
 
-      <div className={`min-w-0 transition-[padding] duration-200 ${sidebarExpanded ? 'lg:pl-60 xl:pl-64 2xl:pl-72' : ''}`}>
+      <div className={`min-w-0 ${sidebarExpanded ? 'lg:pl-60 xl:pl-64 2xl:pl-72' : ''}`}>
         <header className="z-30 border-b border-slate-300/70 bg-[#e7f1f8]/92 backdrop-blur supports-[backdrop-filter]:bg-[#e7f1f8]/84 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80 lg:sticky lg:top-0">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-6 xl:px-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -4041,7 +4041,7 @@ function AppShell({
         </header>
 
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">
-          <div key={page} className="page-transition min-w-0">
+          <div key={page} className="min-w-0">
             {children}
           </div>
         </main>
@@ -4329,7 +4329,7 @@ function DashboardSituationCard({ values, total }) {
                 </linearGradient>
               </defs>
               <path d={areaPath} fill="url(#dashboard-area-fill)" />
-              <path d={linePath} className="dashboard-line" fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={linePath} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
               {points.map((point, index) => (
                 <circle
                   key={`${point.x}-${point.y}-${index}`}
@@ -6823,7 +6823,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                 Restaurar padrão
               </button>
             </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="mt-4 grid min-w-0 gap-3">
               <div className="space-y-3">
                 <label className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
                   Assunto sugerido
@@ -6854,9 +6854,9 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                 </label>
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">Prévia formatada</p>
-                <div className="mt-1 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-950 shadow-sm dark:border-gray-700 dark:bg-white dark:text-slate-950">
+                <div className="mt-1 min-w-0 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-950 shadow-sm dark:border-gray-700 dark:bg-white dark:text-slate-950">
                   {retificacaoAtiva ? (
                     <p className="mb-2 text-sm font-semibold text-slate-950">
                       {REINF_RETIFICATION_NOTICE}
@@ -6870,7 +6870,7 @@ function ReinfFiscalModal({ client, selectedSocioByClientId = {}, responsavelOpt
                         : <div key={`intro-blank-${index}`} className="h-2" />
                     ))}
                   </div>
-                  <div className="mt-4 overflow-x-auto">
+                  <div className="mt-4 max-w-full overflow-x-auto overscroll-x-contain">
                     {isTotalsModel ? (
                       <table className="min-w-[760px] border-collapse border border-slate-950 bg-white text-left text-[13px] leading-5 text-slate-950">
                         <thead>
