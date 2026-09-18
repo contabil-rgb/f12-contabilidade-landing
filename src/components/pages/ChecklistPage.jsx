@@ -554,6 +554,7 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
   const [loadedOverview, setLoadedOverview] = useState(null);
   const [selectedCell, setSelectedCell] = useState(null);
   const [savingCell, setSavingCell] = useState(false);
+  const [showAnnualPreview, setShowAnnualPreview] = useState(false);
   const cellTriggerRef = useRef(null);
   const selectedYearRef = useRef(year);
   selectedYearRef.current = year;
@@ -562,6 +563,10 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
   useEffect(() => {
     setSelectedCell(null);
   }, [clientId, year, monthFilter, open]);
+
+  useEffect(() => {
+    setShowAnnualPreview(false);
+  }, [clientId]);
 
   useEffect(() => {
     if (!selectedCell) return undefined;
@@ -808,42 +813,52 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, ope
               </DataTableShell>
               <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em qualquer mês para registrar ou alterar um status. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
               {monthFilter === 'todos' && items.length > 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-700 dark:bg-gray-950/35">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-black text-slate-900 dark:text-white">Prévia das pendências do ano</p>
-                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                        Consulte os documentos por mês. O envio manual usará exatamente os meses e itens desta prévia.
-                      </p>
-                    </div>
-                    <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-                      {formatNumber(visiblePending)} pendência(s) · {formatNumber(annualPendingGroups.length)} mês(es)
-                    </StatusBadge>
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <ActionButton type="button" size="sm" variant="subtle" onClick={() => setShowAnnualPreview((current) => !current)} aria-expanded={showAnnualPreview}>
+                      {showAnnualPreview ? 'Ocultar prévia das pendências' : 'Visualizar prévia das pendências'}
+                      <ChevronDown size={16} className={classNames('transition-transform', showAnnualPreview && 'rotate-180')} aria-hidden="true" />
+                    </ActionButton>
                   </div>
-                  {annualPendingGroups.length > 0 ? (
-                    <div className="mt-4 grid gap-2 lg:grid-cols-2">
-                      {annualPendingGroups.map(({ month, label, pendingItems }) => (
-                        <details key={month} className="rounded-xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900/70">
-                          <summary className="cursor-pointer px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-gray-100">
-                            {label}/{year} · {formatNumber(pendingItems.length)} pendência(s)
-                          </summary>
-                          <ul className="space-y-2 border-t border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 dark:border-gray-700 dark:text-gray-200">
-                            {pendingItems.map((item) => (
-                              <li key={item.key} className="flex gap-2">
-                                <span className="text-amber-600 dark:text-amber-300" aria-hidden="true">•</span>
-                                <span>
-                                  {item.descricao}
-                                  {item.tipo === 'personalizado' ? <span className="ml-1 text-blue-700 dark:text-blue-200">· Específico deste cliente</span> : null}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      ))}
+                  {showAnnualPreview ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-gray-700 dark:bg-gray-950/35">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-900 dark:text-white">Prévia das pendências do ano</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
+                            Consulte os documentos por mês. O envio manual usará exatamente os meses e itens desta prévia.
+                          </p>
+                        </div>
+                        <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+                          {formatNumber(visiblePending)} pendência(s) · {formatNumber(annualPendingGroups.length)} mês(es)
+                        </StatusBadge>
+                      </div>
+                      {annualPendingGroups.length > 0 ? (
+                        <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                          {annualPendingGroups.map(({ month, label, pendingItems }) => (
+                            <details key={month} className="rounded-xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900/70">
+                              <summary className="cursor-pointer px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-gray-100">
+                                {label}/{year} · {formatNumber(pendingItems.length)} pendência(s)
+                              </summary>
+                              <ul className="space-y-2 border-t border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 dark:border-gray-700 dark:text-gray-200">
+                                {pendingItems.map((item) => (
+                                  <li key={item.key} className="flex gap-2">
+                                    <span className="text-amber-600 dark:text-amber-300" aria-hidden="true">•</span>
+                                    <span>
+                                      {item.descricao}
+                                      {item.tipo === 'personalizado' ? <span className="ml-1 text-blue-700 dark:text-blue-200">· Específico deste cliente</span> : null}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-gray-400">Nenhuma pendência nos meses com status disponível neste ano.</p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-gray-400">Nenhuma pendência nos meses com status disponível neste ano.</p>
-                  )}
+                  ) : null}
                 </div>
               ) : null}
             </>
