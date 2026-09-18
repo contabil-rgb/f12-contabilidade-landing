@@ -582,17 +582,34 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, cur
     saveInFlightRef.current = true;
     const selectedYear = year;
     const selectedClientId = clientId;
+    const nextStatus = getNextChecklistStatus(currentStatus);
+    const isPersonalizado = item.tipo === 'personalizado';
+    const updateRows = (rows, row) => [
+      ...rows.filter((current) => (isPersonalizado ? current.item_personalizado_id : current.item_id) !== item.id || current.mes !== month),
+      ...(row ? [row] : []),
+    ];
+    const previousRow = (isPersonalizado ? personalStatusRows : statusRows).find((row) =>
+      (isPersonalizado ? row.item_personalizado_id : row.item_id) === item.id && row.mes === month
+    );
+    const setRows = isPersonalizado ? setPersonalStatusRows : setStatusRows;
     setSavingCellKey(`${item.key}:${month}`);
+    setRows((rows) => updateRows(rows, {
+      ...(previousRow ?? {}),
+      [isPersonalizado ? 'item_personalizado_id' : 'item_id']: item.id,
+      ano: selectedYear,
+      mes: month,
+      status: nextStatus,
+    }));
     try {
-      const saved = await onStatusChange(client, item.vinculo, getNextChecklistStatus(currentStatus), { ano: selectedYear, mes: month });
-      if (saved && selectedYearRef.current === selectedYear && selectedClientRef.current === selectedClientId) {
-        const updateRows = (rows) => [
-          ...rows.filter((row) => (item.tipo === 'personalizado' ? row.item_personalizado_id : row.item_id) !== item.id || row.mes !== month),
-          saved,
-        ];
-        if (item.tipo === 'personalizado') setPersonalStatusRows(updateRows);
-        else setStatusRows(updateRows);
+      const saved = await onStatusChange(client, item.vinculo, nextStatus, { ano: selectedYear, mes: month });
+      if (selectedYearRef.current === selectedYear && selectedClientRef.current === selectedClientId) {
+        setRows((rows) => updateRows(rows, saved || previousRow));
       }
+    } catch (error) {
+      if (selectedYearRef.current === selectedYear && selectedClientRef.current === selectedClientId) {
+        setRows((rows) => updateRows(rows, previousRow));
+      }
+      console.error('[checklist-status]', error);
     } finally {
       saveInFlightRef.current = false;
       setSavingCellKey('');
@@ -1274,6 +1291,7 @@ function ChecklistContactReminder({
   contact,
   savingContactId,
   sendingReminderId,
+  statusSaving,
   onSaveContact,
   onSendReminder,
 }) {
@@ -1329,7 +1347,7 @@ function ChecklistContactReminder({
       setLocalError('Informe e salve o e-mail principal antes de enviar o lembrete.');
       return;
     }
-    if (!reminderPreviewReady || !reminderPeriodEligible || pendingCount === 0) return;
+    if (!reminderPreviewReady || !reminderPeriodEligible || statusSaving || pendingCount === 0) return;
     setShowEmailPreview(true);
   }
 
@@ -1398,7 +1416,7 @@ function ChecklistContactReminder({
             size="sm"
             variant="primary"
             onClick={handleSend}
-            disabled={saving || sending || !hasEmail || !reminderPreviewReady || !reminderPeriodEligible || pendingCount === 0}
+            disabled={saving || sending || statusSaving || !hasEmail || !reminderPreviewReady || !reminderPeriodEligible || pendingCount === 0}
           >
             <Send size={14} aria-hidden="true" />
             {sending ? 'Enviando...' : 'Revisar e enviar'}
@@ -1462,6 +1480,7 @@ function ClientChecklistDetails({
   savingConfigId,
   savingContactId,
   sendingReminderId,
+  statusSaving,
   personalItemBusyKey,
   onReload,
   onSaveClientItems,
@@ -1723,6 +1742,7 @@ function ClientChecklistDetails({
             contact={contact}
             savingContactId={savingContactId}
             sendingReminderId={sendingReminderId}
+            statusSaving={statusSaving}
             onSaveContact={onSaveContact}
             onSendReminder={onSendReminder}
           />
@@ -1923,7 +1943,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [detailsByClient, setDetailsByClient] = useState({});
   const [overviewSummariesByClient, setOverviewSummariesByClient] = useState({});
   const [overviewSelectionsByClient, setOverviewSelectionsByClient] = useState({});
+  const resumoRequestId = useRef(0);
   const detailRequestIds = useRef({});
+  const statusSavePendingClients = useRef(new Set());
+  const [statusSavingClientId, setStatusSavingClientId] = useState('');
   const [catalogItems, setCatalogItems] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
@@ -2006,13 +2029,16 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   }, [clients]);
 
   async function loadResumo({ silent = false } = {}) {
+    const requestId = ++resumoRequestId.current;
     if (!silent) setLoadingResumo(true);
     setError('');
     try {
       const rows = await listarChecklistResumo({ ano, mes });
-      setResumos(rows);
+      if (resumoRequestId.current === requestId) setResumos(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível carregar o resumo do checklist.');
+      if (resumoRequestId.current === requestId) {
+        setError(err instanceof Error ? err.message : 'Não foi possível carregar o resumo do checklist.');
+      }
     } finally {
       if (!silent) setLoadingResumo(false);
     }
@@ -2367,6 +2393,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
     const statusMes = toNumber(competence.mes, mes);
     const isSelectedCompetence = statusAno === toNumber(selectedCompetence.ano, ano)
       && statusMes === toNumber(selectedCompetence.mes, mes);
+    statusSavePendingClients.current.add(client.id);
+    setStatusSavingClientId(client.id);
     setToast(null);
 
     try {
@@ -2388,6 +2416,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
       if (isSelectedCompetence) setDetailsByClient((current) => {
         const detail = current[client.id] ?? {};
+        if (detail.ano !== statusAno || detail.mes !== statusMes) return current;
         if (isPersonalizado) {
           return {
             ...current,
@@ -2421,15 +2450,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         };
       });
 
-      await Promise.all([
-        loadResumo({ silent: true }),
-        ...(isSelectedCompetence ? [loadClientDetails(client.id, { force: true, competence: selectedCompetence })] : []),
-      ]);
-      setToast({ tone: 'success', title: 'Status atualizado', message: `${getClientName(client)} foi atualizado para ${getMonthLabel(statusMes)}/${statusAno}.` });
+      void loadResumo({ silent: true });
       return saved;
     } catch (err) {
       setToast({ tone: 'danger', title: 'Erro ao salvar status', message: err instanceof Error ? err.message : 'Não foi possível salvar o status.' });
       return null;
+    } finally {
+      statusSavePendingClients.current.delete(client.id);
+      setStatusSavingClientId('');
     }
   }
 
@@ -2635,6 +2663,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
   async function handleSendReminder(client, values) {
     if (!client?.id) return;
+    if (statusSavePendingClients.current.has(client.id)) {
+      setToast({ tone: 'danger', title: 'Status ainda sendo salvo', message: 'Aguarde a confirmação do status antes de revisar o lembrete.' });
+      return;
+    }
 
     const summary = overviewSummariesByClient[client.id];
     const selection = overviewSelectionsByClient[client.id] ?? { year: summary?.year ?? ano, monthFilter: 'todos' };
@@ -3175,6 +3207,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                       savingConfigId={savingConfigId}
                       savingContactId={savingContactId}
                       sendingReminderId={sendingReminderId}
+                      statusSaving={statusSavingClientId === row.cliente_id}
                       personalItemBusyKey={personalItemBusyKey}
                       onReload={(clienteId) => loadClientDetails(clienteId, { force: true })}
                       onSaveClientItems={handleSaveClientItems}
