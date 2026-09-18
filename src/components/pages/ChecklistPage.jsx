@@ -1428,16 +1428,7 @@ function ChecklistContactReminder({
         <p className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
           Não há pendências para o período selecionado.
         </p>
-      ) : (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/20 dark:bg-amber-400/10">
-          <p className="text-xs font-black uppercase tracking-wide text-amber-700 dark:text-amber-200">Pendências que serão enviadas</p>
-          <p className="mt-2 text-xs font-semibold text-slate-700 dark:text-gray-200">
-            {annualMode
-              ? reminderGroups.map((group) => `${getMonthLabel(group.month)}/${overviewYear}: ${formatNumber(group.pendingItems.length)}`).join(' · ')
-              : `${getMonthLabel(mes)}/${ano}: ${formatNumber(pendingCount)} documento(s)`}
-          </p>
-        </div>
-      )}
+      ) : null}
 
       {showEmailPreview && typeof document !== 'undefined' ? createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4" role="presentation">
