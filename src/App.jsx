@@ -25,7 +25,9 @@ import {
   LockKeyhole,
   LogOut,
   Mail,
+  Menu,
   Paperclip,
+  PanelLeftClose,
   Plus,
   RefreshCcw,
   Save,
@@ -3841,6 +3843,8 @@ function AppShell({
   supabaseStatusTone = 'neutral',
   writeBlockedMessage = '',
 }) {
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.permission || can(currentUser, item.permission));
   const profile = getProfile(currentUser);
   const currentTitle = NAV_ITEMS.find((item) => item.key === page)?.label ?? 'Cliente';
@@ -3861,17 +3865,56 @@ function AppShell({
     }))
     .filter((group) => group.items.length > 0);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    function handleEscape(event) {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    }
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    function handleDesktopChange(event) {
+      if (event.matches) setMobileMenuOpen(false);
+    }
+    window.addEventListener('keydown', handleEscape);
+    desktopMedia.addEventListener('change', handleDesktopChange);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+      desktopMedia.removeEventListener('change', handleDesktopChange);
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-gray-100">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 overflow-y-auto overflow-x-hidden border-r border-slate-300/80 bg-[#d8e7f3]/95 text-[#16324f] shadow-[18px_0_48px_rgba(30,64,115,0.16)] dark:border-gray-800 dark:bg-gray-950 dark:text-white dark:shadow-none lg:block xl:w-64 2xl:w-72 sidebar-scroll">
+      {mobileMenuOpen ? (
+        <button
+          type="button"
+          aria-label="Fechar menu de navegação"
+          className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      ) : null}
+      <aside
+        id="portal-sidebar"
+        className={`fixed inset-y-0 left-0 z-50 w-60 max-w-[calc(100vw-3rem)] overflow-y-auto overflow-x-hidden border-r border-slate-300/80 bg-[#d8e7f3]/95 text-[#16324f] shadow-[18px_0_48px_rgba(30,64,115,0.16)] dark:border-gray-800 dark:bg-gray-950 dark:text-white dark:shadow-none xl:w-64 2xl:w-72 sidebar-scroll ${mobileMenuOpen ? 'block' : 'hidden'} ${sidebarExpanded ? 'lg:block' : 'lg:hidden'}`}
+      >
         <div className="flex min-h-full flex-col">
           <div className="border-b border-slate-300/70 bg-[#c9deef]/45 px-4 py-4 dark:border-gray-800 dark:bg-transparent xl:px-5 2xl:px-6 2xl:py-6">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
               <img
                 src={f12Logo}
                 alt="F12 Contabilidade Estratégica"
                 className="h-11 w-32 rounded-lg bg-[#080c2b] object-contain object-left xl:h-12 xl:w-36 2xl:h-14 2xl:w-40"
               />
+              <button
+                type="button"
+                aria-label="Fechar menu de navegação"
+                className="rounded-lg p-2 text-slate-700 hover:bg-white/65 dark:text-gray-200 dark:hover:bg-gray-800 lg:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
               <div className="sr-only">
                 <p>Portal Contábil</p>
                 <p>Gestão interna</p>
@@ -3887,7 +3930,7 @@ function AppShell({
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setPage(key)}
+                    onClick={() => { setPage(key); setMobileMenuOpen(false); }}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-bold transition 2xl:gap-3 2xl:py-2.5 2xl:text-sm ${
                       page === key ? 'bg-brand-blue text-white shadow-sm shadow-blue-950/20' : 'text-slate-700 hover:bg-white/65 hover:text-slate-950 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
                     }`}
@@ -3929,18 +3972,40 @@ function AppShell({
         </div>
       </aside>
 
-      <div className="min-w-0 lg:pl-60 xl:pl-64 2xl:pl-72">
+      <div className={`min-w-0 transition-[padding] duration-200 ${sidebarExpanded ? 'lg:pl-60 xl:pl-64 2xl:pl-72' : ''}`}>
         <header className="z-30 border-b border-slate-300/70 bg-[#e7f1f8]/92 backdrop-blur supports-[backdrop-filter]:bg-[#e7f1f8]/84 dark:border-gray-800 dark:bg-gray-900/90 dark:supports-[backdrop-filter]:bg-gray-900/80 lg:sticky lg:top-0">
           <div className="flex min-h-24 flex-col gap-4 px-4 py-4 sm:px-6 lg:px-6 xl:px-7 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <div className="min-w-0">
-              <img
-                src={f12Logo}
-                alt="F12 Contabilidade Estratégica"
-                className="mb-4 h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left lg:hidden"
-              />
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
-              <h1 className={`mt-1 max-w-full font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
-              <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <button
+                type="button"
+                aria-label={mobileMenuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+                aria-controls="portal-sidebar"
+                aria-expanded={mobileMenuOpen}
+                className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300/80 bg-white/60 text-slate-700 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:hidden"
+                onClick={() => setMobileMenuOpen((open) => !open)}
+              >
+                {mobileMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+              </button>
+              <button
+                type="button"
+                aria-label={sidebarExpanded ? 'Recolher menu lateral' : 'Mostrar menu lateral'}
+                aria-controls="portal-sidebar"
+                aria-expanded={sidebarExpanded}
+                className="mt-1 hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300/80 bg-white/60 text-slate-700 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 lg:inline-flex"
+                onClick={() => setSidebarExpanded((expanded) => !expanded)}
+              >
+                {sidebarExpanded ? <PanelLeftClose size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+              </button>
+              <div className="min-w-0">
+                <img
+                  src={f12Logo}
+                  alt="F12 Contabilidade Estratégica"
+                  className="mb-4 h-12 w-36 rounded-lg bg-[#080c2b] object-contain object-left lg:hidden"
+                />
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Escritório contábil | Carteira de clientes</p>
+                <h1 className={`mt-1 max-w-full font-black tracking-tight leading-tight text-slate-950 dark:text-gray-100 ${page === 'dashboard' ? 'text-[1.75rem] sm:text-[1.95rem]' : 'text-[2rem] sm:text-[2.15rem]'}`}>{currentTitle}</h1>
+                <p className={`mt-2 max-w-2xl font-semibold text-slate-500 dark:text-gray-300 ${page === 'dashboard' ? 'text-[13px] leading-5' : 'text-sm leading-6'}`}>{pageDescription}</p>
+              </div>
             </div>
 
             {showDashboardHeaderControls ? (
@@ -3973,22 +4038,6 @@ function AppShell({
               <AlertBanner tone="warning">{writeBlockedMessage}</AlertBanner>
             </div>
           ) : null}
-
-          <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 sm:px-6 dark:border-gray-800 lg:hidden">
-            {visibleNavItems.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setPage(key)}
-                className={`inline-flex min-w-[calc(50%-0.25rem)] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold sm:min-w-0 ${
-                  page === key ? 'bg-brand-blue text-white' : 'bg-white text-slate-700 shadow-sm dark:bg-gray-800 dark:text-gray-100'
-                }`}
-              >
-                <Icon size={16} aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
         </header>
 
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-6 xl:px-8">
