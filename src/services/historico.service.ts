@@ -13,6 +13,7 @@ export const CAMPOS_HISTORICO_RELEVANTES = [
   'ultima_competencia_entregue',
   'situacao',
   'dias_atraso',
+  'dias_atraso_texto',
   'distribuicao_lucros',
   'envio_reinf',
   'data_enviada_reinf',

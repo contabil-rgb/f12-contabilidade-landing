@@ -11,7 +11,8 @@ function preferBoolean(persistedValue, fallbackValue) {
 }
 
 export function analyzeClient(client) {
-  const diasAtraso = numberValue(client.dias_atraso);
+  const diasAtrasoTexto = String(client.dias_atraso_texto ?? client.dias_atraso ?? '').trim();
+  const diasAtraso = numberValue(diasAtrasoTexto);
   const situacao = normalizeText(client.situacao);
   const obrigacoes = client?._db_obrigacoes ?? {};
 
@@ -81,7 +82,9 @@ export function analyzeClient(client) {
   const alerts = [
     emAtraso && {
       key: 'atraso',
-      label: diasAtraso > 0 ? `${diasAtraso} dia(s) de atraso` : 'Competência em atraso',
+      label: diasAtraso > 0
+        ? `${diasAtraso} dia(s) de atraso`
+        : (diasAtrasoTexto && diasAtrasoTexto !== '0' ? diasAtrasoTexto : 'Competência em atraso'),
       tone: 'danger',
     },
     situacaoCritica && { key: 'critico', label: 'Situação crítica', tone: 'danger' },

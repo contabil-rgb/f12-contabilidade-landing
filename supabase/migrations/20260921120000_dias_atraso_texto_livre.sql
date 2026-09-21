@@ -1,3 +1,13 @@
+-- Adiciona um campo textual livre para a informação de atraso.
+-- O campo numérico legado é preservado para manter indicadores e views existentes.
+
+alter table public.clientes
+  add column if not exists dias_atraso_texto text;
+
+update public.clientes
+set dias_atraso_texto = dias_atraso::text
+where dias_atraso_texto is null
+  and dias_atraso is not null;
 -- Portal de Gestao Contabil - Hardening de public.clientes
 -- Etapas 4.2, 4.3 e 4.4: funcoes seguras para criar, atualizar e inativar cliente.
 -- Pode ser executado mais de uma vez.

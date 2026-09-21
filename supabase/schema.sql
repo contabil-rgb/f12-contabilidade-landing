@@ -25,6 +25,7 @@ create table if not exists public.clientes (
   situacao text,
   competencia_em_dia text,
   dias_atraso integer default 0,
+  dias_atraso_texto text,
   distribuicao_lucros text,
   envio_reinf text,
   data_enviada_reinf date,

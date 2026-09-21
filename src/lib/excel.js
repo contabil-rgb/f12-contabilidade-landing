@@ -59,7 +59,7 @@ const EXTRA_BASE_HEADER_MAP = {
   'ultima competencia entregue': 'ultima_competencia_entregue',
   'competencia em dia': 'competencia_em_dia',
   'competencia em dia?': 'competencia_em_dia',
-  'dias de atraso': 'dias_atraso',
+  'dias de atraso': 'dias_atraso_texto',
   situacao: 'situacao',
   'enviam documentos': 'enviam_documentos',
   'modo de entrega': 'modo_entrega',

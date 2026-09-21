@@ -45,7 +45,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'ultima_importacao', label: 'Última importação', group: 'Status Contábil', type: 'date' },
   { key: 'ultima_competencia_entregue', label: 'Última Competência Entregue', group: 'Status Contábil', type: 'text' },
   { key: 'competencia_em_dia', label: 'Competência em Dia?', group: 'Status Contábil', type: 'select', listKey: 'competencia_em_dia' },
-  { key: 'dias_atraso', label: 'Dias de Atraso', group: 'Status Contábil', type: 'number' },
+  { key: 'dias_atraso_texto', label: 'Dias de Atraso', group: 'Status Contábil', type: 'text' },
   { key: 'situacao', label: 'Situação', group: 'Status Contábil', type: 'select', listKey: 'situacao' },
 
   { key: 'enviam_documentos', label: 'Envia documentos', group: 'Documentação', type: 'select', listKey: 'enviam_documentos' },
@@ -122,7 +122,7 @@ export const EXCEL_HEADER_MAP = {
   'Última importação': 'ultima_importacao',
   'Última Competência Entregue': 'ultima_competencia_entregue',
   'Competência em Dia?': 'competencia_em_dia',
-  'Dias de Atraso': 'dias_atraso',
+  'Dias de Atraso': 'dias_atraso_texto',
   Situação: 'situacao',
   'Valor Lucro Acumulado': 'valor_lucro_acumulado',
   'Precisa de Ata?': 'precisa_ata',
@@ -235,7 +235,7 @@ export const DETAIL_SECTIONS = [
   },
   {
     title: 'ECF',
-    fields: ['ecf', 'ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'primeira_competencia', 'ultima_competencia_entregue', 'competencia_em_dia', 'dias_atraso', 'situacao'],
+    fields: ['ecf', 'ultima_ecf_entregue', 'data_entrega_ecf', 'data_envio_ecf', 'primeira_competencia', 'ultima_competencia_entregue', 'competencia_em_dia', 'dias_atraso_texto', 'situacao'],
   },
   {
     title: 'ECD',

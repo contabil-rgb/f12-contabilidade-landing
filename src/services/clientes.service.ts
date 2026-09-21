@@ -39,6 +39,7 @@ const CLIENTE_FIELDS = new Set([
   'situacao',
   'competencia_em_dia',
   'dias_atraso',
+  'dias_atraso_texto',
   'distribuicao_lucros',
   'envio_reinf',
   'data_enviada_reinf',
