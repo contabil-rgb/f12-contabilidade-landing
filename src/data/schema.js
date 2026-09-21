@@ -45,7 +45,7 @@ export const FIELD_DEFINITIONS = [
   { key: 'ultima_importacao', label: 'Última importação', group: 'Status Contábil', type: 'date' },
   { key: 'ultima_competencia_entregue', label: 'Última Competência Entregue', group: 'Status Contábil', type: 'text' },
   { key: 'competencia_em_dia', label: 'Competência em Dia?', group: 'Status Contábil', type: 'select', listKey: 'competencia_em_dia' },
-  { key: 'dias_atraso_texto', label: 'Dias de Atraso', group: 'Status Contábil', type: 'text' },
+  { key: 'dias_atraso_texto', label: 'Tempo de Atraso', group: 'Status Contábil', type: 'text' },
   { key: 'situacao', label: 'Situação', group: 'Status Contábil', type: 'select', listKey: 'situacao' },
 
   { key: 'enviam_documentos', label: 'Envia documentos', group: 'Documentação', type: 'select', listKey: 'enviam_documentos' },
