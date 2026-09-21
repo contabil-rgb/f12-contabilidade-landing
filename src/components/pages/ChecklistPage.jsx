@@ -130,13 +130,11 @@ const CHECKLIST_VIEW_OPTIONS = [
   {
     value: 'checklist',
     label: 'Acompanhamento dos documentos',
-    description: 'Acompanhe os documentos por mês, ajuste status e envie lembretes.',
     icon: ListChecks,
   },
   {
     value: 'catalog',
     label: 'Cadastro de documentos',
-    description: 'Configure os documentos padrão e os itens por cliente.',
     icon: ClipboardCheck,
   },
 ];
@@ -709,7 +707,6 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, cur
           </span>
           <div>
             <p className="text-sm font-black text-slate-900 dark:text-white">Acompanhamento dos documentos</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-gray-400">Acompanhe o ano inteiro ou selecione um mês para consultar e alterar os status.</p>
           </div>
         </div>
         <ActionButton type="button" size="sm" variant="subtle" onClick={onToggle} aria-expanded={open}>
@@ -808,7 +805,6 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, cur
                   ) : null}
                 </tbody>
               </DataTableShell>
-              <p className="text-xs font-medium text-slate-500 dark:text-gray-400">Clique em um status para avançar: Pendente → OK → N/A → ERP → Pendente. Células sem registro começam em Pendente. Nos últimos 12 meses e no mês atual, itens sem registro aparecem como pendentes; nos demais meses ficam em branco até serem registrados.</p>
               {monthFilter === 'todos' && items.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex justify-end">
@@ -822,9 +818,6 @@ function ClientYearOverview({ client, items, year, monthFilter, yearOptions, cur
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-black text-slate-900 dark:text-white">Prévia das pendências do ano</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-gray-400">
-                            Consulte os documentos por mês. O lembrete cobrará somente competências até {getMonthLabel(lastReminderCompetence.mes)}/{lastReminderCompetence.ano}.
-                          </p>
                         </div>
                         <StatusBadge toneClass="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
                           {formatNumber(retroactivePendingCount)} pendência(s) · {formatNumber(retroactivePendingGroups.length)} mês(es)
@@ -1045,65 +1038,6 @@ function ChecklistBatchApplyModal({
 }
 
 
-function ChecklistWorkflowGuide() {
-  const steps = [
-    { title: '1. Filtre a carteira', detail: 'Escolha cliente, responsável e situação do checklist.' },
-    { title: '2. Revise o cliente', detail: 'Abra o card para acompanhar e alterar os status por mês.' },
-    { title: '3. Envie o lembrete', detail: 'Dispare a cobrança dos itens pendentes da competência.' },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm dark:border-blue-400/20 dark:bg-blue-500/10">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-black text-blue-900 dark:text-blue-100">Fluxo sugerido para cobrança</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-blue-800/80 dark:text-blue-100/80">
-            Use os filtros rápidos para priorizar a rotina e abra somente os clientes que precisam de ação.
-          </p>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
-          {steps.map((step) => (
-            <div key={step.title} className="rounded-xl border border-blue-200/75 bg-white/80 px-3 py-2 dark:border-blue-400/20 dark:bg-slate-950/25">
-              <p className="text-xs font-black text-blue-900 dark:text-blue-100">{step.title}</p>
-              <p className="mt-1 text-[11px] font-semibold leading-5 text-blue-700/85 dark:text-blue-100/75">{step.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-function CatalogWorkflowGuide() {
-  const steps = [
-    { title: '1. Mantenha o catálogo', detail: 'Cadastre, edite ou inative documentos padrão.' },
-    { title: '2. Aplique o padrão', detail: 'Use o lote para clientes que ainda estão sem checklist.' },
-    { title: '3. Ajuste por cliente', detail: 'Abra o cliente e salve somente os itens aplicáveis.' },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/10">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-black text-emerald-900 dark:text-emerald-100">Fluxo sugerido de configuração</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-emerald-800/80 dark:text-emerald-100/80">
-            Use esta aba para manter os documentos disponíveis e configurar quais itens se aplicam a cada cliente.
-          </p>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
-          {steps.map((step) => (
-            <div key={step.title} className="rounded-xl border border-emerald-200/75 bg-white/80 px-3 py-2 dark:border-emerald-400/20 dark:bg-slate-950/25">
-              <p className="text-xs font-black text-emerald-900 dark:text-emerald-100">{step.title}</p>
-              <p className="mt-1 text-[11px] font-semibold leading-5 text-emerald-700/85 dark:text-emerald-100/75">{step.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ChecklistCatalogManager({
   items,
   loading,
@@ -1134,7 +1068,6 @@ function ChecklistCatalogManager({
   return (
     <SurfacePanel
       title="Catálogo de documentos"
-      description="Gerencie os documentos disponíveis para vincular ao checklist dos clientes."
       right={(
         <div className="flex flex-wrap gap-2">
           <ActionButton type="button" variant="secondary" onClick={onOpenBatchApply}>
@@ -2811,9 +2744,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
                   </span>
                 </span>
               </div>
-              <span className={classNames('mt-3 block text-sm font-semibold leading-5', active ? 'text-blue-50' : 'text-slate-500 dark:text-gray-300')}>
-                {option.description}
-              </span>
             </button>
           );
         })}
@@ -2821,9 +2751,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
       <SurfacePanel
         title={isCatalogMode ? 'Central do catálogo' : 'Central de checklist'}
-        description={isCatalogMode
-          ? 'Gerencie o catálogo padrão e configure quais documentos se aplicam a cada cliente.'
-          : 'Acompanhe documentos pendentes por competência, salve contatos e envie lembretes pelo e-mail do setor contábil.'}
         right={(
           <div className="flex flex-wrap items-center gap-2">
             {!isCatalogMode ? (
@@ -2913,9 +2840,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
       <SurfacePanel
         title={isCatalogMode ? 'Filtros do catálogo' : 'Filtros do checklist'}
-        description={isCatalogMode
-          ? 'Refine a carteira antes de configurar os documentos aplicáveis aos clientes.'
-          : 'Refine a carteira antes de abrir um cliente e consultar a competência desejada.'}
         right={(
           <ActionButton type="button" variant="secondary" onClick={clearChecklistFilters}>
             <RefreshCcw size={16} aria-hidden="true" />
@@ -2954,9 +2878,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">Acompanhamento rápido</p>
-              <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-gray-300">
-                {isCatalogMode ? 'Filtre clientes por configuração do checklist.' : 'Filtre a carteira pela situação atual do checklist. A competência é escolhida dentro do cliente.'}
-              </p>
             </div>
             <p className="text-xs font-bold text-slate-500 dark:text-gray-400">
               {formatNumber(filteredRows.length)} de {formatNumber(baseFilteredRows.length)} cliente(s)
@@ -2987,8 +2908,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           </div>
         </div>
       </SurfacePanel>
-
-      {isCatalogMode ? <CatalogWorkflowGuide /> : <ChecklistWorkflowGuide />}
 
       {isCatalogMode ? (
         <ChecklistCatalogManager
