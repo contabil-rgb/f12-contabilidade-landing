@@ -123,6 +123,7 @@ export const EXCEL_HEADER_MAP = {
   'Última Competência Entregue': 'ultima_competencia_entregue',
   'Competência em Dia?': 'competencia_em_dia',
   'Dias de Atraso': 'dias_atraso_texto',
+  'Tempo de Atraso': 'dias_atraso_texto',
   Situação: 'situacao',
   'Valor Lucro Acumulado': 'valor_lucro_acumulado',
   'Precisa de Ata?': 'precisa_ata',

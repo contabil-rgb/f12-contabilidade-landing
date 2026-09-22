@@ -146,3 +146,35 @@ export function normalizeClienteRowForSync(input, options = {}) {
   });
   return sanitized;
 }
+
+function hasImportValue(value) {
+  if (value === null || value === undefined) return false;
+  return typeof value !== 'string' || value.trim() !== '';
+}
+
+export function mergeClienteRowForImport(input, existingRow, importedFields = []) {
+  const normalizedImport = normalizeClienteRowForSync(input);
+  if (!normalizedImport) return null;
+  if (!existingRow) return normalizedImport;
+
+  const included = new Set(importedFields);
+  const merged = {};
+  CLIENT_SYNC_DB_FIELDS.forEach((field) => {
+    if (field === 'atualizado_em') {
+      merged[field] = normalizedImport[field];
+      return;
+    }
+    if (field === 'cnpj') {
+      merged[field] = normalizedImport[field];
+      return;
+    }
+    const importedValue = normalizedImport[field];
+    merged[field] = included.has(field)
+      && hasImportValue(input?.[field])
+      && hasImportValue(importedValue)
+      ? importedValue
+      : (existingRow[field] ?? importedValue);
+  });
+
+  return normalizeClienteRowForSync(merged, { updatedAt: normalizedImport.atualizado_em });
+}

@@ -5,7 +5,8 @@ import {
   FIELD_DEFINITIONS,
   LIST_HEADER_MAP,
 } from '../data/schema.js';
-import { formatCnpj, normalizeCnpj, normalizeText, todayBr, uniqueValues } from './formatters.js';
+import { formatCnpj, normalizeCnpj, normalizeText, onlyDigits, todayBr, uniqueValues } from './formatters.js';
+import { isValidCnpj, validateExcelBuffer, validateWorkbookDimensions } from './excel-import-validation.js';
 
 const BASE_SHEET_NAME = 'Base';
 const LIST_SHEET_NAME = 'Listagens';
@@ -60,6 +61,7 @@ const EXTRA_BASE_HEADER_MAP = {
   'competencia em dia': 'competencia_em_dia',
   'competencia em dia?': 'competencia_em_dia',
   'dias de atraso': 'dias_atraso_texto',
+  'tempo de atraso': 'dias_atraso_texto',
   situacao: 'situacao',
   'enviam documentos': 'enviam_documentos',
   'modo de entrega': 'modo_entrega',
@@ -107,8 +109,14 @@ function cellValue(cell, fieldKey) {
   if (!cell || cell.t === 'z') return '';
 
   if (fieldKey === 'cnpj') {
-    const digits = normalizeCnpj(cell.v ?? cell.w ?? '');
-    return digits ? formatCnpj(digits) : '';
+    const formattedDigits = onlyDigits(cell.w ?? '');
+    const rawValue = formattedDigits.length === 14 ? cell.w : (cell.v ?? cell.w ?? '');
+    const digits = onlyDigits(rawValue);
+    if (cell.t === 'n' && digits.length === 13) {
+      const paddedDigits = digits.padStart(14, '0');
+      if (isValidCnpj(paddedDigits)) return formatCnpj(paddedDigits);
+    }
+    return digits.length === 14 ? formatCnpj(digits) : String(rawValue).trim();
   }
 
   if (cell.t === 'd' && cell.v instanceof Date) {
@@ -174,6 +182,7 @@ function resolveBaseHeaders(sheet, baseRange) {
 }
 
 export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidade Oficial.xlsx') {
+  validateWorkbookDimensions(workbook, XLSX.utils.decode_range);
   const baseSheet = workbook.Sheets[BASE_SHEET_NAME] ?? workbook.Sheets[workbook.SheetNames[0]];
   const listSheet = LIST_SHEET_ALIASES.map((sheetName) => workbook.Sheets[sheetName]).find(Boolean) ?? workbook.Sheets[LIST_SHEET_NAME];
   if (!baseSheet) {
@@ -191,6 +200,8 @@ export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidad
   const clientsByCnpj = new Map();
   let totalRowsRead = 0;
   let skippedEmptyRows = 0;
+  const invalidRows = [];
+  const duplicateRows = [];
 
   for (let row = headerRowIndex + 1; row <= baseRange.e.r; row += 1) {
     totalRowsRead += 1;
@@ -211,7 +222,17 @@ export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidad
       continue;
     }
 
-    const cnpjDigits = normalizeCnpj(client.cnpj);
+    const rawCnpjDigits = onlyDigits(client.cnpj);
+    if (!client.razao_social || !isValidCnpj(rawCnpjDigits)) {
+      invalidRows.push({
+        linha: row + 1,
+        motivo: !client.razao_social ? 'Razão Social não informada' : 'CNPJ inválido',
+        cnpj: String(client.cnpj ?? '').trim(),
+      });
+      continue;
+    }
+
+    const cnpjDigits = normalizeCnpj(rawCnpjDigits);
     const id = cnpjDigits ? `cliente-${cnpjDigits}` : `cliente-linha-${row + 1}`;
     const normalized = {
       ...client,
@@ -225,6 +246,9 @@ export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidad
     };
 
     if (cnpjDigits) {
+      if (clientsByCnpj.has(cnpjDigits)) {
+        duplicateRows.push({ cnpj: formatCnpj(cnpjDigits), linha: row + 1 });
+      }
       clientsByCnpj.set(cnpjDigits, { ...(clientsByCnpj.get(cnpjDigits) ?? {}), ...normalized });
     } else {
       clientsByCnpj.set(id, normalized);
@@ -240,6 +264,11 @@ export function parseContabilidadeWorkbook(workbook, source = 'Base Contabilidad
       baseRows: Array.from(clientsByCnpj.values()).length,
       totalRowsRead,
       skippedEmptyRows,
+      invalidRows,
+      duplicateRows,
+      invalidRowsCount: invalidRows.length,
+      duplicateRowsCount: duplicateRows.length,
+      importedFields: [...mappedHeaderKeys],
       sheets: workbook.SheetNames,
     },
   };
@@ -282,10 +311,15 @@ export function mergeLists(lists, clients) {
 }
 
 export function workbookFromArrayBuffer(buffer, source) {
+  validateExcelBuffer(buffer, source);
   const workbook = XLSX.read(buffer, {
     cellDates: true,
     cellText: true,
     cellNF: true,
+    cellFormula: false,
+    bookVBA: false,
+    bookFiles: false,
+    sheetRows: 5001,
   });
   return parseContabilidadeWorkbook(workbook, source);
 }

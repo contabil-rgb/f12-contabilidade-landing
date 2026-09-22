@@ -149,6 +149,7 @@ import {
   importarClientesExcel,
   previsualizarImportacaoExcel,
 } from './services/importacao.service';
+import { validateExcelFileMetadata } from './lib/excel-import-validation.js';
 import {
   indexarStatusObrigacoes,
   listarStatusObrigacoesClientes,
@@ -9878,11 +9879,35 @@ function Toast({ toast, onClose }) {
   }, [toast]);
 
   if (!toast) return null;
+  const inferredError = /^(falha|erro|acesso negado|importação interrompida)/i.test(String(toast.title ?? ''));
+  const tone = toast.tone ?? (inferredError ? 'danger' : 'success');
+  const toneConfig = {
+    success: {
+      Icon: CheckCircle2,
+      iconClass: 'text-emerald-600 dark:text-emerald-400',
+      panelClass: 'border-emerald-200 dark:border-emerald-500/30',
+    },
+    warning: {
+      Icon: AlertTriangle,
+      iconClass: 'text-amber-600 dark:text-amber-400',
+      panelClass: 'border-amber-200 dark:border-amber-500/30',
+    },
+    danger: {
+      Icon: ShieldAlert,
+      iconClass: 'text-red-600 dark:text-red-400',
+      panelClass: 'border-red-200 dark:border-red-500/30',
+    },
+  }[tone] ?? null;
+  const ToastIcon = toneConfig?.Icon ?? CheckCircle2;
   return (
-    <div className="fixed bottom-5 right-5 z-[60] max-w-md">
-      <SurfacePanel className="p-4 shadow-panel">
+    <div
+      className="fixed bottom-5 right-5 z-[60] max-w-md"
+      role={tone === 'danger' ? 'alert' : 'status'}
+      aria-live={tone === 'danger' ? 'assertive' : 'polite'}
+    >
+      <SurfacePanel className={`p-4 shadow-panel ${toneConfig?.panelClass ?? ''}`}>
         <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 text-emerald-600" size={19} aria-hidden="true" />
+          <ToastIcon className={`mt-0.5 ${toneConfig?.iconClass ?? ''}`} size={19} aria-hidden="true" />
           <div className="flex-1">
             <p className="font-black text-slate-950">{toast.title}</p>
             {toast.message ? <p className="mt-1 text-sm font-semibold text-slate-600">{toast.message}</p> : null}
@@ -9928,7 +9953,29 @@ function ImportPreviewModal({ preview, busy = false, onCancel, onConfirm }) {
             <p className="text-xs font-black uppercase tracking-normal text-slate-500">Erros</p>
             <p className="mt-1 text-2xl font-black text-red-700">{formatNumber(summary.erros ?? 0)}</p>
           </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500">Linhas inválidas</p>
+            <p className="mt-1 text-2xl font-black text-red-700">{formatNumber(summary.invalidos ?? 0)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500">CNPJs duplicados</p>
+            <p className="mt-1 text-2xl font-black text-amber-700">{formatNumber(summary.duplicados ?? 0)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500">Valores alterados</p>
+            <p className="mt-1 text-2xl font-black text-brand-blue">{formatNumber(summary.valoresAlterados ?? 0)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-black uppercase tracking-normal text-slate-500">Vazios preservados</p>
+            <p className="mt-1 text-2xl font-black text-emerald-700">{formatNumber(summary.valoresVaziosPreservados ?? 0)}</p>
+          </div>
         </div>
+
+        {preview.warnings?.length ? (
+          <div className="px-5 pb-3">
+            <AlertBanner tone="warning">{preview.warnings.join(' ')}</AlertBanner>
+          </div>
+        ) : null}
 
         {errors.length ? (
           <div className="px-5 pb-2">
@@ -11689,6 +11736,7 @@ export default function App() {
     if (!ensureSupabaseWriteReady('importar clientes')) return;
 
     try {
+      validateExcelFileMetadata(file);
       const buffer = await file.arrayBuffer();
       const result = await previsualizarImportacaoExcel(buffer, file.name);
       if (!result.ok) {
@@ -11703,9 +11751,21 @@ export default function App() {
         buffer,
         summary: result.summary,
         errors: result.errors,
+        warnings: [
+          result.summary.invalidos
+            ? `${result.summary.invalidos} linha(s) inválida(s) serão ignoradas.`
+            : '',
+          result.summary.duplicados
+            ? `${result.summary.duplicados} CNPJ(s) repetido(s): será considerada a última ocorrência.`
+            : '',
+          result.summary.camposAlterados?.length
+            ? `Campos com alterações: ${result.summary.camposAlterados.map((field) => getFieldLabel(field)).join(', ')}.`
+            : '',
+          'Células vazias preservam os dados já cadastrados.',
+        ].filter(Boolean),
       });
     } catch (error) {
-      setToast({ title: 'Falha ao validar planilha', message: error.message });
+      setToast({ tone: 'danger', title: 'Falha ao validar planilha', message: error.message });
     }
   }
 
@@ -11718,8 +11778,11 @@ export default function App() {
       const result = await importarClientesExcel(importPreview.buffer, importPreview.fileName);
       if (!result.ok) {
         setToast({
-          title: 'Falha ao importar',
-          message: result.errors?.[0] ?? 'Não foi possível importar clientes para o Supabase.',
+          tone: 'danger',
+          title: result.summary?.parcial ? 'Importação interrompida parcialmente' : 'Falha ao importar',
+          message: result.summary?.parcial
+            ? `${result.summary.aplicados} registro(s) foram gravados antes da falha. Atualize a página e revise a base antes de tentar novamente. ${result.errors?.[0] ?? ''}`
+            : (result.errors?.[0] ?? 'Não foi possível importar clientes para o Supabase.'),
         });
         return;
       }
@@ -11756,7 +11819,7 @@ export default function App() {
           : 'Importação concluída no Supabase, mas a interface não conseguiu recarregar automaticamente.',
       });
     } catch (error) {
-      setToast({ title: 'Falha ao importar', message: error.message });
+      setToast({ tone: 'danger', title: 'Falha ao importar', message: error.message });
     } finally {
       setImportBusy(false);
     }
