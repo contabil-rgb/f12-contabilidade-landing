@@ -76,17 +76,30 @@ export type ChecklistContato = {
 export type ChecklistEnvio = {
   id: string;
   cliente_id: string;
+  cliente_nome: string;
+  cliente_cnpj: string;
   competencias: unknown[];
+  itens_cobrados: unknown[];
   destinatario: string;
   cc: string;
   assunto: string;
   qtd_pendencias: number;
+  origem: string;
+  status: string;
+  tentativa: number;
+  chave_idempotencia: string;
+  execucao_id: string;
   email_resend_id: string;
+  erro_codigo: string;
+  erro_mensagem: string;
   enviado_por: string;
   enviado_por_nome: string;
   enviado_por_email: string;
+  iniciado_em: string;
+  finalizado_em: string;
   enviado_em: string;
   criado_em: string;
+  atualizado_em: string;
 };
 
 export type ChecklistPendencia = {
@@ -244,17 +257,30 @@ function normalizeEnvio(row: Record<string, unknown>): ChecklistEnvio {
   return {
     id: text(row.id),
     cliente_id: text(row.cliente_id),
+    cliente_nome: text(row.cliente_nome),
+    cliente_cnpj: text(row.cliente_cnpj),
     competencias: arrayValue(row.competencias),
+    itens_cobrados: arrayValue(row.itens_cobrados),
     destinatario: text(row.destinatario),
     cc: text(row.cc),
     assunto: text(row.assunto),
     qtd_pendencias: numberValue(row.qtd_pendencias),
+    origem: text(row.origem),
+    status: text(row.status),
+    tentativa: numberValue(row.tentativa, 1),
+    chave_idempotencia: text(row.chave_idempotencia),
+    execucao_id: text(row.execucao_id),
     email_resend_id: text(row.email_resend_id),
+    erro_codigo: text(row.erro_codigo),
+    erro_mensagem: text(row.erro_mensagem),
     enviado_por: text(row.enviado_por),
     enviado_por_nome: text(row.enviado_por_nome),
     enviado_por_email: text(row.enviado_por_email),
+    iniciado_em: text(row.iniciado_em),
+    finalizado_em: text(row.finalizado_em),
     enviado_em: text(row.enviado_em),
     criado_em: text(row.criado_em),
+    atualizado_em: text(row.atualizado_em),
   };
 }
 
@@ -620,7 +646,22 @@ export async function enviarChecklistLembretes(payload: Record<string, unknown>)
   });
 
   if (error) {
-    throw new Error(`Não foi possível enviar lembretes do checklist: ${error.message}`);
+    let remoteMessage = '';
+    const context = 'context' in error ? error.context : null;
+    if (context && typeof context === 'object' && 'clone' in context && typeof context.clone === 'function') {
+      try {
+        const errorBody = await context.clone().json();
+        if (errorBody && typeof errorBody === 'object') {
+          const body = errorBody as Record<string, unknown>;
+          remoteMessage = text(body.error);
+          const details = text(body.details);
+          if (details && details !== remoteMessage) remoteMessage = `${remoteMessage || 'Falha no envio.'} ${details}`;
+        }
+      } catch (_error) {
+        // Mantem a mensagem fornecida pelo cliente do Supabase quando o corpo nao e JSON.
+      }
+    }
+    throw new Error(remoteMessage || `Não foi possível enviar lembretes do checklist: ${error.message}`);
   }
 
   if (data && typeof data === 'object' && 'error' in data) {

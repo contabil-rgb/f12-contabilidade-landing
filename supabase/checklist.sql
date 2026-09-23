@@ -75,22 +75,41 @@ create table if not exists public.checklist_contatos (
 
 create table if not exists public.checklist_envios (
   id uuid primary key default gen_random_uuid(),
-  cliente_id uuid not null references public.clientes(id) on delete cascade,
+  cliente_id uuid references public.clientes(id) on delete set null,
+  cliente_nome text not null,
+  cliente_cnpj text,
   competencias jsonb not null default '[]'::jsonb,
+  itens_cobrados jsonb not null default '[]'::jsonb,
   destinatario text not null,
   cc text,
   assunto text not null,
   qtd_pendencias integer not null default 0,
+  origem text not null default 'MANUAL',
+  status text not null default 'ENVIADO',
+  tentativa integer not null default 1,
+  chave_idempotencia text not null default gen_random_uuid()::text,
+  execucao_id uuid,
   email_resend_id text,
+  erro_codigo text,
+  erro_mensagem text,
   enviado_por uuid references public.usuarios(id) on delete set null,
   enviado_por_nome text,
   enviado_por_email text,
-  enviado_em timestamp with time zone not null default now(),
+  iniciado_em timestamp with time zone not null default now(),
+  finalizado_em timestamp with time zone,
+  enviado_em timestamp with time zone,
   criado_em timestamp with time zone not null default now(),
+  atualizado_em timestamp with time zone not null default now(),
   constraint checklist_envios_competencias_array_check check (jsonb_typeof(competencias) = 'array'),
+  constraint checklist_envios_itens_cobrados_array_check check (jsonb_typeof(itens_cobrados) = 'array'),
   constraint checklist_envios_destinatario_not_blank check (nullif(btrim(destinatario), '') is not null),
   constraint checklist_envios_assunto_not_blank check (nullif(btrim(assunto), '') is not null),
-  constraint checklist_envios_qtd_pendencias_check check (qtd_pendencias >= 0)
+  constraint checklist_envios_qtd_pendencias_check check (qtd_pendencias >= 0),
+  constraint checklist_envios_cliente_nome_not_blank check (nullif(btrim(cliente_nome), '') is not null),
+  constraint checklist_envios_origem_check check (origem in ('MANUAL', 'AUTOMATICO')),
+  constraint checklist_envios_status_check check (status in ('PROCESSANDO', 'ENVIADO', 'FALHOU', 'CANCELADO')),
+  constraint checklist_envios_tentativa_check check (tentativa >= 1),
+  constraint checklist_envios_chave_idempotencia_unique unique (chave_idempotencia)
 );
 
 create index if not exists idx_checklist_itens_ativo_ordem
@@ -120,6 +139,26 @@ create index if not exists idx_checklist_envios_cliente_enviado_em
 create index if not exists idx_checklist_envios_enviado_em
   on public.checklist_envios(enviado_em desc);
 
+create index if not exists idx_checklist_envios_evento_em
+  on public.checklist_envios ((coalesce(enviado_em, finalizado_em, iniciado_em, criado_em)) desc);
+
+create index if not exists idx_checklist_envios_cliente_evento_em
+  on public.checklist_envios (cliente_id, (coalesce(enviado_em, finalizado_em, iniciado_em, criado_em)) desc);
+
+create index if not exists idx_checklist_envios_status_origem
+  on public.checklist_envios (status, origem);
+
+create index if not exists idx_checklist_envios_responsavel_evento_em
+  on public.checklist_envios (enviado_por, (coalesce(enviado_em, finalizado_em, iniciado_em, criado_em)) desc);
+
+create index if not exists idx_checklist_envios_execucao
+  on public.checklist_envios (execucao_id)
+  where execucao_id is not null;
+
+create unique index if not exists idx_checklist_envios_execucao_cliente_unique
+  on public.checklist_envios (execucao_id, cliente_id)
+  where origem = 'AUTOMATICO' and execucao_id is not null and cliente_id is not null;
+
 drop trigger if exists trg_checklist_itens_set_atualizado_em on public.checklist_itens;
 create trigger trg_checklist_itens_set_atualizado_em
 before update on public.checklist_itens
@@ -144,6 +183,12 @@ before update on public.checklist_contatos
 for each row
 execute function public.set_atualizado_em();
 
+drop trigger if exists trg_checklist_envios_set_atualizado_em on public.checklist_envios;
+create trigger trg_checklist_envios_set_atualizado_em
+before update on public.checklist_envios
+for each row
+execute function public.set_atualizado_em();
+
 alter table public.checklist_itens enable row level security;
 alter table public.checklist_clientes_itens enable row level security;
 alter table public.checklist_status enable row level security;
@@ -154,7 +199,7 @@ grant select, insert, update on table public.checklist_itens to authenticated;
 grant select, insert, update on table public.checklist_clientes_itens to authenticated;
 grant select, insert, update on table public.checklist_status to authenticated;
 grant select, insert, update on table public.checklist_contatos to authenticated;
-grant select, insert on table public.checklist_envios to authenticated;
+grant select on table public.checklist_envios to authenticated;
 
 drop policy if exists checklist_itens_select_usuario_ativo on public.checklist_itens;
 create policy checklist_itens_select_usuario_ativo
@@ -250,10 +295,3 @@ on public.checklist_envios
 for select
 to authenticated
 using (public.is_portal_usuario_ativo());
-
-drop policy if exists checklist_envios_insert_usuario_ativo on public.checklist_envios;
-create policy checklist_envios_insert_usuario_ativo
-on public.checklist_envios
-for insert
-to authenticated
-with check (public.is_portal_usuario_ativo());

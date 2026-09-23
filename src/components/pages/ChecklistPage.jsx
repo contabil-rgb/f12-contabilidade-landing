@@ -43,7 +43,6 @@ import {
   listarChecklistResumo,
   listarChecklistStatus,
   listarChecklistStatusPersonalizados,
-  registrarChecklistEnvio,
   enviarChecklistLembretes,
   excluirChecklistItem,
   excluirChecklistClienteItemPersonalizado,
@@ -482,6 +481,11 @@ function buildReminderText(pendencias, assinaturaNome = '') {
     '',
     assinaturaNome || 'F12 Contabilidade',
   ].join('\n');
+}
+
+function createReminderIdempotencyKey() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  return `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function buildReminderHtml(pendencias, assinaturaUrl = '', assinaturaNome = '') {
@@ -1232,6 +1236,7 @@ function ChecklistContactReminder({
   const [cc, setCc] = useState('');
   const [localError, setLocalError] = useState('');
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
 
   useEffect(() => {
     setEmail(contact?.email ?? '');
@@ -1254,6 +1259,7 @@ function ChecklistContactReminder({
 
   useEffect(() => {
     setShowEmailPreview(false);
+    setIdempotencyKey('');
   }, [ano, mes, annualMode, overviewYear, reminderGroups]);
 
   function validateContact() {
@@ -1281,6 +1287,7 @@ function ChecklistContactReminder({
       return;
     }
     if (!reminderPreviewReady || !reminderPeriodEligible || statusSaving || pendingCount === 0) return;
+    setIdempotencyKey(createReminderIdempotencyKey());
     setShowEmailPreview(true);
   }
 
@@ -1384,7 +1391,7 @@ function ChecklistContactReminder({
             <pre className="mt-4 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-800 dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-100">{previewText}</pre>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <ActionButton type="button" variant="subtle" onClick={() => setShowEmailPreview(false)}>Cancelar</ActionButton>
-              <ActionButton type="button" variant="primary" onClick={() => { setShowEmailPreview(false); onSendReminder(client, { email, cc, previewedGroupSignature: reminderGroupSignature(reminderGroups) }); }}>
+              <ActionButton type="button" variant="primary" disabled={sending || !idempotencyKey} onClick={() => { setShowEmailPreview(false); onSendReminder(client, { email, cc, chaveIdempotencia: idempotencyKey, previewedGroupSignature: reminderGroupSignature(reminderGroups) }); }}>
                 <Send size={14} aria-hidden="true" /> Confirmar e enviar
               </ActionButton>
             </div>
@@ -2663,6 +2670,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
       }));
 
       const sent = await enviarChecklistLembretes({
+        chave_idempotencia: String(values.chaveIdempotencia ?? '').trim(),
         destinatario,
         cc,
         assunto,
@@ -2679,22 +2687,14 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         pendencias,
       });
 
-      const emailResendId = sent && typeof sent === 'object' ? String(sent.id ?? '') : '';
-      await registrarChecklistEnvio({
-        cliente_id: client.id,
-        competencias: reminderGroups.map((group) => ({ ano: reminderAno, mes: group.month })),
-        destinatario,
-        cc,
-        assunto,
-        qtd_pendencias: pendencias.length,
-        email_resend_id: emailResendId,
-      });
-
       await loadClientDetails(client.id, { force: true });
+      const duplicate = Boolean(sent && typeof sent === 'object' && sent.duplicado === true);
       setToast({
         tone: 'success',
-        title: 'Lembrete enviado',
-        message: `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s) de ${formatNumber(reminderGroups.length)} mês(es) de ${reminderAno}.`,
+        title: duplicate ? 'Lembrete já processado' : 'Lembrete enviado',
+        message: duplicate
+          ? 'Esta mesma solicitação já havia sido concluída. Nenhum e-mail adicional foi enviado.'
+          : `Lembrete enviado para ${destinatario} com ${formatNumber(pendencias.length)} pendência(s) de ${formatNumber(reminderGroups.length)} mês(es) de ${reminderAno}.`,
       });
     } catch (err) {
       setToast({
