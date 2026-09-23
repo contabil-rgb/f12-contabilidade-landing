@@ -19,6 +19,7 @@ import { listarUsuariosPortal } from '../../services/usuarios.service';
 import ActionButton from '../ui/ActionButton';
 import AlertBanner from '../ui/AlertBanner';
 import DataTableShell from '../ui/DataTableShell';
+import DropdownSelect from '../ui/DropdownSelect';
 import MetricTile from '../ui/MetricTile';
 import StatusBadge from '../ui/StatusBadge';
 import SurfacePanel from '../ui/SurfacePanel';
@@ -48,6 +49,20 @@ const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'ENVIADO', label: 'Enviado' },
+  { value: 'FALHOU', label: 'Falhou' },
+  { value: 'PROCESSANDO', label: 'Processando' },
+  { value: 'CANCELADO', label: 'Cancelado' },
+];
+
+const ORIGIN_FILTER_OPTIONS = [
+  { value: 'MANUAL', label: 'Manual' },
+  { value: 'AUTOMATICO', label: 'Automática' },
+];
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50].map((value) => ({ value, label: `${value} por página` }));
 
 function addOneDay(date) {
   if (!date) return '';
@@ -121,17 +136,6 @@ function summarizeItems(items = []) {
     groups.set(description, (groups.get(description) ?? 0) + 1);
   });
   return Array.from(groups, ([description, count]) => ({ description, count }));
-}
-
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
-      <span className="block">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="input-shell mt-2 normal-case">
-        {children}
-      </select>
-    </label>
-  );
 }
 
 export default function ChecklistHistoryPanel({ yearOptions = [] }) {
@@ -287,33 +291,46 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
                 />
               </div>
             </label>
-            <SelectField label="Responsável pelo envio" value={draftFilters.responsavelId} onChange={(value) => updateDraft('responsavelId', value)}>
-              <option value="">Todos</option>
-              {shownResponsibles.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-            </SelectField>
+            <DropdownSelect
+              label="Responsável pelo envio"
+              value={draftFilters.responsavelId}
+              options={shownResponsibles.map((item) => ({ value: item.id, label: item.nome }))}
+              onChange={(value) => updateDraft('responsavelId', value)}
+              emptyLabel="Todos"
+              searchPlaceholder="Pesquisar responsável"
+            />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-            <SelectField label="Status" value={draftFilters.status} onChange={(value) => updateDraft('status', value)}>
-              <option value="">Todos</option>
-              <option value="ENVIADO">Enviado</option>
-              <option value="FALHOU">Falhou</option>
-              <option value="PROCESSANDO">Processando</option>
-              <option value="CANCELADO">Cancelado</option>
-            </SelectField>
-            <SelectField label="Origem" value={draftFilters.origem} onChange={(value) => updateDraft('origem', value)}>
-              <option value="">Todas</option>
-              <option value="MANUAL">Manual</option>
-              <option value="AUTOMATICO">Automática</option>
-            </SelectField>
-            <SelectField label="Ano" value={draftFilters.ano} onChange={(value) => updateDraft('ano', value)}>
-              <option value="">Todos</option>
-              {[...yearOptions].reverse().map((year) => <option key={year} value={year}>{year}</option>)}
-            </SelectField>
-            <SelectField label="Mês" value={draftFilters.mes} onChange={(value) => updateDraft('mes', value)}>
-              <option value="">Todos</option>
-              {MONTHS.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
-            </SelectField>
+            <DropdownSelect
+              label="Status"
+              value={draftFilters.status}
+              options={STATUS_FILTER_OPTIONS}
+              onChange={(value) => updateDraft('status', value)}
+              searchable={false}
+            />
+            <DropdownSelect
+              label="Origem"
+              value={draftFilters.origem}
+              options={ORIGIN_FILTER_OPTIONS}
+              onChange={(value) => updateDraft('origem', value)}
+              emptyLabel="Todas"
+              searchable={false}
+            />
+            <DropdownSelect
+              label="Ano"
+              value={draftFilters.ano}
+              options={[...yearOptions].reverse().map((year) => ({ value: year, label: String(year) }))}
+              onChange={(value) => updateDraft('ano', value)}
+              searchable={false}
+            />
+            <DropdownSelect
+              label="Mês"
+              value={draftFilters.mes}
+              options={MONTHS.map((label, index) => ({ value: index + 1, label }))}
+              onChange={(value) => updateDraft('mes', value)}
+              searchable={false}
+            />
             <label className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">
               <span className="block">Data inicial</span>
               <input type="date" value={draftFilters.dataInicio} onChange={(event) => updateDraft('dataInicio', event.target.value)} className="input-shell mt-2 normal-case" />
@@ -339,16 +356,16 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
         right={(
           <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-gray-300">
             <span>{formatNumber(total)} registro(s)</span>
-            <select
+            <DropdownSelect
               value={perPage}
-              onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}
-              className="input-shell h-9 w-auto min-w-[96px] py-1 text-xs normal-case"
-              aria-label="Registros por página"
-            >
-              <option value={10}>10 por página</option>
-              <option value={25}>25 por página</option>
-              <option value={50}>50 por página</option>
-            </select>
+              options={PAGE_SIZE_OPTIONS}
+              onChange={(value) => { setPerPage(Number(value)); setPage(1); }}
+              includeBlank={false}
+              searchable={false}
+              ariaLabel="Registros por página"
+              className="w-auto min-w-[112px]"
+              buttonClassName="h-9 min-w-[112px] py-1 text-xs"
+            />
           </div>
         )}
         bodyClassName="pb-5"
