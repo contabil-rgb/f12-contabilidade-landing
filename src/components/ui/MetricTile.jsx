@@ -7,6 +7,8 @@ export function getMetricPanelToneClass(tone = 'neutral') {
     warning: 'surface-tone-warning',
     danger: 'surface-tone-danger',
     info: 'surface-tone-info',
+    blue: 'surface-tone-blue',
+    violet: 'surface-tone-violet',
     muted: 'surface-tone-muted',
     neutral: '',
   }[tone] ?? '';

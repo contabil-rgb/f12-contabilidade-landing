@@ -492,12 +492,12 @@
   }
 
   .dark .surface-tone-warning {
-    border-color: rgba(245, 158, 11, 0.34);
+    border-color: rgba(250, 204, 21, 0.42);
     background:
-      linear-gradient(180deg, rgba(120, 53, 15, 0.5), rgba(146, 64, 14, 0.3));
+      linear-gradient(180deg, rgba(113, 88, 4, 0.58), rgba(82, 64, 3, 0.36));
     box-shadow:
       0 12px 30px rgba(0, 0, 0, 0.24),
-      0 0 0 1px rgba(245, 158, 11, 0.04) inset;
+      0 0 0 1px rgba(250, 204, 21, 0.05) inset;
   }
 
   .surface-tone-danger {
@@ -534,6 +534,42 @@
     box-shadow:
       0 12px 30px rgba(0, 0, 0, 0.24),
       0 0 0 1px rgba(14, 165, 233, 0.04) inset;
+  }
+
+  .surface-tone-blue {
+    border-color: rgba(37, 99, 235, 0.62);
+    background:
+      linear-gradient(135deg, rgba(239, 246, 255, 0.99), rgba(191, 219, 254, 0.94));
+    box-shadow:
+      0 12px 28px rgba(37, 99, 235, 0.12),
+      0 1px 0 rgba(255, 255, 255, 0.86) inset;
+  }
+
+  .dark .surface-tone-blue {
+    border-color: rgba(59, 130, 246, 0.36);
+    background:
+      linear-gradient(180deg, rgba(30, 64, 175, 0.58), rgba(30, 58, 138, 0.34));
+    box-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.24),
+      0 0 0 1px rgba(96, 165, 250, 0.05) inset;
+  }
+
+  .surface-tone-violet {
+    border-color: rgba(124, 58, 237, 0.58);
+    background:
+      linear-gradient(135deg, rgba(245, 243, 255, 0.99), rgba(221, 214, 254, 0.94));
+    box-shadow:
+      0 12px 28px rgba(124, 58, 237, 0.11),
+      0 1px 0 rgba(255, 255, 255, 0.86) inset;
+  }
+
+  .dark .surface-tone-violet {
+    border-color: rgba(139, 92, 246, 0.34);
+    background:
+      linear-gradient(180deg, rgba(76, 29, 149, 0.56), rgba(59, 7, 100, 0.34));
+    box-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.24),
+      0 0 0 1px rgba(167, 139, 250, 0.05) inset;
   }
 
   .surface-tone-muted {

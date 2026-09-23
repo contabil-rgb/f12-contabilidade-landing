@@ -253,11 +253,11 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
         bodyClassName="px-4 pb-4 sm:px-5 sm:pb-5"
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          <MetricTile title="Total" value={formatNumber(summary.total)} icon={History} tone="muted" className="min-h-[118px]" />
+          <MetricTile title="Total" value={formatNumber(summary.total)} icon={History} tone="violet" className="min-h-[118px]" />
           <MetricTile title="Enviados" value={formatNumber(summary.enviados)} icon={CheckCircle2} tone="success" onClick={() => filterByStatus('ENVIADO')} className="min-h-[118px]" />
-          <MetricTile title="Falhas" value={formatNumber(summary.falhas)} icon={AlertCircle} tone={summary.falhas ? 'danger' : 'muted'} onClick={() => filterByStatus('FALHOU')} className="min-h-[118px]" />
-          <MetricTile title="Processando" value={formatNumber(summary.processando)} icon={Clock3} tone={summary.processando ? 'warning' : 'muted'} onClick={() => filterByStatus('PROCESSANDO')} className="min-h-[118px]" />
-          <MetricTile title="Manuais" value={formatNumber(summary.manuais)} icon={UserRound} tone="info" className="min-h-[118px]" />
+          <MetricTile title="Falhas" value={formatNumber(summary.falhas)} icon={AlertCircle} tone="danger" onClick={() => filterByStatus('FALHOU')} className="min-h-[118px]" />
+          <MetricTile title="Processando" value={formatNumber(summary.processando)} icon={Clock3} tone="warning" onClick={() => filterByStatus('PROCESSANDO')} className="min-h-[118px]" />
+          <MetricTile title="Manuais" value={formatNumber(summary.manuais)} icon={UserRound} tone="blue" className="min-h-[118px]" />
           <MetricTile title="Automáticos" value={formatNumber(summary.automaticos)} icon={Bot} tone="info" className="min-h-[118px]" />
         </div>
       </SurfacePanel>
