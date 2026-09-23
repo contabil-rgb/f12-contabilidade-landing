@@ -34,7 +34,7 @@ export default function MetricTile({
       className={classNames(
         'min-h-[168px] p-5 text-left',
         panelToneClass,
-        interactive ? 'group hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : '',
+        interactive ? 'group flex flex-col items-stretch justify-start hover:-translate-y-0.5 hover:border-brand-blue/35 hover:shadow-soft' : '',
         className,
       )}
     >
