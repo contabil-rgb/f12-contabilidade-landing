@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   FileCheck2,
   FileQuestion,
+  History,
   Plus,
   ListChecks,
   Mail,
@@ -24,6 +25,7 @@ import DataTableShell from '../ui/DataTableShell';
 import MetricTile from '../ui/MetricTile';
 import StatusBadge from '../ui/StatusBadge';
 import SurfacePanel from '../ui/SurfacePanel';
+import ChecklistHistoryPanel from './ChecklistHistoryPanel';
 import { classNames } from '../ui/classNames';
 import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
 import {
@@ -135,6 +137,11 @@ const CHECKLIST_VIEW_OPTIONS = [
     value: 'catalog',
     label: 'Cadastro de documentos',
     icon: ClipboardCheck,
+  },
+  {
+    value: 'history',
+    label: 'Histórico de envios',
+    icon: History,
   },
 ];
 
@@ -1902,6 +1909,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [personalItemBusyKey, setPersonalItemBusyKey] = useState('');
   const [viewMode, setViewMode] = useState('checklist');
   const isCatalogMode = viewMode === 'catalog';
+  const isHistoryMode = viewMode === 'history';
   const quickFilterOptions = isCatalogMode ? CATALOG_QUICK_FILTERS : CHECKLIST_QUICK_FILTERS;
 
   useEffect(() => {
@@ -2709,7 +2717,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
         {CHECKLIST_VIEW_OPTIONS.map((option) => {
           const active = viewMode === option.value;
           const Icon = option.icon;
@@ -2749,6 +2757,10 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
         })}
       </div>
 
+      {isHistoryMode ? (
+        <ChecklistHistoryPanel yearOptions={yearOptions} />
+      ) : (
+        <>
       <SurfacePanel
         title={isCatalogMode ? 'Central do catálogo' : 'Central de checklist'}
         right={(
@@ -3182,6 +3194,8 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
           ) : null}
         </div>
       </SurfacePanel>
+        </>
+      )}
     </div>
   );
 }

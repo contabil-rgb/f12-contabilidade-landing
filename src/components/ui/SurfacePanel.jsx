@@ -11,9 +11,10 @@ export default function SurfacePanel({
   right,
   children,
   footer,
+  ...props
 }) {
   return (
-    <Component className={classNames('min-w-0 surface-card', className)}>
+    <Component className={classNames('min-w-0 surface-card', className)} {...props}>
       {title || description || right ? (
         <div className={classNames('flex flex-col gap-4 p-5 sm:p-6 2xl:flex-row 2xl:items-start 2xl:justify-between', headerClassName)}>
           <div className="min-w-0">

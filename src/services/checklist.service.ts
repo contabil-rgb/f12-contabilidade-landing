@@ -148,6 +148,37 @@ export type ListarChecklistEnviosFiltros = {
   limite?: number;
 };
 
+export type ListarChecklistHistoricoFiltros = {
+  pagina?: number;
+  porPagina?: number;
+  busca?: string;
+  origem?: string;
+  status?: string;
+  responsavelId?: string;
+  ano?: number;
+  mes?: number;
+  dataInicio?: string;
+  dataFim?: string;
+};
+
+export type ChecklistHistoricoResumo = {
+  total: number;
+  enviados: number;
+  falhas: number;
+  processando: number;
+  cancelados: number;
+  manuais: number;
+  automaticos: number;
+};
+
+export type ChecklistHistoricoResultado = {
+  rows: ChecklistEnvio[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+  resumo: ChecklistHistoricoResumo;
+};
+
 function text(value: unknown) {
   return String(value ?? '').trim();
 }
@@ -626,6 +657,51 @@ export async function listarChecklistEnvios(filtros: ListarChecklistEnviosFiltro
   }
 
   return rows;
+}
+
+export async function listarChecklistHistorico(
+  filtros: ListarChecklistHistoricoFiltros = {},
+): Promise<ChecklistHistoricoResultado> {
+  const payload = {
+    pagina: filtros.pagina ?? 1,
+    por_pagina: filtros.porPagina ?? 25,
+    busca: filtros.busca || undefined,
+    origem: filtros.origem || undefined,
+    status: filtros.status || undefined,
+    responsavel_id: filtros.responsavelId || undefined,
+    ano: filtros.ano || undefined,
+    mes: filtros.mes || undefined,
+    data_inicio: filtros.dataInicio || undefined,
+    data_fim: filtros.dataFim || undefined,
+  };
+  const { data, error } = await supabase.rpc('listar_checklist_envios_portal', {
+    p_filtros: payload,
+  });
+
+  if (error) {
+    throw new Error(`Não foi possível carregar o histórico de envios: ${error.message}`);
+  }
+
+  const result = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  const rawSummary = (result.resumo && typeof result.resumo === 'object'
+    ? result.resumo
+    : {}) as Record<string, unknown>;
+
+  return {
+    rows: arrayValue(result.rows).map((row) => normalizeEnvio(row as Record<string, unknown>)),
+    total: numberValue(result.total),
+    pagina: numberValue(result.pagina, payload.pagina),
+    por_pagina: numberValue(result.por_pagina, payload.por_pagina),
+    resumo: {
+      total: numberValue(rawSummary.total),
+      enviados: numberValue(rawSummary.enviados),
+      falhas: numberValue(rawSummary.falhas),
+      processando: numberValue(rawSummary.processando),
+      cancelados: numberValue(rawSummary.cancelados),
+      manuais: numberValue(rawSummary.manuais),
+      automaticos: numberValue(rawSummary.automaticos),
+    },
+  };
 }
 
 export async function registrarChecklistEnvio(envio: Record<string, unknown>) {
