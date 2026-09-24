@@ -146,4 +146,16 @@ A migração `supabase/migrations/20260924110000_checklist_automacao_base.sql` e
 
 O calendário inicial cobre 2026 a 2030. O cálculo do segundo dia útil bloqueia anos ainda não preparados, evitando executar a automação com um calendário incompleto. A carga do ano seguinte deverá fazer parte da manutenção anual.
 
+## Implementação da Etapa 3
+
+A migração `supabase/migrations/20260924150000_checklist_automacao_preparacao.sql` implementa a preparação transacional e idempotente. Ela identifica todas as competências anteriores pendentes de cada cliente habilitado, cria um retrato imutável das competências, itens e destinatários e registra um trabalho por cliente. A preparação não chama a função de envio e não cria agendamento.
+
+Itens adicionados ao checklist passam a valer a partir do mês de sua inclusão, no calendário de Manaus. Itens que já existiam antes desta etapa herdam a competência inicial configurada para o cliente, preservando o histórico que será revisado antes da habilitação.
+
+As funções de seleção e preparação são internas e executáveis somente pelo `service_role`. O modo `SIMULACAO` permanece disponível mesmo com a automação global pausada e não persiste execuções ou trabalhos. Chamadas efetivas exigem a automação ativa; o acionamento agendado também exige que a data local seja o segundo dia útil.
+
+O script `supabase/checklist-automacao-preparacao-validacao.sql` testa estrutura, RLS, permissões, simulação, destinatários de teste, ausência de envio e idempotência. Ele executa o cenário dentro de uma transação e aplica `ROLLBACK` no final.
+
+Em 24/09/2026, a migração da Etapa 3 foi executada no Supabase de produção. As nove verificações retornaram `OK`; o cenário temporário foi desfeito pelo `ROLLBACK`, nenhum e-mail foi enviado e a automação permaneceu pausada.
+
 Em 24/09/2026, a migração foi executada no Supabase de produção e as nove verificações do script de validação retornaram `OK`. Nenhuma execução foi criada e nenhum agendamento ou envio foi ativado.

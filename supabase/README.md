@@ -24,6 +24,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/risco-operacional.sql` -> view persistente de risco resumido
 - `supabase/migrations/20260924110000_checklist_automacao_base.sql` -> configuracao, calendario, execucoes e auditoria da automacao de lembretes, inicialmente pausada
 - `supabase/checklist-automacao-base-validacao.sql` -> validacao somente leitura da base da automacao
+- `supabase/migrations/20260924150000_checklist_automacao_preparacao.sql` -> selecao de pendencias e preparacao transacional e idempotente, sem envio de e-mails
+- `supabase/checklist-automacao-preparacao-validacao.sql` -> validacao transacional da preparacao; desfaz todos os dados de teste com `ROLLBACK`
 
 ## Ordem recomendada no SQL Editor
 
