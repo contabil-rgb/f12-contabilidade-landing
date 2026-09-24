@@ -26,6 +26,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-base-validacao.sql` -> validacao somente leitura da base da automacao
 - `supabase/migrations/20260924150000_checklist_automacao_preparacao.sql` -> selecao de pendencias e preparacao transacional e idempotente, sem envio de e-mails
 - `supabase/checklist-automacao-preparacao-validacao.sql` -> validacao transacional da preparacao; desfaz todos os dados de teste com `ROLLBACK`
+- `supabase/migrations/20260924180000_checklist_automacao_fila.sql` -> fila relacional, reserva concorrente, historico automatico e controle de novas tentativas
+- `supabase/checklist-automacao-fila-validacao.sql` -> validacao transacional da fila; simula falhas sem enviar e-mails e desfaz o ciclo com `ROLLBACK`
 
 ## Ordem recomendada no SQL Editor
 

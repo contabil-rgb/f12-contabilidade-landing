@@ -158,4 +158,12 @@ O script `supabase/checklist-automacao-preparacao-validacao.sql` testa estrutura
 
 Em 24/09/2026, a migração da Etapa 3 foi executada no Supabase de produção. As nove verificações retornaram `OK`; o cenário temporário foi desfeito pelo `ROLLBACK`, nenhum e-mail foi enviado e a automação permaneceu pausada.
 
-Em 24/09/2026, a migração foi executada no Supabase de produção e as nove verificações do script de validação retornaram `OK`. Nenhuma execução foi criada e nenhum agendamento ou envio foi ativado.
+## Etapa 4, parte 1 preparada na branch
+
+A migração `supabase/migrations/20260924180000_checklist_automacao_fila.sql` transforma os trabalhos preparados em uma fila relacional durável. A reserva usa bloqueio com `SKIP LOCKED`, token exclusivo e prazo de expiração para impedir processamento concorrente do mesmo trabalho.
+
+Cada trabalho preserva o limite e os intervalos de tentativas vigentes quando foi criado. Falhas transitórias são reagendadas a partir da primeira tentativa, usando os intervalos `0`, `15` e `45` minutos; falhas definitivas encerram o trabalho. A mesma tentativa só pode iniciar um registro no histórico, e a chave do trabalho permanece estável para ser reutilizada como proteção idempotente no provedor de e-mail na parte 2.
+
+A fila respeita a pausa global e a desativação individual do cliente. Somente o `service_role` pode reservar, iniciar ou finalizar trabalhos. Esta parte não cria cron, não chama Edge Functions e não envia e-mails.
+
+Em 24/09/2026, a migração da Etapa 4, parte 1, foi executada no Supabase de produção e as 14 verificações do script de validação retornaram `OK`. Os ciclos temporários foram desfeitos pelo `ROLLBACK`; nenhum agendamento foi criado e nenhum e-mail foi enviado.
