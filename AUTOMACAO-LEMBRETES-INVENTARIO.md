@@ -139,3 +139,11 @@ Não há fila implementada. A Etapa 2 deve preparar as tabelas e contratos de da
 - Fluxo manual, tabelas, views, RPCs, permissões, Edge Functions e segredos necessários inventariados.
 - Componentes reutilizáveis e lacunas identificados.
 - Nenhum envio, publicação, alteração de banco ou agendamento realizado.
+
+## Etapa 2 preparada na branch
+
+A migração `supabase/migrations/20260924110000_checklist_automacao_base.sql` e o script de validação `supabase/checklist-automacao-base-validacao.sql` foram adicionados após a conclusão do inventário. A migração mantém a automação global pausada, usa modo de teste e deixa todos os clientes desabilitados.
+
+O calendário inicial cobre 2026 a 2030. O cálculo do segundo dia útil bloqueia anos ainda não preparados, evitando executar a automação com um calendário incompleto. A carga do ano seguinte deverá fazer parte da manutenção anual.
+
+Em 24/09/2026, a migração foi executada no Supabase de produção e as nove verificações do script de validação retornaram `OK`. Nenhuma execução foi criada e nenhum agendamento ou envio foi ativado.

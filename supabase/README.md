@@ -22,6 +22,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/clientes-campos-acompanhamento.sql` -> datas e status de notificacao e retorno
 - `supabase/acompanhamento-operacional.sql` -> view persistente de acompanhamento
 - `supabase/risco-operacional.sql` -> view persistente de risco resumido
+- `supabase/migrations/20260924110000_checklist_automacao_base.sql` -> configuracao, calendario, execucoes e auditoria da automacao de lembretes, inicialmente pausada
+- `supabase/checklist-automacao-base-validacao.sql` -> validacao somente leitura da base da automacao
 
 ## Ordem recomendada no SQL Editor
 
