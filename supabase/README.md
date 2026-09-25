@@ -30,6 +30,7 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-fila-validacao.sql` -> validacao transacional da fila; simula falhas sem enviar e-mails e desfaz o ciclo com `ROLLBACK`
 - `supabase/functions/processar-checklist-automacao/index.ts` -> trabalhador interno da fila; envia pelo Resend com idempotencia e registra sucesso, falha ou nova tentativa
 - `supabase/functions/_shared/checklist-automation-email.ts` -> montagem e validacao do e-mail automatico agrupado por competencia
+- `supabase/functions/coordenar-checklist-automacao/index.ts` -> coordenacao mensal interna; respeita pausa, data e horario de Manaus antes de preparar e acionar o worker
 
 ## Ordem recomendada no SQL Editor
 

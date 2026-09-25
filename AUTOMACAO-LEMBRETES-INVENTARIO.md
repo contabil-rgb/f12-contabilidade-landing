@@ -179,3 +179,13 @@ O conteúdo agrupa todos os itens pendentes por competência e preserva os desti
 O teste local cobre bloqueio de credencial inválida, conteúdo e escape de HTML, envio idempotente simulado, cópia oculta, finalização de sucesso e reagendamento de uma resposta `429`. Nenhuma chamada real ao Supabase ou ao Resend é feita durante o teste.
 
 Em 24/09/2026, a versão 1 da função foi publicada no Supabase com verificação de JWT ativa. Uma chamada sem autenticação foi recusada com HTTP `401`. A chamada interna autenticada retornou HTTP `200`, `pausada: true` e zero trabalhos, confirmando que a função respeita o bloqueio global. Nenhum e-mail foi enviado nessa validação e nenhum agendamento foi criado.
+
+## Etapa 5, parte 1 implementada e publicada
+
+A Edge Function `coordenar-checklist-automacao` implementa a coordenação mensal sem criar agendamentos. Ela aceita somente a credencial interna, consulta a configuração global e encerra a chamada imediatamente quando a automação está pausada.
+
+Quando ativa, a coordenadora calcula a data e o horário em `America/Manaus`, consulta no banco o segundo dia útil do mês e bloqueia a preparação fora desse dia ou antes do horário configurado. Na janela correta, chama a preparação com uma chave mensal estável e, em seguida, aciona um lote do worker. A idempotência da preparação impede a criação de outra execução se a coordenadora receber a mesma chamada novamente.
+
+O teste local cobre credencial inválida, pausa global, cálculo de Manaus, bloqueios de data e horário, chave idempotente mensal, preparação simulada e acionamento simulado do worker. Nenhuma chamada externa real e nenhum envio são feitos pelo teste. O cron, a chamada recorrente do worker e o armazenamento da credencial para o agendamento permanecem reservados para a parte 2 da Etapa 5.
+
+Em 25/09/2026, a versão 1 da coordenadora foi publicada no Supabase com verificação de JWT. A chamada interna de validação retornou HTTP `200`, modo `TESTE`, `pausada: true`, `preparacao: null` e `processamento: null`. Nenhuma execução ou trabalho foi preparado, o worker não foi acionado e nenhum e-mail foi enviado.
