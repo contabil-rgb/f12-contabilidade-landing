@@ -34,6 +34,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/migrations/20260925110000_checklist_automacao_agendamento.sql` -> agenda a coordenacao diaria as 08:00 de Manaus e o processamento da fila durante a janela de novas tentativas, com credenciais no Vault
 - `supabase/checklist-automacao-agendamento-validacao.sql` -> validacao somente leitura das extensoes, segredos, protecoes e dois agendamentos
 - `supabase/checklist-automacao-integrada-validacao.sql` -> validacao transacional do ciclo mensal completo, lotes, idempotencia, pausa e tentativas de 08:15 e 08:45; nao chama o Resend e desfaz os dados simulados
+- `supabase/migrations/20260925150000_checklist_automacao_portal_controles.sql` -> RPCs protegidas para os dois perfis consultarem e administrarem configuracao, clientes, feriados e simulacoes pelo portal
+- `supabase/checklist-automacao-portal-controles-validacao.sql` -> validacao transacional das permissoes equivalentes, confirmacoes, auditoria e rollback dos controles do portal
 - `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
 
 ## Ordem recomendada no SQL Editor
