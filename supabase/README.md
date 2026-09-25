@@ -28,6 +28,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-preparacao-validacao.sql` -> validacao transacional da preparacao; desfaz todos os dados de teste com `ROLLBACK`
 - `supabase/migrations/20260924180000_checklist_automacao_fila.sql` -> fila relacional, reserva concorrente, historico automatico e controle de novas tentativas
 - `supabase/checklist-automacao-fila-validacao.sql` -> validacao transacional da fila; simula falhas sem enviar e-mails e desfaz o ciclo com `ROLLBACK`
+- `supabase/functions/processar-checklist-automacao/index.ts` -> trabalhador interno da fila; envia pelo Resend com idempotencia e registra sucesso, falha ou nova tentativa
+- `supabase/functions/_shared/checklist-automation-email.ts` -> montagem e validacao do e-mail automatico agrupado por competencia
 
 ## Ordem recomendada no SQL Editor
 

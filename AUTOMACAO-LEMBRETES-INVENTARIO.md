@@ -167,3 +167,15 @@ Cada trabalho preserva o limite e os intervalos de tentativas vigentes quando fo
 A fila respeita a pausa global e a desativação individual do cliente. Somente o `service_role` pode reservar, iniciar ou finalizar trabalhos. Esta parte não cria cron, não chama Edge Functions e não envia e-mails.
 
 Em 24/09/2026, a migração da Etapa 4, parte 1, foi executada no Supabase de produção e as 14 verificações do script de validação retornaram `OK`. Os ciclos temporários foram desfeitos pelo `ROLLBACK`; nenhum agendamento foi criado e nenhum e-mail foi enviado.
+
+## Etapa 4, parte 2 implementada e publicada
+
+A Edge Function `processar-checklist-automacao` implementa o trabalhador interno da fila. Ela aceita somente a credencial `service_role`, reserva até dez trabalhos por chamada e processa o lote sequencialmente para manter o tempo e a carga previsíveis.
+
+Antes de chamar o Resend, a função abre de forma idempotente o registro automático no histórico. O envio usa a chave estável do trabalho no cabeçalho `Idempotency-Key`; assim, uma repetição causada por falha de rede ou de finalização não cria outro e-mail no provedor. Respostas `408`, `429` e `5xx`, falhas de rede e respostas de sucesso sem identificador são tratadas como transitórias. Os demais erros do provedor e dados inválidos encerram o trabalho como falha definitiva.
+
+O conteúdo agrupa todos os itens pendentes por competência e preserva os destinatários efetivos definidos durante a preparação. No modo `TESTE`, inclui um aviso com o destinatário original. A função não prepara execuções, não cria agendamentos e respeita a pausa global aplicada pela reserva no banco.
+
+O teste local cobre bloqueio de credencial inválida, conteúdo e escape de HTML, envio idempotente simulado, cópia oculta, finalização de sucesso e reagendamento de uma resposta `429`. Nenhuma chamada real ao Supabase ou ao Resend é feita durante o teste.
+
+Em 24/09/2026, a versão 1 da função foi publicada no Supabase com verificação de JWT ativa. Uma chamada sem autenticação foi recusada com HTTP `401`. A chamada interna autenticada retornou HTTP `200`, `pausada: true` e zero trabalhos, confirmando que a função respeita o bloqueio global. Nenhum e-mail foi enviado nessa validação e nenhum agendamento foi criado.

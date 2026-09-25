@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
+    "test:checklist-automation-worker": "node --experimental-strip-types scripts/checklist-automation-worker.test.mjs",
     "supabase:sync:clientes": "node scripts/sync-clientes-supabase.mjs",
     "supabase:sync:clientes:apply": "node scripts/sync-clientes-supabase.mjs --apply"
   },
