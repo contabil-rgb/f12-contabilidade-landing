@@ -33,6 +33,7 @@ Arquivos SQL ativos do projeto.
 - `supabase/functions/coordenar-checklist-automacao/index.ts` -> coordenacao mensal interna; respeita pausa, data e horario de Manaus antes de preparar e acionar o worker
 - `supabase/migrations/20260925110000_checklist_automacao_agendamento.sql` -> agenda a coordenacao diaria as 08:00 de Manaus e o processamento da fila durante a janela de novas tentativas, com credenciais no Vault
 - `supabase/checklist-automacao-agendamento-validacao.sql` -> validacao somente leitura das extensoes, segredos, protecoes e dois agendamentos
+- `supabase/checklist-automacao-integrada-validacao.sql` -> validacao transacional do ciclo mensal completo, lotes, idempotencia, pausa e tentativas de 08:15 e 08:45; nao chama o Resend e desfaz os dados simulados
 - `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
 
 ## Ordem recomendada no SQL Editor
