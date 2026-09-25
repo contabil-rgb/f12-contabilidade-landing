@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 
 const serviceRoleKey = 'service-role-coordinator-test';
+const internalApiKey = 'internal-api-coordinator-test';
 const environment = new Map([
   ['SUPABASE_URL', 'https://project.supabase.co'],
   ['SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey],
+  ['CHECKLIST_AUTOMACAO_INTERNAL_KEY', internalApiKey],
 ]);
 
 let handler;
@@ -33,7 +35,7 @@ globalThis.fetch = async (url, options = {}) => {
 
 const unauthorized = await handler(new Request('https://coordinator.example.com', {
   method: 'POST',
-  headers: { Authorization: 'Bearer invalid-key' },
+  headers: { apikey: 'invalid-key' },
   body: '{}',
 }));
 assert.equal(unauthorized.status, 403);
@@ -56,7 +58,7 @@ globalThis.fetch = async (url, options = {}) => {
 
 const paused = await handler(new Request('https://coordinator.example.com', {
   method: 'POST',
-  headers: { Authorization: `Bearer ${serviceRoleKey}` },
+  headers: { apikey: internalApiKey },
   body: '{}',
 }));
 const pausedBody = await paused.json();
@@ -108,7 +110,7 @@ globalThis.fetch = async (url, options = {}) => {
 const coordinated = await handler(new Request('https://coordinator.example.com', {
   method: 'POST',
   headers: {
-    Authorization: `Bearer ${serviceRoleKey}`,
+    apikey: internalApiKey,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({ limite: 3 }),

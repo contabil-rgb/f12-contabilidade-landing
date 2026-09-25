@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 
 const serviceRoleKey = 'service-role-test-key';
+const internalApiKey = 'internal-api-test-key';
 const environment = new Map([
   ['SUPABASE_URL', 'https://project.supabase.co'],
   ['SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey],
+  ['CHECKLIST_AUTOMACAO_INTERNAL_KEY', internalApiKey],
   ['RESEND_API_KEY', 'resend-test-key'],
   ['CHECKLIST_EMAIL_FROM', 'F12 <contabil@example.com>'],
   ['CHECKLIST_EMAIL_BCC', 'auditoria@example.com'],
@@ -55,7 +57,7 @@ globalThis.fetch = async (url, options = {}) => {
 
 const unauthorized = await handler(new Request('https://worker.example.com', {
   method: 'POST',
-  headers: { Authorization: 'Bearer invalid-key' },
+  headers: { apikey: 'invalid-key' },
   body: '{}',
 }));
 assert.equal(unauthorized.status, 403);
@@ -106,7 +108,7 @@ globalThis.fetch = async (url, options = {}) => {
 const success = await handler(new Request('https://worker.example.com', {
   method: 'POST',
   headers: {
-    Authorization: `Bearer ${serviceRoleKey}`,
+    apikey: internalApiKey,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({ limite: 1 }),
@@ -145,7 +147,7 @@ globalThis.fetch = async (url, options = {}) => {
 const retry = await handler(new Request('https://worker.example.com', {
   method: 'POST',
   headers: {
-    Authorization: `Bearer ${serviceRoleKey}`,
+    apikey: internalApiKey,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({ limite: 1 }),

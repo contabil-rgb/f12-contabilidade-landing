@@ -31,9 +31,8 @@ function jsonResponse(body: JsonRecord, status = 200) {
   });
 }
 
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get("Authorization") ?? "";
-  return authorization.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
+function getInternalApiKey(request: Request) {
+  return request.headers.get("apikey")?.trim() ?? "";
 }
 
 function getApiErrorMessage(value: unknown, fallback: string) {
@@ -406,6 +405,7 @@ Deno.serve(async (request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const internalApiKey = Deno.env.get("CHECKLIST_AUTOMACAO_INTERNAL_KEY") ?? "";
   const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
   const fromEmail = Deno.env.get("CHECKLIST_EMAIL_FROM")
     ?? Deno.env.get("REINF_EMAIL_FROM")
@@ -414,11 +414,11 @@ Deno.serve(async (request) => {
   const signatureName = Deno.env.get("CHECKLIST_AUTOMACAO_ASSINATURA")
     ?? "F12 Contabilidade";
 
-  if (!supabaseUrl || !serviceRoleKey || !resendApiKey || !fromEmail) {
+  if (!supabaseUrl || !serviceRoleKey || !internalApiKey || !resendApiKey || !fromEmail) {
     return jsonResponse({ error: "Configuracao interna da automacao incompleta." }, 500);
   }
 
-  if (!safeEquals(getBearerToken(request), serviceRoleKey)) {
+  if (!safeEquals(getInternalApiKey(request), internalApiKey)) {
     return jsonResponse({ error: "Credencial interna invalida." }, 403);
   }
 

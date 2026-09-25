@@ -31,9 +31,8 @@ function asInteger(value: unknown, fallback: number) {
   return Number.isInteger(number) ? number : fallback;
 }
 
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get("Authorization") ?? "";
-  return authorization.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
+function getInternalApiKey(request: Request) {
+  return request.headers.get("apikey")?.trim() ?? "";
 }
 
 function safeEquals(left: string, right: string) {
@@ -164,14 +163,14 @@ export function getCoordinationBlock(
 
 async function invokeWorker(
   supabaseUrl: string,
-  serviceRoleKey: string,
+  internalApiKey: string,
   limit: number,
 ) {
   const response = await fetch(
     `${supabaseUrl}/functions/v1/processar-checklist-automacao`,
     {
       method: "POST",
-      headers: internalHeaders(serviceRoleKey),
+      headers: internalHeaders(internalApiKey),
       body: JSON.stringify({ limite: limit }),
     },
   );
@@ -189,10 +188,11 @@ Deno.serve(async (request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!supabaseUrl || !serviceRoleKey) {
+  const internalApiKey = Deno.env.get("CHECKLIST_AUTOMACAO_INTERNAL_KEY") ?? "";
+  if (!supabaseUrl || !serviceRoleKey || !internalApiKey) {
     return jsonResponse({ error: "Configuracao interna da coordenacao incompleta." }, 500);
   }
-  if (!safeEquals(getBearerToken(request), serviceRoleKey)) {
+  if (!safeEquals(getInternalApiKey(request), internalApiKey)) {
     return jsonResponse({ error: "Credencial interna invalida." }, 403);
   }
 
@@ -313,7 +313,7 @@ Deno.serve(async (request) => {
 
   let processing: unknown;
   try {
-    processing = await invokeWorker(supabaseUrl, serviceRoleKey, limit);
+    processing = await invokeWorker(supabaseUrl, internalApiKey, limit);
   } catch (error) {
     return jsonResponse({
       error: "A execucao foi preparada, mas o worker nao respondeu.",

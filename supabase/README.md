@@ -31,6 +31,9 @@ Arquivos SQL ativos do projeto.
 - `supabase/functions/processar-checklist-automacao/index.ts` -> trabalhador interno da fila; envia pelo Resend com idempotencia e registra sucesso, falha ou nova tentativa
 - `supabase/functions/_shared/checklist-automation-email.ts` -> montagem e validacao do e-mail automatico agrupado por competencia
 - `supabase/functions/coordenar-checklist-automacao/index.ts` -> coordenacao mensal interna; respeita pausa, data e horario de Manaus antes de preparar e acionar o worker
+- `supabase/migrations/20260925110000_checklist_automacao_agendamento.sql` -> agenda a coordenacao diaria as 08:00 de Manaus e o processamento da fila durante a janela de novas tentativas, com credenciais no Vault
+- `supabase/checklist-automacao-agendamento-validacao.sql` -> validacao somente leitura das extensoes, segredos, protecoes e dois agendamentos
+- `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
 
 ## Ordem recomendada no SQL Editor
 
