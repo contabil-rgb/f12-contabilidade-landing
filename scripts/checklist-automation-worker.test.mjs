@@ -63,6 +63,18 @@ const unauthorized = await handler(new Request('https://worker.example.com', {
 assert.equal(unauthorized.status, 403);
 assert.equal(externalCalls.length, 0);
 
+externalCalls = [];
+const invalidExecution = await handler(new Request('https://worker.example.com', {
+  method: 'POST',
+  headers: {
+    apikey: internalApiKey,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ execucao_id: 'invalida' }),
+}));
+assert.equal(invalidExecution.status, 400);
+assert.equal(externalCalls.length, 0);
+
 const work = {
   id: '11111111-1111-4111-8111-111111111111',
   token_reserva: '22222222-2222-4222-8222-222222222222',
@@ -119,6 +131,52 @@ assert.equal(successBody.ok, true);
 assert.equal(successBody.reservados, 1);
 assert.equal(successBody.enviados, 1);
 assert.equal(successBody.falhas, 0);
+
+const targetedExecutionId = '33333333-3333-4333-8333-333333333333';
+externalCalls = [];
+globalThis.fetch = async (url, options = {}) => {
+  const address = String(url);
+  const body = options.body ? JSON.parse(String(options.body)) : {};
+  externalCalls.push({ url: address, options, body });
+
+  if (address.endsWith('/rpc/reservar_checklist_automacao_teste_interno')) {
+    assert.equal(body.p_execucao_id, targetedExecutionId);
+    assert.equal(body.p_limite, 1);
+    return Response.json({
+      execucao_id: targetedExecutionId,
+      quantidade: 1,
+      trabalhos: [work],
+      automacao_global_pausada: true,
+    });
+  }
+  if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
+    return Response.json({ adquirido: true, ja_enviado: false });
+  }
+  if (address === 'https://api.resend.com/emails') {
+    return Response.json({ id: 'resend-targeted-test-id' });
+  }
+  if (address.endsWith('/rpc/finalizar_checklist_automacao_trabalho_interno')) {
+    assert.equal(body.p_status, 'ENVIADO');
+    return Response.json({ duplicado: false, nova_tentativa: false });
+  }
+  throw new Error(`URL inesperada no teste direcionado: ${address}`);
+};
+
+const targeted = await handler(new Request('https://worker.example.com', {
+  method: 'POST',
+  headers: {
+    apikey: internalApiKey,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ limite: 1, execucao_id: targetedExecutionId }),
+}));
+const targetedBody = await targeted.json();
+assert.equal(targeted.status, 200);
+assert.equal(targetedBody.ok, true);
+assert.equal(targetedBody.direcionada, true);
+assert.equal(targetedBody.execucao_id, targetedExecutionId);
+assert.equal(targetedBody.automacao_global_pausada, true);
+assert.equal(targetedBody.enviados, 1);
 
 externalCalls = [];
 globalThis.fetch = async (url, options = {}) => {

@@ -22,6 +22,7 @@ type Reservation = {
   quantidade?: unknown;
   trabalhos?: unknown;
   pausada?: unknown;
+  automacao_global_pausada?: unknown;
 };
 
 function jsonResponse(body: JsonRecord, status = 200) {
@@ -52,6 +53,10 @@ function normalizeRpcResult(value: unknown) {
 function asInteger(value: unknown, fallback: number) {
   const number = typeof value === "number" ? value : Number(value);
   return Number.isInteger(number) ? number : fallback;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function safeEquals(left: string, right: string) {
@@ -433,17 +438,30 @@ Deno.serve(async (request) => {
   const limit = Math.min(Math.max(requestedLimit, 1), 10);
   const requestedLease = asInteger(payload.duracao_reserva_minutos, 10);
   const leaseMinutes = Math.min(Math.max(requestedLease, 5), 30);
+  const executionId = asText(payload.execucao_id);
+  if (executionId && !isUuid(executionId)) {
+    return jsonResponse({ error: "Identificador da execucao de teste invalido." }, 400);
+  }
+  const targeted = Boolean(executionId);
 
   let reservation: Reservation;
   try {
     reservation = ((await callRpc(
       supabaseUrl,
       serviceRoleKey,
-      "reservar_checklist_automacao_trabalhos_interno",
-      {
-        p_limite: limit,
-        p_duracao_reserva_minutos: leaseMinutes,
-      },
+      targeted
+        ? "reservar_checklist_automacao_teste_interno"
+        : "reservar_checklist_automacao_trabalhos_interno",
+      targeted
+        ? {
+          p_execucao_id: executionId,
+          p_limite: limit,
+          p_duracao_reserva_minutos: leaseMinutes,
+        }
+        : {
+          p_limite: limit,
+          p_duracao_reserva_minutos: leaseMinutes,
+        },
     )) ?? {}) as Reservation;
   } catch (error) {
     return jsonResponse({
@@ -453,7 +471,14 @@ Deno.serve(async (request) => {
   }
 
   if (reservation.pausada === true) {
-    return jsonResponse({ ok: true, pausada: true, quantidade: 0, resultados: [] });
+    return jsonResponse({
+      ok: true,
+      pausada: true,
+      direcionada: targeted,
+      execucao_id: executionId || null,
+      quantidade: 0,
+      resultados: [],
+    });
   }
 
   const works = Array.isArray(reservation.trabalhos)
@@ -474,6 +499,11 @@ Deno.serve(async (request) => {
   return jsonResponse({
     ok: true,
     pausada: false,
+    automacao_global_pausada: targeted
+      ? reservation.automacao_global_pausada === true
+      : false,
+    direcionada: targeted,
+    execucao_id: executionId || null,
     reservados: works.length,
     enviados: results.filter((result) => result.ok === true).length,
     falhas: results.filter((result) => result.ok !== true).length,

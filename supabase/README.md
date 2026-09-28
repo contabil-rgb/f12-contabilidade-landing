@@ -28,7 +28,7 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-preparacao-validacao.sql` -> validacao transacional da preparacao; desfaz todos os dados de teste com `ROLLBACK`
 - `supabase/migrations/20260924180000_checklist_automacao_fila.sql` -> fila relacional, reserva concorrente, historico automatico e controle de novas tentativas
 - `supabase/checklist-automacao-fila-validacao.sql` -> validacao transacional da fila; simula falhas sem enviar e-mails e desfaz o ciclo com `ROLLBACK`
-- `supabase/functions/processar-checklist-automacao/index.ts` -> trabalhador interno da fila; envia pelo Resend com idempotencia e registra sucesso, falha ou nova tentativa
+- `supabase/functions/processar-checklist-automacao/index.ts` -> trabalhador interno da fila mensal ou de uma execucao manual direcionada; envia pelo Resend com idempotencia e registra sucesso, falha ou nova tentativa
 - `supabase/functions/_shared/checklist-automation-email.ts` -> montagem e validacao do e-mail automatico agrupado por competencia
 - `supabase/functions/coordenar-checklist-automacao/index.ts` -> coordenacao mensal interna; respeita pausa, data e horario de Manaus antes de preparar e acionar o worker
 - `supabase/migrations/20260925110000_checklist_automacao_agendamento.sql` -> agenda a coordenacao diaria as 08:00 de Manaus e o processamento da fila durante a janela de novas tentativas, com credenciais no Vault
@@ -38,6 +38,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-portal-controles-validacao.sql` -> validacao transacional das permissoes equivalentes, confirmacoes, auditoria e rollback dos controles do portal
 - `supabase/migrations/20260928100000_checklist_automacao_teste_manual_base.sql` -> base segura do teste manual para ate 10 clientes selecionados, com previa, idempotencia, auditoria e reserva direcionada mesmo durante a pausa global
 - `supabase/checklist-automacao-teste-manual-validacao.sql` -> validacao transacional da selecao em lote, limite, idempotencia, auditoria e reserva do teste manual; nao envia e-mails e desfaz os dados simulados
+- `supabase/functions/executar-checklist-automacao-teste/index.ts` -> endpoint autenticado do teste manual; prepara a execucao direcionada e aciona o worker sem reativar a automacao global
+- `npm run test:checklist-automation-manual` -> valida autenticacao, perfis, selecao, idempotencia e acionamento direcionado sem acessar o Supabase ou o Resend reais
 - `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
 
 ## Ordem recomendada no SQL Editor
