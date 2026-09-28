@@ -20,6 +20,7 @@ export type ChecklistAutomacaoCliente = {
   cliente_id: string;
   nome: string;
   cnpj: string;
+  responsavel: string;
   status: string;
   arquivado: boolean;
   habilitada: boolean;
@@ -49,6 +50,7 @@ export type ChecklistAutomacaoPainel = {
     dia_util_ordem: number;
     horario_local: string;
     intervalos_tentativas_minutos: number[];
+    maximo_clientes_teste_manual: number;
   };
   resumo: {
     clientes_total: number;
@@ -141,5 +143,37 @@ export async function simularChecklistAutomacao(competenciaReferencia: string) {
     p_competencia_referencia: competenciaReferencia,
   });
   if (error) throw new Error(`Não foi possível simular a automação: ${message(error, 'erro desconhecido')}`);
+  return data as Record<string, unknown>;
+}
+
+export async function simularChecklistAutomacaoTeste(
+  competenciaReferencia: string,
+  clienteIds: string[],
+) {
+  const { data, error } = await supabase.rpc('simular_checklist_automacao_teste_portal', {
+    p_competencia_referencia: competenciaReferencia,
+    p_cliente_ids: clienteIds,
+  });
+  if (error) throw new Error(`Não foi possível preparar a prévia do teste: ${message(error, 'erro desconhecido')}`);
+  return data as Record<string, unknown>;
+}
+
+export async function executarChecklistAutomacaoTeste(values: {
+  competenciaReferencia: string;
+  clienteIds: string[];
+  chaveRequisicao: string;
+}) {
+  const { data, error } = await supabase.functions.invoke('executar-checklist-automacao-teste', {
+    body: {
+      competencia_referencia: values.competenciaReferencia,
+      cliente_ids: values.clienteIds,
+      chave_requisicao: values.chaveRequisicao,
+    },
+  });
+  if (error) throw new Error(`Não foi possível executar o teste: ${message(error, 'erro desconhecido')}`);
+  if (data?.error) {
+    const details = data?.details ? ` ${String(data.details)}` : '';
+    throw new Error(`${String(data.error)}${details}`.trim());
+  }
   return data as Record<string, unknown>;
 }

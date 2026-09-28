@@ -7,11 +7,13 @@ import {
   CheckCircle2,
   Clock3,
   Edit3,
+  Eye,
   PauseCircle,
   PlayCircle,
   RefreshCcw,
   Save,
   Search,
+  Send,
   ShieldCheck,
   Trash2,
   Users,
@@ -22,9 +24,11 @@ import {
   atualizarChecklistAutomacaoClientesLote,
   atualizarChecklistAutomacaoConfiguracao,
   excluirChecklistAutomacaoFeriado,
+  executarChecklistAutomacaoTeste,
   obterChecklistAutomacaoPainel,
   salvarChecklistAutomacaoFeriado,
   simularChecklistAutomacao,
+  simularChecklistAutomacaoTeste,
 } from '../../services/checklist-automacao.service';
 import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
 import ActionButton from '../ui/ActionButton';
@@ -88,6 +92,18 @@ function fieldLabel(children) {
   return <span className="block text-xs font-black uppercase tracking-wide text-slate-500 dark:text-gray-400">{children}</span>;
 }
 
+function formatCompetence(value) {
+  if (!value) return '—';
+  if (typeof value === 'string') return dateToMonth(value).split('-').reverse().join('/');
+  const month = String(value.mes ?? '').padStart(2, '0');
+  return value.ano && month !== '00' ? `${month}/${value.ano}` : '—';
+}
+
+function createRequestKey() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `teste-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 function Toggle({ checked, onChange, disabled = false, label }) {
   return (
     <button
@@ -142,6 +158,83 @@ function ConfirmDialog({ dialog, busy, onCancel, onConfirm }) {
   );
 }
 
+function ManualTestDialog({ state, busy, onCancel, onConfirm }) {
+  if (!state || typeof document === 'undefined') return null;
+  const previewJobs = Array.isArray(state.preview?.trabalhos) ? state.preview.trabalhos : [];
+  const previewSummary = state.preview?.resumo && typeof state.preview.resumo === 'object' ? state.preview.resumo : {};
+  const processing = state.result?.processamento && typeof state.result.processamento === 'object' ? state.result.processamento : {};
+  const processingResults = Array.isArray(processing.resultados) ? processing.resultados : [];
+  const preparedWorks = Array.isArray(state.result?.preparacao?.trabalhos) ? state.result.preparacao.trabalhos : [];
+  const preparedById = new Map(preparedWorks.map((work) => [String(work.id), work]));
+  const completed = Boolean(state.result);
+
+  return createPortal(
+    <div className="modal-backdrop z-[10000] flex items-center justify-center" role="presentation">
+      <div className="modal-panel modal-panel-xl" role="dialog" aria-modal="true" aria-labelledby="manual-test-title">
+        <div className="modal-header flex items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 id="manual-test-title" className="text-xl font-black text-slate-950 dark:text-white">{completed ? 'Resultado do teste da automação' : 'Revisar teste da automação'}</h3>
+              <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200">Modo TESTE</StatusBadge>
+            </div>
+            <p className="mt-2 text-sm font-medium text-slate-600 dark:text-gray-300">Competência {formatCompetence(state.month)} · {formatNumber(state.clientIds.length)} cliente(s) selecionado(s)</p>
+          </div>
+          <button type="button" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800" onClick={onCancel} disabled={busy} aria-label="Fechar"><X size={18} /></button>
+        </div>
+
+        <div className="modal-body space-y-4">
+          {completed ? (
+            <>
+              <AlertBanner tone={Number(processing.falhas ?? 0) > 0 ? 'warning' : 'success'} title={Number(processing.falhas ?? 0) > 0 ? 'Teste concluído com falhas' : 'Teste concluído'}>
+                Foram enviados {formatNumber(processing.enviados ?? 0)} lembrete(s). {formatNumber(processing.falhas ?? 0)} envio(s) falharam. A execução ficou registrada no histórico.
+              </AlertBanner>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Preparados', state.result?.preparacao?.resumo?.preparados ?? 0],
+                  ['Enviados', processing.enviados ?? 0],
+                  ['Falhas', processing.falhas ?? 0],
+                ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-gray-700 dark:bg-gray-950/25"><p className="text-[11px] font-black uppercase text-slate-500 dark:text-gray-400">{label}</p><p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{formatNumber(value)}</p></div>)}
+              </div>
+              <div className="space-y-2">
+                {processingResults.map((result, index) => {
+                  const work = preparedById.get(String(result.trabalho_id)) ?? preparedWorks[index] ?? {};
+                  return <div key={String(result.trabalho_id ?? index)} className="rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-gray-700 dark:bg-gray-950/25"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-black text-slate-900 dark:text-white">{work.cliente_nome || `Cliente ${index + 1}`}</p><p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">Tentativa {formatNumber(result.tentativa ?? 1)}{result.resend_id ? ` · Resend ${result.resend_id}` : ''}</p>{result.erro_mensagem ? <p className="mt-2 text-sm font-semibold text-red-600 dark:text-red-300">{result.erro_mensagem}</p> : null}</div><StatusBadge toneClass={result.ok ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-red-300 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200'}>{result.ok ? 'Enviado' : 'Falhou'}</StatusBadge></div></div>;
+                })}
+                {!processingResults.length ? <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm font-medium text-slate-500 dark:border-gray-700 dark:text-gray-400">Nenhum e-mail precisou ser processado para esta seleção.</p> : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <AlertBanner tone="warning" title="Confirmação obrigatória">
+                Ao confirmar, os e-mails abaixo serão enviados agora somente para os destinatários de teste configurados. Os contatos reais aparecem apenas para conferência.
+              </AlertBanner>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Preparados', previewSummary.preparados ?? 0],
+                  ['Pendências', previewSummary.total_pendencias ?? 0],
+                  ['Sem pendências', previewSummary.sem_pendencias ?? 0],
+                ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-gray-700 dark:bg-gray-950/25"><p className="text-[11px] font-black uppercase text-slate-500 dark:text-gray-400">{label}</p><p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{formatNumber(value)}</p></div>)}
+              </div>
+              <div className="max-h-[48vh] space-y-3 overflow-y-auto pr-1">
+                {previewJobs.map((job, index) => {
+                  const competences = Array.isArray(job.competencias) ? job.competencias.map(formatCompetence).join(', ') : '—';
+                  return <div key={`${job.cliente_id || index}-${job.resultado || ''}`} className="rounded-xl border border-slate-200 bg-white/60 p-4 dark:border-gray-700 dark:bg-gray-950/25"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-black text-slate-900 dark:text-white">{job.cliente_nome || 'Cliente'}</p><p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">{formatNumber(job.qtd_pendencias ?? 0)} pendência(s) · Competências: {competences}</p></div><StatusBadge toneClass={job.resultado === 'PREPARADO' ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'}>{job.resultado || 'ANALISADO'}</StatusBadge></div><div className="mt-3 grid gap-3 border-t border-slate-200 pt-3 text-xs dark:border-gray-700 md:grid-cols-2"><div><p className="font-black uppercase text-slate-500 dark:text-gray-400">Contato cadastrado</p><p className="mt-1 break-all font-semibold text-slate-700 dark:text-gray-200">{job.destinatario_original || 'Sem e-mail principal'}{job.cc_original ? ` · Cc: ${job.cc_original}` : ''}</p></div><div><p className="font-black uppercase text-blue-600 dark:text-blue-300">Destino efetivo do teste</p><p className="mt-1 break-all font-semibold text-slate-700 dark:text-gray-200">{job.destinatario_efetivo || '—'}{job.cc_efetivo ? ` · Cc: ${job.cc_efetivo}` : ''}</p></div></div>{job.motivo ? <p className="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-200">{job.motivo}</p> : null}</div>;
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="modal-footer flex flex-wrap justify-end gap-2">
+          <ActionButton type="button" variant="subtle" onClick={onCancel} disabled={busy}>{completed ? 'Fechar' : 'Cancelar'}</ActionButton>
+          {!completed ? <ActionButton type="button" variant="primary" onClick={onConfirm} disabled={busy || Number(previewSummary.preparados ?? 0) < 1}>{busy ? <RefreshCcw size={16} className="animate-spin" /> : <Send size={16} />}Confirmar e enviar teste</ActionButton> : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export default function ChecklistAutomationPanel() {
   const [panel, setPanel] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -151,6 +244,7 @@ export default function ChecklistAutomationPanel() {
   const [config, setConfig] = useState(null);
   const [clientSearch, setClientSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('todos');
+  const [clientResponsible, setClientResponsible] = useState('');
   const [clientLimit, setClientLimit] = useState(25);
   const [selectedClients, setSelectedClients] = useState([]);
   const [clientAction, setClientAction] = useState(null);
@@ -158,6 +252,8 @@ export default function ChecklistAutomationPanel() {
   const [holidayForm, setHolidayForm] = useState(EMPTY_HOLIDAY);
   const [simulationMonth, setSimulationMonth] = useState(currentMonth());
   const [simulation, setSimulation] = useState(null);
+  const [manualTestMonth, setManualTestMonth] = useState(currentMonth());
+  const [manualTest, setManualTest] = useState(null);
   const [dialog, setDialog] = useState(null);
 
   async function loadPanel({ silent = false } = {}) {
@@ -190,13 +286,29 @@ export default function ChecklistAutomationPanel() {
     return (panel?.clientes ?? []).filter((client) => {
       if (clientFilter === 'habilitados' && !client.habilitada) return false;
       if (clientFilter === 'pausados' && client.habilitada) return false;
-      return !search || normalizeText(`${client.nome} ${client.cnpj}`).includes(search);
+      if (clientResponsible && client.responsavel !== clientResponsible) return false;
+      return !search || normalizeText(`${client.nome} ${client.cnpj} ${client.responsavel || ''}`).includes(search);
     });
-  }, [clientFilter, clientSearch, panel?.clientes]);
+  }, [clientFilter, clientResponsible, clientSearch, panel?.clientes]);
+
+  const responsibleOptions = useMemo(() => Array.from(new Set(
+    (panel?.clientes ?? []).map((client) => client.responsavel).filter(Boolean),
+  )).sort((left, right) => left.localeCompare(right, 'pt-BR')).map((responsible) => ({ value: responsible, label: responsible })), [panel?.clientes]);
+
+  const selectedClientRows = useMemo(() => (panel?.clientes ?? []).filter((client) => selectedClients.includes(client.cliente_id)), [panel?.clientes, selectedClients]);
+  const maxManualTestClients = Number(panel?.regras_fixas?.maximo_clientes_teste_manual) || 10;
+  const manualTestBlock = useMemo(() => {
+    if (!selectedClientRows.length) return 'Selecione de 1 a 10 clientes para preparar o teste.';
+    if (selectedClientRows.length > maxManualTestClients) return `O teste manual aceita no máximo ${maxManualTestClients} clientes por execução.`;
+    if (config?.modo !== 'TESTE') return 'Altere a configuração global para o modo TESTE antes de executar.';
+    const invalid = selectedClientRows.find((client) => !client.habilitada || client.arquivado || normalizeText(client.status) !== 'ativo' || !client.competencia_inicial);
+    if (invalid) return `${invalid.nome} precisa estar ativo, habilitado e com competência inicial definida.`;
+    return '';
+  }, [config?.modo, maxManualTestClients, selectedClientRows]);
 
   useEffect(() => {
     setClientLimit(25);
-  }, [clientFilter, clientSearch]);
+  }, [clientFilter, clientResponsible, clientSearch]);
 
   const configChanged = useMemo(() => {
     if (!config || !panel?.configuracao) return false;
@@ -371,6 +483,59 @@ export default function ChecklistAutomationPanel() {
     }
   }
 
+  async function prepareManualTest() {
+    if (manualTestBlock) {
+      setNotice({ tone: 'warning', title: 'Teste indisponível', message: manualTestBlock });
+      return;
+    }
+    if (!manualTestMonth) {
+      setNotice({ tone: 'warning', title: 'Competência obrigatória', message: 'Informe a competência de referência do teste.' });
+      return;
+    }
+    setBusy(true);
+    try {
+      const preview = await simularChecklistAutomacaoTeste(monthToDate(manualTestMonth), selectedClients);
+      setManualTest({
+        month: monthToDate(manualTestMonth),
+        clientIds: [...selectedClients],
+        requestKey: createRequestKey(),
+        preview,
+        result: null,
+      });
+      setNotice(null);
+    } catch (err) {
+      showFailure('Erro ao preparar o teste', err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeManualTest() {
+    if (!manualTest || manualTest.result) return;
+    setBusy(true);
+    try {
+      const result = await executarChecklistAutomacaoTeste({
+        competenciaReferencia: manualTest.month,
+        clienteIds: manualTest.clientIds,
+        chaveRequisicao: manualTest.requestKey,
+      });
+      setManualTest((current) => ({ ...current, result }));
+      await loadPanel({ silent: true });
+      setSelectedClients([]);
+      const processing = result?.processamento && typeof result.processamento === 'object' ? result.processamento : {};
+      const failures = Number(processing.falhas ?? 0);
+      setNotice({
+        tone: failures ? 'warning' : 'success',
+        title: failures ? 'Teste concluído com falhas' : 'Teste concluído',
+        message: `${formatNumber(processing.enviados ?? 0)} lembrete(s) enviado(s) e ${formatNumber(failures)} falha(s).`,
+      });
+    } catch (err) {
+      showFailure('Erro ao executar o teste', err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <SurfacePanel className="p-10">
@@ -487,22 +652,26 @@ export default function ChecklistAutomationPanel() {
         right={selectedClients.length ? (
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge size="md" toneClass="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200">{selectedClients.length} selecionado(s)</StatusBadge>
+            <ActionButton type="button" size="sm" variant="primary" onClick={prepareManualTest} disabled={busy}><Eye size={15} /> Executar teste agora</ActionButton>
             <ActionButton type="button" size="sm" variant="primary" onClick={() => openClientAction(selectedClients, true)}>Habilitar</ActionButton>
             <ActionButton type="button" size="sm" variant="secondary" onClick={() => openClientAction(selectedClients, false)}>Pausar</ActionButton>
           </div>
         ) : null}
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
-        <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_220px_240px_190px]">
           <label className="relative">
             {fieldLabel('Cliente ou CNPJ')}
             <Search size={17} className="absolute bottom-3.5 left-3 text-slate-400" />
             <input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Pesquisar cliente" className="input-shell mt-2 pl-10 normal-case" />
           </label>
           <DropdownSelect label="Situação" value={clientFilter} options={CLIENT_FILTER_OPTIONS} includeBlank={false} searchable={false} onChange={setClientFilter} />
+          <DropdownSelect label="Responsável" value={clientResponsible} options={responsibleOptions} emptyLabel="Todos" searchPlaceholder="Pesquisar responsável" onChange={setClientResponsible} />
+          <label>{fieldLabel('Competência do teste')}<input type="month" max={currentMonth()} value={manualTestMonth} onChange={(event) => setManualTestMonth(event.target.value)} className="input-shell mt-2 normal-case" /></label>
         </div>
+        {selectedClients.length ? <div className="mt-4"><AlertBanner tone={manualTestBlock ? 'warning' : 'info'} title={manualTestBlock ? 'Revise a seleção para o teste' : 'Seleção pronta para teste'}>{manualTestBlock || `A prévia será calculada para ${formatNumber(selectedClients.length)} cliente(s). O envio só começa depois da confirmação.`}</AlertBanner></div> : null}
         <div className="mt-4">
-          <DataTableShell headers={['', 'Cliente', 'Situação', 'Competência inicial', 'Última alteração', 'Ações']} minWidth="min-w-[920px]" hasRows={filteredClients.length > 0} emptyTitle="Nenhum cliente encontrado.">
+          <DataTableShell headers={['', 'Cliente', 'Responsável', 'Situação', 'Competência inicial', 'Última alteração', 'Ações']} minWidth="min-w-[1080px]" hasRows={filteredClients.length > 0} emptyTitle="Nenhum cliente encontrado.">
             <tbody>
               {filteredClients.slice(0, clientLimit).map((client) => {
                 const checked = selectedClients.includes(client.cliente_id);
@@ -510,6 +679,7 @@ export default function ChecklistAutomationPanel() {
                   <tr key={client.cliente_id} className="table-row">
                     <td className="table-cell"><input type="checkbox" checked={checked} onChange={() => setSelectedClients((current) => checked ? current.filter((id) => id !== client.cliente_id) : [...current, client.cliente_id])} aria-label={`Selecionar ${client.nome}`} /></td>
                     <td className="table-cell"><p className="font-black text-slate-900 dark:text-white">{client.nome}</p><p className="mt-1 text-xs text-slate-500 dark:text-gray-400">{formatCnpj(client.cnpj)}</p></td>
+                    <td className="table-cell"><p className="font-bold text-slate-700 dark:text-gray-200">{client.responsavel || 'Sem responsável'}</p></td>
                     <td className="table-cell"><StatusBadge toneClass={client.habilitada ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-600 dark:bg-gray-700/60 dark:text-gray-200'}>{client.habilitada ? 'Habilitada' : 'Pausada'}</StatusBadge>{!client.habilitada && client.motivo_pausa ? <p className="mt-1.5 max-w-[28ch] text-xs text-slate-500 dark:text-gray-400">{client.motivo_pausa}</p> : null}</td>
                     <td className="table-cell">{client.competencia_inicial ? dateToMonth(client.competencia_inicial).split('-').reverse().join('/') : '—'}</td>
                     <td className="table-cell">{formatDate(client.atualizado_em, true)}</td>
@@ -600,6 +770,7 @@ export default function ChecklistAutomationPanel() {
           </div>
         </div>, document.body) : null}
 
+      <ManualTestDialog state={manualTest} busy={busy} onCancel={() => !busy && setManualTest(null)} onConfirm={executeManualTest} />
       <ConfirmDialog dialog={dialog} busy={busy} onCancel={() => !busy && setDialog(null)} onConfirm={() => dialog?.execute?.()} />
     </div>
   );
