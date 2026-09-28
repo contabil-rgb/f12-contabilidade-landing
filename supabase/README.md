@@ -36,6 +36,8 @@ Arquivos SQL ativos do projeto.
 - `supabase/checklist-automacao-integrada-validacao.sql` -> validacao transacional do ciclo mensal completo, lotes, idempotencia, pausa e tentativas de 08:15 e 08:45; nao chama o Resend e desfaz os dados simulados
 - `supabase/migrations/20260925150000_checklist_automacao_portal_controles.sql` -> RPCs protegidas para os dois perfis consultarem e administrarem configuracao, clientes, feriados e simulacoes pelo portal
 - `supabase/checklist-automacao-portal-controles-validacao.sql` -> validacao transacional das permissoes equivalentes, confirmacoes, auditoria e rollback dos controles do portal
+- `supabase/migrations/20260928100000_checklist_automacao_teste_manual_base.sql` -> base segura do teste manual para ate 10 clientes selecionados, com previa, idempotencia, auditoria e reserva direcionada mesmo durante a pausa global
+- `supabase/checklist-automacao-teste-manual-validacao.sql` -> validacao transacional da selecao em lote, limite, idempotencia, auditoria e reserva do teste manual; nao envia e-mails e desfaz os dados simulados
 - `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
 
 ## Ordem recomendada no SQL Editor
