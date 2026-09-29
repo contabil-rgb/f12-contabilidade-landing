@@ -23,11 +23,15 @@ import {
   atualizarChecklistAutomacaoCliente,
   atualizarChecklistAutomacaoClientesLote,
   atualizarChecklistAutomacaoConfiguracao,
+  cancelarChecklistAutomacaoAgendamentoTeste,
+  criarChecklistAutomacaoAgendamentoTeste,
   excluirChecklistAutomacaoFeriado,
   executarChecklistAutomacaoTeste,
+  listarChecklistAutomacaoAgendamentosTeste,
   obterChecklistAutomacaoPainel,
   salvarChecklistAutomacaoFeriado,
   simularChecklistAutomacao,
+  simularChecklistAutomacaoAgendamentoTeste,
   simularChecklistAutomacaoTeste,
 } from '../../services/checklist-automacao.service';
 import { formatCnpj, formatNumber, normalizeText } from '../../lib/formatters';
@@ -55,6 +59,12 @@ const HOLIDAY_SCOPE_OPTIONS = [
   { value: 'NACIONAL', label: 'Nacional' },
   { value: 'ESTADUAL', label: 'Estadual — Amazonas' },
   { value: 'MUNICIPAL', label: 'Municipal — Manaus' },
+];
+
+const SCHEDULE_SCOPE_OPTIONS = [
+  { value: 'selecionados', label: 'Clientes selecionados' },
+  { value: 'filtrados', label: 'Clientes elegíveis do filtro atual' },
+  { value: 'todos', label: 'Todos os clientes elegíveis' },
 ];
 
 const EMPTY_HOLIDAY = {
@@ -102,6 +112,34 @@ function formatCompetence(value) {
 function createRequestKey() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `teste-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function manausDateTimeLocal(offsetMinutes = 30) {
+  const date = new Date(Date.now() + offsetMinutes * 60 * 1000);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Manaus',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function formatManausLocal(value) {
+  if (!value) return '—';
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (!match) return String(value);
+  return `${match[3]}/${match[2]}/${match[1]}, ${match[4]}:${match[5]}`;
+}
+
+function scheduleStatus(status) {
+  const states = {
+    AGENDADO: ['Agendado', 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200'],
+    PROCESSANDO: ['Processando', 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'],
+    CONCLUIDO: ['Concluído', 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200'],
+    CANCELADO: ['Cancelado', 'border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-600 dark:bg-gray-700/60 dark:text-gray-200'],
+    FALHA: ['Falha', 'border-red-300 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200'],
+  };
+  return states[status] ?? [status || 'Desconhecido', states.CANCELADO[1]];
 }
 
 function Toggle({ checked, onChange, disabled = false, label }) {
@@ -235,6 +273,66 @@ function ManualTestDialog({ state, busy, onCancel, onConfirm }) {
   );
 }
 
+function ScheduledTestDialog({ state, busy, onCancel, onConfirm }) {
+  if (!state || typeof document === 'undefined') return null;
+  const jobs = Array.isArray(state.preview?.trabalhos) ? state.preview.trabalhos : [];
+  const summary = state.preview?.resumo && typeof state.preview.resumo === 'object' ? state.preview.resumo : {};
+
+  return createPortal(
+    <div className="modal-backdrop z-[10000] flex items-center justify-center" role="presentation">
+      <div className="modal-panel modal-panel-xl" role="dialog" aria-modal="true" aria-labelledby="scheduled-test-title">
+        <div className="modal-header flex items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 id="scheduled-test-title" className="text-xl font-black text-slate-950 dark:text-white">Revisar teste agendado</h3>
+              <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200">Modo TESTE</StatusBadge>
+            </div>
+            <p className="mt-2 text-sm font-medium text-slate-600 dark:text-gray-300">
+              Competência {formatCompetence(state.competence)} · {formatManausLocal(state.dateTime)} (Manaus)
+            </p>
+          </div>
+          <button type="button" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800" onClick={onCancel} disabled={busy} aria-label="Fechar"><X size={18} /></button>
+        </div>
+
+        <div className="modal-body space-y-4">
+          <AlertBanner tone="warning" title="Revise antes de confirmar">
+            O agendamento será gravado com os destinatários de teste abaixo. Nenhum e-mail será enviado durante esta confirmação.
+          </AlertBanner>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['Preparados', summary.preparados ?? 0],
+              ['Pendências', summary.total_pendencias ?? 0],
+              ['Sem pendências', summary.sem_pendencias ?? 0],
+            ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-gray-700 dark:bg-gray-950/25"><p className="text-[11px] font-black uppercase text-slate-500 dark:text-gray-400">{label}</p><p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{formatNumber(value)}</p></div>)}
+          </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-sm dark:border-blue-400/25 dark:bg-blue-400/10">
+            <p className="font-black text-blue-800 dark:text-blue-200">Destinos congelados no agendamento</p>
+            <p className="mt-1 break-all font-semibold text-slate-700 dark:text-gray-200">Para: {state.preview?.destinatario_teste || '—'} · Cc: {state.preview?.cc_teste || '—'}</p>
+          </div>
+          <div className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
+            {jobs.map((job, index) => (
+              <div key={`${job.cliente_id || index}-${job.resultado || ''}`} className="rounded-xl border border-slate-200 bg-white/60 p-3 dark:border-gray-700 dark:bg-gray-950/25">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div><p className="font-black text-slate-900 dark:text-white">{job.cliente_nome || 'Cliente'}</p><p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">{formatNumber(job.qtd_pendencias ?? 0)} pendência(s){job.responsavel ? ` · Responsável: ${job.responsavel}` : ''}</p></div>
+                  <StatusBadge toneClass={job.resultado === 'PREPARADO' ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200' : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200'}>{job.resultado || 'ANALISADO'}</StatusBadge>
+                </div>
+                {job.motivo ? <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-200">{job.motivo}</p> : null}
+              </div>
+            ))}
+            {!jobs.length ? <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm font-medium text-slate-500 dark:border-gray-700 dark:text-gray-400">Nenhum cliente elegível foi encontrado para este escopo.</p> : null}
+          </div>
+        </div>
+
+        <div className="modal-footer flex flex-wrap justify-end gap-2">
+          <ActionButton type="button" variant="subtle" onClick={onCancel} disabled={busy}>Cancelar</ActionButton>
+          <ActionButton type="button" variant="primary" onClick={onConfirm} disabled={busy || Number(summary.preparados ?? 0) < 1}>{busy ? <RefreshCcw size={16} className="animate-spin" /> : <CalendarDays size={16} />}Confirmar agendamento</ActionButton>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export default function ChecklistAutomationPanel() {
   const [panel, setPanel] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -254,14 +352,21 @@ export default function ChecklistAutomationPanel() {
   const [simulation, setSimulation] = useState(null);
   const [manualTestMonth, setManualTestMonth] = useState(currentMonth());
   const [manualTest, setManualTest] = useState(null);
+  const [scheduleForm, setScheduleForm] = useState({ competence: currentMonth(), dateTime: manausDateTimeLocal(), scope: 'selecionados' });
+  const [scheduledTests, setScheduledTests] = useState([]);
+  const [schedulePreview, setSchedulePreview] = useState(null);
   const [dialog, setDialog] = useState(null);
 
   async function loadPanel({ silent = false } = {}) {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const data = await obterChecklistAutomacaoPainel();
+      const [data, schedules] = await Promise.all([
+        obterChecklistAutomacaoPainel(),
+        listarChecklistAutomacaoAgendamentosTeste(50),
+      ]);
       setPanel(data);
+      setScheduledTests(schedules);
       setConfig({ ...data.configuracao });
       setSelectedClients((current) => current.filter((id) => data.clientes.some((client) => client.cliente_id === id)));
     } catch (err) {
@@ -296,6 +401,12 @@ export default function ChecklistAutomationPanel() {
   )).sort((left, right) => left.localeCompare(right, 'pt-BR')).map((responsible) => ({ value: responsible, label: responsible })), [panel?.clientes]);
 
   const selectedClientRows = useMemo(() => (panel?.clientes ?? []).filter((client) => selectedClients.includes(client.cliente_id)), [panel?.clientes, selectedClients]);
+  const filteredEligibleClients = useMemo(() => filteredClients.filter((client) => (
+    client.habilitada
+    && !client.arquivado
+    && normalizeText(client.status) === 'ativo'
+    && Boolean(client.competencia_inicial)
+  )), [filteredClients]);
   const maxManualTestClients = Number(panel?.regras_fixas?.maximo_clientes_teste_manual) || 10;
   const manualTestBlock = useMemo(() => {
     if (!selectedClientRows.length) return 'Selecione de 1 a 10 clientes para preparar o teste.';
@@ -536,6 +647,115 @@ export default function ChecklistAutomationPanel() {
     }
   }
 
+  function resolveScheduleScope() {
+    if (scheduleForm.scope === 'todos') {
+      return { backendScope: 'TODOS_ELEGIVEIS', clientIds: null, description: 'todos os clientes elegíveis' };
+    }
+    const rows = scheduleForm.scope === 'filtrados' ? filteredEligibleClients : selectedClientRows;
+    const label = scheduleForm.scope === 'filtrados' ? 'do filtro atual' : 'selecionados';
+    return {
+      backendScope: 'CLIENTES_SELECIONADOS',
+      clientIds: rows.map((client) => client.cliente_id),
+      description: `${formatNumber(rows.length)} cliente(s) ${label}`,
+    };
+  }
+
+  async function prepareScheduledTest() {
+    if (configChanged) {
+      setNotice({ tone: 'warning', title: 'Configuração ainda não salva', message: 'Salve ou descarte as alterações da configuração global antes de preparar o agendamento.' });
+      return;
+    }
+    if (config?.modo !== 'TESTE') {
+      setNotice({ tone: 'warning', title: 'Modo TESTE obrigatório', message: 'Altere e salve a configuração global no modo TESTE antes de agendar.' });
+      return;
+    }
+    if (config?.ativa) {
+      setNotice({ tone: 'warning', title: 'Pause a automação global', message: 'O agendamento de teste só pode ser criado enquanto a automação global estiver pausada.' });
+      return;
+    }
+    if (!scheduleForm.competence || !scheduleForm.dateTime) {
+      setNotice({ tone: 'warning', title: 'Preencha o agendamento', message: 'Informe a competência, a data e o horário de Manaus.' });
+      return;
+    }
+
+    const scope = resolveScheduleScope();
+    if (scope.backendScope === 'CLIENTES_SELECIONADOS' && !scope.clientIds.length) {
+      setNotice({ tone: 'warning', title: 'Nenhum cliente elegível', message: scheduleForm.scope === 'filtrados' ? 'O filtro atual não contém clientes ativos, habilitados e configurados.' : 'Selecione pelo menos um cliente elegível na tabela.' });
+      return;
+    }
+    if (scope.clientIds?.length > 500) {
+      setNotice({ tone: 'warning', title: 'Seleção muito grande', message: 'O agendamento aceita no máximo 500 clientes em uma seleção direcionada.' });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const preview = await simularChecklistAutomacaoAgendamentoTeste({
+        competenciaReferencia: monthToDate(scheduleForm.competence),
+        escopo: scope.backendScope,
+        clienteIds: scope.clientIds,
+      });
+      setSchedulePreview({
+        competence: monthToDate(scheduleForm.competence),
+        dateTime: scheduleForm.dateTime,
+        scope: scope.backendScope,
+        clientIds: scope.clientIds,
+        description: scope.description,
+        requestKey: createRequestKey(),
+        preview,
+      });
+      setNotice(null);
+    } catch (err) {
+      showFailure('Erro ao preparar o agendamento', err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmScheduledTest() {
+    if (!schedulePreview) return;
+    setBusy(true);
+    try {
+      const result = await criarChecklistAutomacaoAgendamentoTeste({
+        competenciaReferencia: schedulePreview.competence,
+        dataHoraLocal: schedulePreview.dateTime.replace('T', ' '),
+        escopo: schedulePreview.scope,
+        clienteIds: schedulePreview.clientIds,
+        chaveRequisicao: schedulePreview.requestKey,
+      });
+      await loadPanel({ silent: true });
+      setSchedulePreview(null);
+      showSuccess('Teste agendado', `O teste ficou programado para ${formatManausLocal(result?.data_hora_manaus || scheduleForm.dateTime)}, no horário de Manaus.`);
+    } catch (err) {
+      showFailure('Erro ao criar o agendamento', err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function requestCancelScheduledTest(schedule) {
+    setDialog({
+      title: 'Cancelar teste agendado',
+      message: `Confirma o cancelamento do teste programado para ${formatManausLocal(schedule.data_hora_manaus)}?`,
+      warning: 'O cancelamento é definitivo e ficará registrado na auditoria. Ele só é permitido antes do início do processamento.',
+      danger: true,
+      confirmLabel: 'Cancelar agendamento',
+      execute: async () => {
+        setBusy(true);
+        try {
+          await cancelarChecklistAutomacaoAgendamentoTeste(schedule.id);
+          await loadPanel({ silent: true });
+          showSuccess('Agendamento cancelado', 'O teste agendado foi cancelado e não poderá mais ser processado.');
+        } catch (err) {
+          showFailure('Erro ao cancelar o agendamento', err);
+        } finally {
+          setBusy(false);
+          setDialog(null);
+        }
+      },
+    });
+  }
+
   if (loading) {
     return (
       <SurfacePanel className="p-10">
@@ -698,6 +918,64 @@ export default function ChecklistAutomationPanel() {
         </div>
       </SurfacePanel>
 
+      <SurfacePanel
+        title="Teste agendado da automação"
+        description="Programe um disparo único em modo TESTE, usando o horário de Manaus e os destinatários pessoais configurados."
+        right={<ActionButton type="button" size="sm" variant="secondary" onClick={() => loadPanel({ silent: true })} disabled={busy}><RefreshCcw size={15} className={busy ? 'animate-spin' : ''} /> Atualizar lista</ActionButton>}
+        bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
+      >
+        <AlertBanner tone="info" title="Agendamento isolado e seguro">
+          Nesta parte, o portal registra, mostra e permite cancelar o teste. O acionamento automático continua desativado até a próxima validação controlada.
+        </AlertBanner>
+
+        <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white/55 p-4 md:grid-cols-2 xl:grid-cols-[190px_240px_1fr_auto] dark:border-gray-700 dark:bg-gray-950/25">
+          <label>{fieldLabel('Competência')}<input type="month" max={currentMonth()} value={scheduleForm.competence} onChange={(event) => setScheduleForm((current) => ({ ...current, competence: event.target.value }))} className="input-shell mt-2 normal-case" /></label>
+          <label>{fieldLabel('Data e hora — Manaus')}<input type="datetime-local" min={manausDateTimeLocal(1)} value={scheduleForm.dateTime} onChange={(event) => setScheduleForm((current) => ({ ...current, dateTime: event.target.value }))} className="input-shell mt-2 normal-case" /></label>
+          <DropdownSelect label="Clientes do teste" value={scheduleForm.scope} options={SCHEDULE_SCOPE_OPTIONS} includeBlank={false} searchable={false} onChange={(value) => setScheduleForm((current) => ({ ...current, scope: value }))} />
+          <div className="flex items-end"><ActionButton type="button" variant="primary" className="w-full justify-center" onClick={prepareScheduledTest} disabled={busy}><Eye size={16} /> Revisar agendamento</ActionButton></div>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm dark:border-gray-700 dark:bg-gray-900/50">
+            <p className="font-black text-slate-900 dark:text-white">Escopo atual</p>
+            <p className="mt-1 font-medium text-slate-600 dark:text-gray-300">
+              {scheduleForm.scope === 'selecionados'
+                ? `${formatNumber(selectedClientRows.length)} cliente(s) marcado(s) na tabela.`
+                : scheduleForm.scope === 'filtrados'
+                  ? `${formatNumber(filteredEligibleClients.length)} cliente(s) elegível(is) nos filtros atuais${clientResponsible ? `, sob responsabilidade de ${clientResponsible}` : ''}.`
+                  : 'Todos os clientes ativos, habilitados e com competência inicial serão avaliados.'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm dark:border-gray-700 dark:bg-gray-900/50">
+            <p className="font-black text-slate-900 dark:text-white">Destinos do teste</p>
+            <p className="mt-1 break-all font-medium text-slate-600 dark:text-gray-300">Para: {panel.configuracao.email_teste_destinatario || 'Não configurado'} · Cc: {panel.configuracao.email_teste_cc || 'Não configurado'}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-slate-200 pt-5 dark:border-gray-700">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-black text-slate-900 dark:text-white">Agendamentos recentes</h3><p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">O cancelamento fica disponível somente enquanto o teste estiver aguardando.</p></div><StatusBadge>{formatNumber(scheduledTests.length)} registro(s)</StatusBadge></div>
+          <div className="space-y-2">
+            {scheduledTests.length ? scheduledTests.map((schedule) => {
+              const [statusLabel, statusTone] = scheduleStatus(schedule.status);
+              const selectedCount = Array.isArray(schedule.cliente_ids) ? schedule.cliente_ids.length : null;
+              return (
+                <div key={schedule.id} className="rounded-xl border border-slate-200 bg-white/60 p-4 dark:border-gray-700 dark:bg-gray-950/25">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><p className="font-black text-slate-900 dark:text-white">{formatManausLocal(schedule.data_hora_manaus)} · Competência {formatCompetence(schedule.competencia_referencia)}</p><StatusBadge toneClass={statusTone}>{statusLabel}</StatusBadge></div>
+                      <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">{schedule.escopo === 'TODOS_ELEGIVEIS' ? 'Todos os clientes elegíveis' : `${formatNumber(selectedCount ?? 0)} cliente(s) direcionado(s)`} · Criado por {schedule.criado_por_nome || schedule.criado_por_email || 'usuário do portal'}</p>
+                      <p className="mt-1 break-all text-xs font-semibold text-slate-600 dark:text-gray-300">Destino: {schedule.destinatario_teste || '—'} · Cc: {schedule.cc_teste || '—'}</p>
+                      {schedule.erro_mensagem ? <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300">{schedule.erro_mensagem}</p> : null}
+                    </div>
+                    {schedule.status === 'AGENDADO' ? <ActionButton type="button" size="sm" variant="danger" onClick={() => requestCancelScheduledTest(schedule)} disabled={busy}><Trash2 size={15} /> Cancelar</ActionButton> : null}
+                  </div>
+                </div>
+              );
+            }) : <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm font-medium text-slate-500 dark:border-gray-700 dark:text-gray-400">Nenhum teste foi agendado.</p>}
+          </div>
+        </div>
+      </SurfacePanel>
+
       <div className="grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
         <SurfacePanel title="Calendário de feriados" description="Feriados nacionais, estaduais do Amazonas e municipais de Manaus usados no cálculo dos dias úteis." bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6">
           <form onSubmit={saveHoliday} className="grid gap-3 rounded-2xl border border-slate-200 bg-white/55 p-4 md:grid-cols-2 dark:border-gray-700 dark:bg-gray-950/25">
@@ -771,6 +1049,7 @@ export default function ChecklistAutomationPanel() {
         </div>, document.body) : null}
 
       <ManualTestDialog state={manualTest} busy={busy} onCancel={() => !busy && setManualTest(null)} onConfirm={executeManualTest} />
+      <ScheduledTestDialog state={schedulePreview} busy={busy} onCancel={() => !busy && setSchedulePreview(null)} onConfirm={confirmScheduledTest} />
       <ConfirmDialog dialog={dialog} busy={busy} onCancel={() => !busy && setDialog(null)} onConfirm={() => dialog?.execute?.()} />
     </div>
   );

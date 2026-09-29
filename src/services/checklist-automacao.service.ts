@@ -64,6 +64,29 @@ export type ChecklistAutomacaoPainel = {
   auditoria_recente: Record<string, unknown>[];
 };
 
+export type ChecklistAutomacaoAgendamentoTeste = {
+  id: string;
+  modo: 'TESTE';
+  status: 'AGENDADO' | 'PROCESSANDO' | 'CONCLUIDO' | 'CANCELADO' | 'FALHA';
+  escopo: 'CLIENTES_SELECIONADOS' | 'TODOS_ELEGIVEIS';
+  competencia_referencia: string;
+  agendado_para: string;
+  data_hora_manaus?: string;
+  cliente_ids: string[] | null;
+  destinatario_teste: string;
+  cc_teste: string;
+  execucao_id: string | null;
+  resumo: Record<string, unknown>;
+  erro_codigo: string | null;
+  erro_mensagem: string | null;
+  criado_em: string;
+  iniciado_em: string | null;
+  finalizado_em: string | null;
+  cancelado_em: string | null;
+  criado_por_nome?: string;
+  criado_por_email?: string;
+};
+
 function message(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'message' in error) {
     return String((error as { message?: unknown }).message || fallback);
@@ -175,5 +198,54 @@ export async function executarChecklistAutomacaoTeste(values: {
     const details = data?.details ? ` ${String(data.details)}` : '';
     throw new Error(`${String(data.error)}${details}`.trim());
   }
+  return data as Record<string, unknown>;
+}
+
+export async function simularChecklistAutomacaoAgendamentoTeste(values: {
+  competenciaReferencia: string;
+  escopo: 'CLIENTES_SELECIONADOS' | 'TODOS_ELEGIVEIS';
+  clienteIds?: string[] | null;
+}) {
+  const { data, error } = await supabase.rpc('simular_checklist_automacao_agendamento_teste_portal', {
+    p_competencia_referencia: values.competenciaReferencia,
+    p_escopo: values.escopo,
+    p_cliente_ids: values.clienteIds?.length ? values.clienteIds : null,
+  });
+  if (error) throw new Error(`Não foi possível preparar a prévia do agendamento: ${message(error, 'erro desconhecido')}`);
+  return data as Record<string, unknown>;
+}
+
+export async function criarChecklistAutomacaoAgendamentoTeste(values: {
+  competenciaReferencia: string;
+  dataHoraLocal: string;
+  escopo: 'CLIENTES_SELECIONADOS' | 'TODOS_ELEGIVEIS';
+  clienteIds?: string[] | null;
+  chaveRequisicao: string;
+}) {
+  const { data, error } = await supabase.rpc('criar_checklist_automacao_agendamento_teste_portal', {
+    p_competencia_referencia: values.competenciaReferencia,
+    p_data_hora_local: values.dataHoraLocal,
+    p_escopo: values.escopo,
+    p_cliente_ids: values.clienteIds?.length ? values.clienteIds : null,
+    p_chave_requisicao: values.chaveRequisicao,
+  });
+  if (error) throw new Error(`Não foi possível criar o agendamento: ${message(error, 'erro desconhecido')}`);
+  return data as Record<string, unknown>;
+}
+
+export async function listarChecklistAutomacaoAgendamentosTeste(limite = 50) {
+  const { data, error } = await supabase.rpc('listar_checklist_automacao_agendamentos_teste_portal', {
+    p_limite: limite,
+  });
+  if (error) throw new Error(`Não foi possível consultar os agendamentos: ${message(error, 'erro desconhecido')}`);
+  return (Array.isArray(data) ? data : []) as ChecklistAutomacaoAgendamentoTeste[];
+}
+
+export async function cancelarChecklistAutomacaoAgendamentoTeste(agendamentoId: string) {
+  const { data, error } = await supabase.rpc('cancelar_checklist_automacao_agendamento_teste_portal', {
+    p_agendamento_id: agendamentoId,
+    p_confirmacao: 'CANCELAR AGENDAMENTO',
+  });
+  if (error) throw new Error(`Não foi possível cancelar o agendamento: ${message(error, 'erro desconhecido')}`);
   return data as Record<string, unknown>;
 }
