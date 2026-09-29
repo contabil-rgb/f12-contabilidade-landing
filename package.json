@@ -10,6 +10,7 @@
     "test:checklist-automation-coordinator": "node --experimental-strip-types scripts/checklist-automation-coordinator.test.mjs",
     "test:checklist-automation-manual": "node --experimental-strip-types scripts/checklist-automation-manual-test.test.mjs",
     "test:checklist-automation-scheduled": "node --experimental-strip-types scripts/checklist-automation-scheduled-test-processor.test.mjs",
+    "test:checklist-automation-scheduled-trigger": "node scripts/checklist-automation-scheduled-test-trigger.test.mjs",
     "test:checklist-automation-worker": "node --experimental-strip-types scripts/checklist-automation-worker.test.mjs",
     "supabase:configure:checklist-scheduling": "node scripts/configure-checklist-automation-scheduling.mjs",
     "supabase:sync:clientes": "node scripts/sync-clientes-supabase.mjs",

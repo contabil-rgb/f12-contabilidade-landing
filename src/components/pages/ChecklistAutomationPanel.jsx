@@ -925,7 +925,7 @@ export default function ChecklistAutomationPanel() {
         bodyClassName="px-5 pb-5 sm:px-6 sm:pb-6"
       >
         <AlertBanner tone="info" title="Agendamento isolado e seguro">
-          Nesta parte, o portal registra, mostra e permite cancelar o teste. O acionamento automático continua desativado até a próxima validação controlada.
+          O processador verifica os horários vencidos uma vez por minuto e só funciona em modo TESTE, com a automação global pausada.
         </AlertBanner>
 
         <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white/55 p-4 md:grid-cols-2 xl:grid-cols-[190px_240px_1fr_auto] dark:border-gray-700 dark:bg-gray-950/25">
