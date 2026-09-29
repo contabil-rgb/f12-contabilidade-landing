@@ -114,7 +114,7 @@ function createRequestKey() {
   return `teste-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function manausDateTimeLocal(offsetMinutes = 30) {
+function manausDateTimeLocal(offsetMinutes = 0) {
   const date = new Date(Date.now() + offsetMinutes * 60 * 1000);
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Manaus',
@@ -353,6 +353,7 @@ export default function ChecklistAutomationPanel() {
   const [manualTestMonth, setManualTestMonth] = useState(currentMonth());
   const [manualTest, setManualTest] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({ competence: currentMonth(), dateTime: manausDateTimeLocal(), scope: 'selecionados' });
+  const [scheduleDateTimeAutomatic, setScheduleDateTimeAutomatic] = useState(true);
   const [scheduledTests, setScheduledTests] = useState([]);
   const [schedulePreview, setSchedulePreview] = useState(null);
   const [dialog, setDialog] = useState(null);
@@ -385,6 +386,21 @@ export default function ChecklistAutomationPanel() {
     const timer = window.setTimeout(() => setNotice(null), 6000);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!scheduleDateTimeAutomatic) return undefined;
+
+    const syncWithManaus = () => {
+      const currentManausDateTime = manausDateTimeLocal();
+      setScheduleForm((current) => current.dateTime === currentManausDateTime
+        ? current
+        : { ...current, dateTime: currentManausDateTime });
+    };
+
+    syncWithManaus();
+    const timer = window.setInterval(syncWithManaus, 1000);
+    return () => window.clearInterval(timer);
+  }, [scheduleDateTimeAutomatic]);
 
   const filteredClients = useMemo(() => {
     const search = normalizeText(clientSearch);
@@ -725,6 +741,7 @@ export default function ChecklistAutomationPanel() {
       });
       await loadPanel({ silent: true });
       setSchedulePreview(null);
+      setScheduleDateTimeAutomatic(true);
       showSuccess('Teste agendado', `O teste ficou programado para ${formatManausLocal(result?.data_hora_manaus || scheduleForm.dateTime)}, no horário de Manaus.`);
     } catch (err) {
       showFailure('Erro ao criar o agendamento', err);
@@ -930,7 +947,27 @@ export default function ChecklistAutomationPanel() {
 
         <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white/55 p-4 md:grid-cols-2 xl:grid-cols-[190px_240px_1fr_auto] dark:border-gray-700 dark:bg-gray-950/25">
           <label>{fieldLabel('Competência')}<input type="month" max={currentMonth()} value={scheduleForm.competence} onChange={(event) => setScheduleForm((current) => ({ ...current, competence: event.target.value }))} className="input-shell mt-2 normal-case" /></label>
-          <label>{fieldLabel('Data e hora — Manaus')}<input type="datetime-local" min={manausDateTimeLocal(1)} value={scheduleForm.dateTime} onChange={(event) => setScheduleForm((current) => ({ ...current, dateTime: event.target.value }))} className="input-shell mt-2 normal-case" /></label>
+          <label>
+            {fieldLabel('Data e hora — Manaus')}
+            <input
+              type="datetime-local"
+              min={manausDateTimeLocal()}
+              value={scheduleForm.dateTime}
+              onChange={(event) => {
+                setScheduleDateTimeAutomatic(false);
+                setScheduleForm((current) => ({ ...current, dateTime: event.target.value }));
+              }}
+              className="input-shell mt-2 normal-case"
+            />
+            <span className="mt-1 flex min-h-5 items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-gray-400">
+              {scheduleDateTimeAutomatic ? 'Sincronizado automaticamente com Manaus.' : 'Horário definido manualmente.'}
+              {!scheduleDateTimeAutomatic ? (
+                <button type="button" className="font-black text-blue-600 hover:underline dark:text-blue-300" onClick={() => setScheduleDateTimeAutomatic(true)}>
+                  Sincronizar agora
+                </button>
+              ) : null}
+            </span>
+          </label>
           <DropdownSelect label="Clientes do teste" value={scheduleForm.scope} options={SCHEDULE_SCOPE_OPTIONS} includeBlank={false} searchable={false} onChange={(value) => setScheduleForm((current) => ({ ...current, scope: value }))} />
           <div className="flex items-end"><ActionButton type="button" variant="primary" className="w-full justify-center" onClick={prepareScheduledTest} disabled={busy}><Eye size={16} /> Revisar agendamento</ActionButton></div>
         </div>
