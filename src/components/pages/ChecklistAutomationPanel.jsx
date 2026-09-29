@@ -346,7 +346,7 @@ export default function ChecklistAutomationPanel() {
   const [clientLimit, setClientLimit] = useState(25);
   const [selectedClients, setSelectedClients] = useState([]);
   const [clientAction, setClientAction] = useState(null);
-  const [clientActionForm, setClientActionForm] = useState({ competencia: currentMonth(), motivo: '' });
+  const [clientActionForm, setClientActionForm] = useState({ competencia: '', motivo: '' });
   const [holidayForm, setHolidayForm] = useState(EMPTY_HOLIDAY);
   const [simulationMonth, setSimulationMonth] = useState(currentMonth());
   const [simulation, setSimulation] = useState(null);
@@ -515,8 +515,17 @@ export default function ChecklistAutomationPanel() {
   }
 
   function openClientAction(clientIds, enable) {
+    const configuredCompetences = Array.from(new Set(
+      (panel?.clientes ?? [])
+        .filter((client) => clientIds.includes(client.cliente_id))
+        .map((client) => client.competencia_inicial ? dateToMonth(client.competencia_inicial) : '')
+        .filter(Boolean),
+    ));
     setClientAction({ clientIds, enable });
-    setClientActionForm({ competencia: currentMonth(), motivo: '' });
+    setClientActionForm({
+      competencia: enable && configuredCompetences.length === 1 ? configuredCompetences[0] : '',
+      motivo: '',
+    });
   }
 
   async function executeClientAction() {
@@ -1079,7 +1088,7 @@ export default function ChecklistAutomationPanel() {
           <div className="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="client-automation-title">
             <div className="modal-header"><h3 id="client-automation-title" className="text-xl font-black text-slate-950 dark:text-white">{clientAction.enable ? 'Habilitar automação' : 'Pausar automação'}</h3><p className="mt-2 text-sm font-medium text-slate-600 dark:text-gray-300">A alteração será aplicada a {formatNumber(clientAction.clientIds.length)} cliente(s).</p></div>
             <div className="modal-body">
-              {clientAction.enable ? <label>{fieldLabel('Competência inicial')}<input type="month" required max={currentMonth()} value={clientActionForm.competencia} onChange={(event) => setClientActionForm((current) => ({ ...current, competencia: event.target.value }))} className="input-shell mt-2 normal-case" /></label> : <label>{fieldLabel('Motivo da pausa')}<textarea required rows={4} value={clientActionForm.motivo} onChange={(event) => setClientActionForm((current) => ({ ...current, motivo: event.target.value }))} placeholder="Descreva por que a automação será pausada" className="input-shell mt-2 h-auto py-3 normal-case" /></label>}
+              {clientAction.enable ? <label>{fieldLabel('Competência inicial')}<input type="month" required max={currentMonth()} value={clientActionForm.competencia} onChange={(event) => setClientActionForm((current) => ({ ...current, competencia: event.target.value }))} className="input-shell mt-2 normal-case" /><span className="mt-2 block text-xs font-medium leading-relaxed text-slate-500 dark:text-gray-400">Escolha o primeiro mês cujas pendências devem entrar na cobrança. Para considerar todo o histórico de 2026, use janeiro de 2026.</span></label> : <label>{fieldLabel('Motivo da pausa')}<textarea required rows={4} value={clientActionForm.motivo} onChange={(event) => setClientActionForm((current) => ({ ...current, motivo: event.target.value }))} placeholder="Descreva por que a automação será pausada" className="input-shell mt-2 h-auto py-3 normal-case" /></label>}
             </div>
             <div className="modal-footer flex justify-end gap-2"><ActionButton type="button" variant="subtle" onClick={() => setClientAction(null)} disabled={busy}>Cancelar</ActionButton><ActionButton type="button" variant="primary" onClick={executeClientAction} disabled={busy}>{busy ? <RefreshCcw size={16} className="animate-spin" /> : clientAction.enable ? <PlayCircle size={16} /> : <PauseCircle size={16} />}{clientAction.enable ? 'Habilitar' : 'Pausar'}</ActionButton></div>
           </div>
