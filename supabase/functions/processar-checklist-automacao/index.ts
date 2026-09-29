@@ -68,6 +68,16 @@ function safeEquals(left: string, right: string) {
   return difference === 0;
 }
 
+function buildPublicSignatureUrl(supabaseUrl: string, path: unknown) {
+  const normalizedPath = asText(path);
+  if (!normalizedPath) return "";
+  const encodedPath = normalizedPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${supabaseUrl}/storage/v1/object/public/assinaturas-email/${encodedPath}`;
+}
+
 async function callRpc(
   supabaseUrl: string,
   serviceRoleKey: string,
@@ -220,7 +230,24 @@ async function processWork(
       throw new Error("Endereco em copia invalido.");
     }
     if (!subject) throw new Error("Assunto do lembrete nao informado.");
-    content = buildChecklistAutomationEmail(work, configuration.signatureName);
+
+    const clientId = asText(work.cliente_id);
+    if (!isUuid(clientId)) throw new Error("Cliente do trabalho nao informado.");
+    const signature = ((await callRpc(
+      configuration.supabaseUrl,
+      configuration.serviceRoleKey,
+      "obter_checklist_automacao_assinatura_interno",
+      { p_cliente_id: clientId },
+    )) ?? {}) as JsonRecord;
+
+    content = buildChecklistAutomationEmail({
+      ...work,
+      responsavel_nome: signature.responsavel_nome,
+      assinatura_email_url: buildPublicSignatureUrl(
+        configuration.supabaseUrl,
+        signature.assinatura_email_path,
+      ),
+    }, configuration.signatureName);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Dados do trabalho invalidos.";
     try {

@@ -38,11 +38,16 @@ const email = helpers.buildChecklistAutomationEmail({
   destinatario_original: 'cliente@example.com',
   assunto: '[TESTE] Lembrete',
   itens_cobrados: items,
+  responsavel_nome: 'Thiago Machado',
+  assinatura_email_url: 'https://project.supabase.co/storage/v1/object/public/assinaturas-email/responsaveis/thiago/assinatura.png',
 });
 assert.match(email.text, /01\/2026/);
 assert.match(email.text, /02\/2026/);
 assert.match(email.html, /Folha &lt;mensal&gt;/);
 assert.match(email.html, /Extrato &amp; relatorio/);
+assert.match(email.html, /Assinatura de Thiago Machado/);
+assert.match(email.html, /assinaturas-email\/responsaveis\/thiago\/assinatura.png/);
+assert.match(email.text, /Thiago Machado/);
 assert.equal(helpers.isTransientResendStatus(429), true);
 assert.equal(helpers.isTransientResendStatus(503), true);
 assert.equal(helpers.isTransientResendStatus(422), false);
@@ -77,6 +82,7 @@ assert.equal(externalCalls.length, 0);
 
 const work = {
   id: '11111111-1111-4111-8111-111111111111',
+  cliente_id: '44444444-4444-4444-8444-444444444444',
   token_reserva: '22222222-2222-4222-8222-222222222222',
   chave_idempotencia: 'checklist:test:cliente',
   tentativa_atual: 1,
@@ -101,12 +107,21 @@ globalThis.fetch = async (url, options = {}) => {
   if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
     return Response.json({ adquirido: true, ja_enviado: false });
   }
+  if (address.endsWith('/rpc/obter_checklist_automacao_assinatura_interno')) {
+    assert.equal(body.p_cliente_id, work.cliente_id);
+    return Response.json({
+      responsavel_nome: 'Thiago Machado',
+      assinatura_email_path: 'responsaveis/thiago/assinatura digital.png',
+    });
+  }
   if (address === 'https://api.resend.com/emails') {
     assert.equal(options.headers['Idempotency-Key'], work.chave_idempotencia);
     assert.deepEqual(body.to, ['teste@example.com']);
     assert.deepEqual(body.cc, ['copia@example.com']);
     assert.deepEqual(body.bcc, ['auditoria@example.com']);
     assert.match(body.html, /Envio de teste/);
+    assert.match(body.html, /Assinatura de Thiago Machado/);
+    assert.match(body.html, /assinatura%20digital.png/);
     return Response.json({ id: 'resend-test-id' });
   }
   if (address.endsWith('/rpc/finalizar_checklist_automacao_trabalho_interno')) {
@@ -152,6 +167,12 @@ globalThis.fetch = async (url, options = {}) => {
   if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
     return Response.json({ adquirido: true, ja_enviado: false });
   }
+  if (address.endsWith('/rpc/obter_checklist_automacao_assinatura_interno')) {
+    return Response.json({
+      responsavel_nome: 'Thiago Machado',
+      assinatura_email_path: 'responsaveis/thiago/assinatura.png',
+    });
+  }
   if (address === 'https://api.resend.com/emails') {
     return Response.json({ id: 'resend-targeted-test-id' });
   }
@@ -189,6 +210,9 @@ globalThis.fetch = async (url, options = {}) => {
   }
   if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
     return Response.json({ adquirido: true, ja_enviado: false });
+  }
+  if (address.endsWith('/rpc/obter_checklist_automacao_assinatura_interno')) {
+    return Response.json({ responsavel_nome: 'Thiago Machado' });
   }
   if (address === 'https://api.resend.com/emails') {
     return Response.json({ message: 'Limite temporario' }, { status: 429 });

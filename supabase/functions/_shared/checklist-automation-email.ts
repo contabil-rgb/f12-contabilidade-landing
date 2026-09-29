@@ -5,11 +5,14 @@ export type ChecklistAutomationItem = {
 };
 
 export type ChecklistAutomationWork = {
+  cliente_id?: unknown;
   cliente_nome?: unknown;
   modo?: unknown;
   destinatario_original?: unknown;
   assunto?: unknown;
   itens_cobrados?: unknown;
+  responsavel_nome?: unknown;
+  assinatura_email_url?: unknown;
 };
 
 type CompetenceGroup = {
@@ -81,7 +84,9 @@ export function buildChecklistAutomationEmail(
   const groups = groupChecklistItems(work.itens_cobrados);
   if (!groups.length) throw new Error("O trabalho nao possui itens validos para envio.");
 
-  const normalizedSignature = asText(signatureName) || "F12 Contabilidade";
+  const responsibleName = asText(work.responsavel_nome);
+  const signatureUrl = asText(work.assinatura_email_url);
+  const normalizedSignature = responsibleName || asText(signatureName) || "F12 Contabilidade";
   const testMode = asText(work.modo).toUpperCase() === "TESTE";
   const originalRecipient = asText(work.destinatario_original);
   const testNoticeText = testMode
@@ -100,6 +105,10 @@ export function buildChecklistAutomationEmail(
     <h3 style="margin:20px 0 6px;font-size:15px;">${formatCompetence(group)}</h3>
     <ul>${group.items.map((description, index) => `<li>${index + 1}) ${escapeHtml(description)}</li>`).join("")}</ul>
   `).join("");
+
+  const signatureHtml = signatureUrl
+    ? `<p style="margin:8px 0 0;"><img src="${escapeHtml(signatureUrl)}" alt="Assinatura de ${escapeHtml(normalizedSignature)}" style="display:block;width:100%;max-width:520px;height:auto;border:0;" /></p>`
+    : `<p>${escapeHtml(normalizedSignature)}</p>`;
 
   const text = [
     "Ola! Tudo bem?",
@@ -127,7 +136,7 @@ export function buildChecklistAutomationEmail(
       <p><strong>Qualquer dúvida, estamos à disposição.</strong></p>
       <p><strong>Por favor, confirme o recebimento deste e-mail.</strong></p>
       <p>Atenciosamente,</p>
-      <p>${escapeHtml(normalizedSignature)}</p>
+      ${signatureHtml}
     </div>
   `.trim();
 
