@@ -3642,6 +3642,10 @@ function getActiveClients(clients) {
   return (clients ?? []).filter((client) => !isClientArchived(client));
 }
 
+function isChecklistEligibleClient(client) {
+  return !isClientArchived(client) && normalizeText(client?.status) !== 'em distrato';
+}
+
 function getClientStatusFilterOption(value) {
   return CLIENT_STATUS_FILTER_OPTIONS.find((option) => option.value === value) ?? CLIENT_STATUS_FILTER_OPTIONS[0];
 }
@@ -10126,6 +10130,11 @@ export default function App() {
 
   const activeClients = useMemo(() => getActiveClients(enrichedClients), [enrichedClients]);
 
+  const checklistClients = useMemo(
+    () => activeClients.filter(isChecklistEligibleClient),
+    [activeClients],
+  );
+
   const filteredClients = useMemo(() => {
     const filtered = filterClients(enrichedClients, filters, { reinfRelatorios });
     return sortByLocale(filtered, sort.key, sort.direction);
@@ -12550,7 +12559,7 @@ export default function App() {
     ),
     checklist: (
       <Suspense fallback={<PageLoadingFallback label="Carregando checklist de documentos..." />}>
-        <LazyChecklistPage clients={activeClients} responsavelCatalogo={responsavelCatalogo} />
+        <LazyChecklistPage clients={checklistClients} responsavelCatalogo={responsavelCatalogo} />
       </Suspense>
     ),
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)

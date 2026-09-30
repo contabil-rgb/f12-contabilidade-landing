@@ -407,6 +407,7 @@ export default function ChecklistAutomationPanel() {
   const filteredClients = useMemo(() => {
     const search = normalizeText(clientSearch);
     return (panel?.clientes ?? []).filter((client) => {
+      if (client.arquivado || ['inativo', 'em distrato'].includes(normalizeText(client.status))) return false;
       if (clientFilter === 'habilitados' && !client.habilitada) return false;
       if (clientFilter === 'pausados' && client.habilitada) return false;
       if (clientResponsible && client.responsavel !== clientResponsible) return false;
