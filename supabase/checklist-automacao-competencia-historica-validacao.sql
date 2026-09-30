@@ -4,8 +4,7 @@ with clientes_esperados as (
   select ac.cliente_id, ac.habilitada
   from public.checklist_automacao_clientes ac
   join public.clientes c on c.id = ac.cliente_id
-  where coalesce(c.arquivado, false) = false
-    and lower(coalesce(c.status, '')) <> 'inativo'
+  where public.checklist_cliente_elegivel_automacao(c.id)
     and ac.competencia_inicial = date '2026-01-01'
     and (
       exists (
