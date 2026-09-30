@@ -67,6 +67,8 @@ const SCHEDULE_SCOPE_OPTIONS = [
   { value: 'todos', label: 'Todos os clientes elegíveis' },
 ];
 
+const CLIENT_PAGE_SIZE = 25;
+
 const EMPTY_HOLIDAY = {
   id: '',
   data: '',
@@ -343,7 +345,7 @@ export default function ChecklistAutomationPanel() {
   const [clientSearch, setClientSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('todos');
   const [clientResponsible, setClientResponsible] = useState('');
-  const [clientLimit, setClientLimit] = useState(25);
+  const [clientLimit, setClientLimit] = useState(CLIENT_PAGE_SIZE);
   const [selectedClients, setSelectedClients] = useState([]);
   const [clientAction, setClientAction] = useState(null);
   const [clientActionForm, setClientActionForm] = useState({ competencia: '', motivo: '' });
@@ -434,7 +436,7 @@ export default function ChecklistAutomationPanel() {
   }, [config?.modo, maxManualTestClients, selectedClientRows]);
 
   useEffect(() => {
-    setClientLimit(25);
+    setClientLimit(CLIENT_PAGE_SIZE);
   }, [clientFilter, clientResponsible, clientSearch]);
 
   const configChanged = useMemo(() => {
@@ -935,10 +937,17 @@ export default function ChecklistAutomationPanel() {
               })}
             </tbody>
           </DataTableShell>
-          {filteredClients.length > clientLimit ? (
+          {filteredClients.length > CLIENT_PAGE_SIZE ? (
             <div className="mt-4 flex flex-col items-center gap-2">
-              <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">Exibindo {formatNumber(clientLimit)} de {formatNumber(filteredClients.length)} cliente(s).</p>
-              <ActionButton type="button" size="sm" variant="secondary" onClick={() => setClientLimit((current) => Math.min(current + 25, filteredClients.length))}>Mostrar mais</ActionButton>
+              <p className="text-xs font-semibold text-slate-500 dark:text-gray-400">Exibindo {formatNumber(Math.min(clientLimit, filteredClients.length))} de {formatNumber(filteredClients.length)} cliente(s).</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {filteredClients.length > clientLimit ? (
+                  <ActionButton type="button" size="sm" variant="secondary" onClick={() => setClientLimit((current) => Math.min(current + CLIENT_PAGE_SIZE, filteredClients.length))}>Mostrar mais</ActionButton>
+                ) : null}
+                {clientLimit > CLIENT_PAGE_SIZE ? (
+                  <ActionButton type="button" size="sm" variant="subtle" onClick={() => setClientLimit(CLIENT_PAGE_SIZE)}>Mostrar menos</ActionButton>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
