@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:checklist-automation-coordinator": "node --experimental-strip-types scripts/checklist-automation-coordinator.test.mjs",
+    "test:checklist-automation-recovery": "node --experimental-strip-types scripts/checklist-automation-recovery.test.mjs",
     "test:checklist-automation-manual": "node --experimental-strip-types scripts/checklist-automation-manual-test.test.mjs",
     "test:checklist-automation-scheduled": "node --experimental-strip-types scripts/checklist-automation-scheduled-test-processor.test.mjs",
     "test:checklist-automation-scheduled-trigger": "node scripts/checklist-automation-scheduled-test-trigger.test.mjs",

@@ -25,6 +25,15 @@ const scheduledLocal = coordinator.getZonedDateTime(new Date('2026-09-02T12:00:0
 assert.equal(coordinator.getCoordinationBlock(scheduledLocal, '2026-09-03', 480), 'FORA_DA_DATA');
 assert.equal(coordinator.getCoordinationBlock(scheduledLocal, '2026-09-02', 481), 'ANTES_DO_HORARIO');
 assert.equal(coordinator.getCoordinationBlock(scheduledLocal, '2026-09-02', 480), null);
+assert.equal(coordinator.getRecoveryDelay(scheduledLocal, 480), 0);
+const recoveredLocal = coordinator.getZonedDateTime(new Date('2026-09-02T12:15:00Z'));
+assert.equal(coordinator.getCoordinationBlock(recoveredLocal, '2026-09-02', 480), null);
+assert.equal(coordinator.getRecoveryDelay(recoveredLocal, 480), 15);
+const expiredLocal = coordinator.getZonedDateTime(new Date('2026-09-02T16:00:00Z'));
+assert.equal(
+  coordinator.getCoordinationBlock(expiredLocal, '2026-09-02', 480),
+  'JANELA_ENCERRADA',
+);
 
 const originalFetch = globalThis.fetch;
 let calls = [];
@@ -67,6 +76,8 @@ assert.equal(pausedBody.pausada, true);
 assert.equal(calls.length, 1);
 
 const nowInManaus = coordinator.getZonedDateTime(new Date());
+const scheduledHour = String(Math.floor(nowInManaus.minutes / 60)).padStart(2, '0');
+const scheduledMinute = String(nowInManaus.minutes % 60).padStart(2, '0');
 const preparationResult = {
   persistido: true,
   duplicado: false,
@@ -83,7 +94,7 @@ globalThis.fetch = async (url, options = {}) => {
       ativa: true,
       modo: 'TESTE',
       fuso_horario: 'America/Manaus',
-      horario_local: '00:00:00',
+      horario_local: `${scheduledHour}:${scheduledMinute}:00`,
     }]);
   }
   if (address.endsWith('/rpc/checklist_segundo_dia_util_manaus')) {
@@ -119,6 +130,8 @@ const coordinatedBody = await coordinated.json();
 assert.equal(coordinated.status, 200);
 assert.equal(coordinatedBody.ok, true);
 assert.equal(coordinatedBody.pausada, false);
+assert.equal(coordinatedBody.recuperacao, false);
+assert.equal(coordinatedBody.atraso_minutos, 0);
 assert.deepEqual(coordinatedBody.preparacao, preparationResult);
 assert.equal(coordinatedBody.processamento.ok, true);
 assert.equal(calls.length, 4);

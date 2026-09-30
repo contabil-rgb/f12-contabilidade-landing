@@ -15,6 +15,8 @@ type ManausDateTime = {
   minutes: number;
 };
 
+const RECOVERY_WINDOW_MINUTES = 240;
+
 function jsonResponse(body: JsonRecord, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -155,10 +157,18 @@ export function getCoordinationBlock(
   local: ManausDateTime,
   secondBusinessDay: string,
   scheduledMinutes: number,
+  recoveryWindowMinutes = RECOVERY_WINDOW_MINUTES,
 ) {
   if (local.date !== secondBusinessDay) return "FORA_DA_DATA";
   if (local.minutes < scheduledMinutes) return "ANTES_DO_HORARIO";
+  if (local.minutes >= scheduledMinutes + recoveryWindowMinutes) {
+    return "JANELA_ENCERRADA";
+  }
   return null;
+}
+
+export function getRecoveryDelay(local: ManausDateTime, scheduledMinutes: number) {
+  return Math.max(local.minutes - scheduledMinutes, 0);
 }
 
 async function invokeWorker(
@@ -291,7 +301,21 @@ Deno.serve(async (request) => {
     });
   }
 
+  if (coordinationBlock === "JANELA_ENCERRADA") {
+    return jsonResponse({
+      ok: true,
+      pausada: false,
+      janela_recuperacao_encerrada: true,
+      data_local: local.date,
+      segundo_dia_util: secondBusinessDay,
+      competencia_referencia: local.competence,
+      preparacao: null,
+      processamento: null,
+    });
+  }
+
   const idempotencyKey = `checklist:${local.competence.slice(0, 7)}:${mode.toLowerCase()}:agendado`;
+  const recoveryDelay = getRecoveryDelay(local, scheduledMinutes);
   let preparation: unknown;
   try {
     preparation = await callRpc(
@@ -311,6 +335,33 @@ Deno.serve(async (request) => {
     }, 500);
   }
 
+  let recoveryRegistration: unknown = null;
+  const preparationRecord = preparation && typeof preparation === "object"
+    ? preparation as JsonRecord
+    : {};
+  const executionRecord = preparationRecord.execucao && typeof preparationRecord.execucao === "object"
+    ? preparationRecord.execucao as JsonRecord
+    : {};
+  const executionId = asText(executionRecord.id);
+  if (recoveryDelay > 0 && preparationRecord.duplicado !== true && executionId) {
+    try {
+      recoveryRegistration = await callRpc(
+        supabaseUrl,
+        serviceRoleKey,
+        "registrar_checklist_automacao_recuperacao_interno",
+        {
+          p_execucao_id: executionId,
+          p_atraso_minutos: recoveryDelay,
+        },
+      );
+    } catch (error) {
+      recoveryRegistration = {
+        registrado: false,
+        erro: error instanceof Error ? error.message : "Erro nao informado.",
+      };
+    }
+  }
+
   let processing: unknown;
   try {
     processing = await invokeWorker(supabaseUrl, internalApiKey, limit);
@@ -318,6 +369,9 @@ Deno.serve(async (request) => {
     return jsonResponse({
       error: "A execucao foi preparada, mas o worker nao respondeu.",
       details: error instanceof Error ? error.message : "Erro nao informado.",
+      recuperacao: recoveryDelay > 0,
+      atraso_minutos: recoveryDelay,
+      registro_recuperacao: recoveryRegistration,
       preparacao: preparation,
       processamento: null,
     }, 502);
@@ -330,6 +384,9 @@ Deno.serve(async (request) => {
     segundo_dia_util: secondBusinessDay,
     competencia_referencia: local.competence,
     chave_idempotencia: idempotencyKey,
+    recuperacao: recoveryDelay > 0,
+    atraso_minutos: recoveryDelay,
+    registro_recuperacao: recoveryRegistration,
     preparacao: preparation,
     processamento: processing,
   });
