@@ -47,8 +47,7 @@ join public.checklist_clientes_itens cci
 join public.checklist_itens i
   on i.id = cci.item_id
  and i.ativo = true
-where coalesce(c.arquivado, false) = false
-  and lower(coalesce(c.status, '')) <> 'inativo'
+where public.checklist_cliente_elegivel_automacao(c.id)
 order by c.id
 limit 2;
 
@@ -316,8 +315,7 @@ begin
   from (
     select c.id
     from public.clientes c
-    where coalesce(c.arquivado, false) = false
-      and lower(coalesce(c.status, '')) <> 'inativo'
+    where public.checklist_cliente_elegivel_automacao(c.id)
     order by c.id
     limit 11
   ) c;
