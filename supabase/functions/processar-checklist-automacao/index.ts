@@ -206,6 +206,15 @@ async function processWork(
   if (startRecord.ja_enviado === true) {
     return { ok: true, trabalho_id: workId, tentativa: attempt, duplicado: true };
   }
+  if (startRecord.cancelado === true) {
+    return {
+      ok: true,
+      trabalho_id: workId,
+      tentativa: attempt,
+      cancelado: true,
+      motivo: asText(startRecord.motivo) || "CLIENTE_INELEGIVEL",
+    };
+  }
   if (startRecord.adquirido !== true) {
     return {
       ok: false,
@@ -532,7 +541,8 @@ Deno.serve(async (request) => {
     direcionada: targeted,
     execucao_id: executionId || null,
     reservados: works.length,
-    enviados: results.filter((result) => result.ok === true).length,
+    enviados: results.filter((result) => result.ok === true && result.cancelado !== true).length,
+    cancelados: results.filter((result) => result.cancelado === true).length,
     falhas: results.filter((result) => result.ok !== true).length,
     resultados: results,
   });

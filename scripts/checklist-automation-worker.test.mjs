@@ -105,6 +105,43 @@ globalThis.fetch = async (url, options = {}) => {
     return Response.json({ quantidade: 1, trabalhos: [work] });
   }
   if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
+    return Response.json({
+      adquirido: false,
+      cancelado: true,
+      motivo: 'CLIENTE_INELEGIVEL',
+    });
+  }
+  throw new Error(`URL inesperada apos cancelamento seguro: ${address}`);
+};
+
+const ineligible = await handler(new Request('https://worker.example.com', {
+  method: 'POST',
+  headers: {
+    apikey: internalApiKey,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ limite: 1 }),
+}));
+const ineligibleBody = await ineligible.json();
+assert.equal(ineligible.status, 200);
+assert.equal(ineligibleBody.ok, true);
+assert.equal(ineligibleBody.reservados, 1);
+assert.equal(ineligibleBody.enviados, 0);
+assert.equal(ineligibleBody.cancelados, 1);
+assert.equal(ineligibleBody.falhas, 0);
+assert.equal(ineligibleBody.resultados[0].motivo, 'CLIENTE_INELEGIVEL');
+assert.equal(externalCalls.length, 2);
+
+externalCalls = [];
+globalThis.fetch = async (url, options = {}) => {
+  const address = String(url);
+  const body = options.body ? JSON.parse(String(options.body)) : {};
+  externalCalls.push({ url: address, options, body });
+
+  if (address.endsWith('/rpc/reservar_checklist_automacao_trabalhos_interno')) {
+    return Response.json({ quantidade: 1, trabalhos: [work] });
+  }
+  if (address.endsWith('/rpc/iniciar_checklist_automacao_envio_interno')) {
     return Response.json({ adquirido: true, ja_enviado: false });
   }
   if (address.endsWith('/rpc/obter_checklist_automacao_assinatura_interno')) {
