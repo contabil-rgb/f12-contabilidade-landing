@@ -68,6 +68,7 @@ const SCHEDULE_SCOPE_OPTIONS = [
 ];
 
 const CLIENT_PAGE_SIZE = 25;
+const SCHEDULE_LEAD_MINUTES = 2;
 
 const EMPTY_HOLIDAY = {
   id: '',
@@ -354,7 +355,7 @@ export default function ChecklistAutomationPanel() {
   const [simulation, setSimulation] = useState(null);
   const [manualTestMonth, setManualTestMonth] = useState(currentMonth());
   const [manualTest, setManualTest] = useState(null);
-  const [scheduleForm, setScheduleForm] = useState({ competence: currentMonth(), dateTime: manausDateTimeLocal(), scope: 'selecionados' });
+  const [scheduleForm, setScheduleForm] = useState({ competence: currentMonth(), dateTime: manausDateTimeLocal(SCHEDULE_LEAD_MINUTES), scope: 'selecionados' });
   const [scheduleDateTimeAutomatic, setScheduleDateTimeAutomatic] = useState(true);
   const [scheduledTests, setScheduledTests] = useState([]);
   const [schedulePreview, setSchedulePreview] = useState(null);
@@ -393,7 +394,7 @@ export default function ChecklistAutomationPanel() {
     if (!scheduleDateTimeAutomatic) return undefined;
 
     const syncWithManaus = () => {
-      const currentManausDateTime = manausDateTimeLocal();
+      const currentManausDateTime = manausDateTimeLocal(SCHEDULE_LEAD_MINUTES);
       setScheduleForm((current) => current.dateTime === currentManausDateTime
         ? current
         : { ...current, dateTime: currentManausDateTime });
@@ -705,6 +706,12 @@ export default function ChecklistAutomationPanel() {
       setNotice({ tone: 'warning', title: 'Preencha o agendamento', message: 'Informe a competência, a data e o horário de Manaus.' });
       return;
     }
+    if (scheduleForm.dateTime <= manausDateTimeLocal()) {
+      setSchedulePreview(null);
+      setScheduleDateTimeAutomatic(true);
+      setNotice({ tone: 'warning', title: 'Horário já vencido', message: 'O horário precisa estar no futuro. O campo foi sincronizado novamente com uma margem de 2 minutos.' });
+      return;
+    }
 
     const scope = resolveScheduleScope();
     if (scope.backendScope === 'CLIENTES_SELECIONADOS' && !scope.clientIds.length) {
@@ -742,6 +749,12 @@ export default function ChecklistAutomationPanel() {
 
   async function confirmScheduledTest() {
     if (!schedulePreview) return;
+    if (schedulePreview.dateTime <= manausDateTimeLocal()) {
+      setSchedulePreview(null);
+      setScheduleDateTimeAutomatic(true);
+      setNotice({ tone: 'warning', title: 'Revisão expirada', message: 'O horário desta revisão já passou. O campo foi atualizado; revise novamente o agendamento.' });
+      return;
+    }
     setBusy(true);
     try {
       const result = await criarChecklistAutomacaoAgendamentoTeste({
@@ -979,7 +992,7 @@ export default function ChecklistAutomationPanel() {
               className="input-shell mt-2 normal-case"
             />
             <span className="mt-1 flex min-h-5 items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-gray-400">
-              {scheduleDateTimeAutomatic ? 'Sincronizado automaticamente com Manaus.' : 'Horário definido manualmente.'}
+              {scheduleDateTimeAutomatic ? 'Horário de Manaus com margem automática de 2 minutos.' : 'Horário definido manualmente.'}
               {!scheduleDateTimeAutomatic ? (
                 <button type="button" className="font-black text-blue-600 hover:underline dark:text-blue-300" onClick={() => setScheduleDateTimeAutomatic(true)}>
                   Sincronizar agora
