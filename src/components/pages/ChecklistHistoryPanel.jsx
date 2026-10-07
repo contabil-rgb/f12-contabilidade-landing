@@ -138,11 +138,14 @@ function summarizeItems(items = []) {
   return Array.from(groups, ([description, count]) => ({ description, count }));
 }
 
-export default function ChecklistHistoryPanel({ yearOptions = [] }) {
+export default function ChecklistHistoryPanel({
+  yearOptions = [],
+  page = 1,
+  perPage = 25,
+  onPaginationChange = () => {},
+}) {
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [total, setTotal] = useState(0);
@@ -173,7 +176,10 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
       setSummary(result.resumo);
       setTotal(result.total);
       if (page > 1 && result.rows.length === 0 && result.total > 0) {
-        setPage(Math.max(1, Math.ceil(result.total / perPage)));
+        onPaginationChange({
+          page: Math.max(1, Math.ceil(result.total / perPage)),
+          pageSize: perPage,
+        });
       }
     } catch (caught) {
       setRows([]);
@@ -224,7 +230,7 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
 
   function applyFilters(event) {
     event?.preventDefault();
-    setPage(1);
+    onPaginationChange({ page: 1, pageSize: perPage });
     setExpandedId('');
     setAppliedFilters({ ...draftFilters });
   }
@@ -232,7 +238,7 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
   function clearFilters() {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
-    setPage(1);
+    onPaginationChange({ page: 1, pageSize: perPage });
     setExpandedId('');
   }
 
@@ -240,7 +246,7 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
     const next = { ...draftFilters, status };
     setDraftFilters(next);
     setAppliedFilters(next);
-    setPage(1);
+    onPaginationChange({ page: 1, pageSize: perPage });
     setExpandedId('');
   }
 
@@ -359,7 +365,7 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
             <DropdownSelect
               value={perPage}
               options={PAGE_SIZE_OPTIONS}
-              onChange={(value) => { setPerPage(Number(value)); setPage(1); }}
+              onChange={(value) => onPaginationChange({ page: 1, pageSize: Number(value) })}
               includeBlank={false}
               searchable={false}
               ariaLabel="Registros por página"
@@ -449,10 +455,10 @@ export default function ChecklistHistoryPanel({ yearOptions = [] }) {
             Página {formatNumber(page)} de {formatNumber(totalPages)}
           </p>
           <div className="flex gap-2">
-            <ActionButton type="button" size="sm" variant="subtle" disabled={loading || page <= 1} onClick={() => { setExpandedId(''); setPage((current) => Math.max(1, current - 1)); }}>
+            <ActionButton type="button" size="sm" variant="subtle" disabled={loading || page <= 1} onClick={() => { setExpandedId(''); onPaginationChange({ page: Math.max(1, page - 1), pageSize: perPage }); }}>
               <ChevronLeft size={16} aria-hidden="true" /> Anterior
             </ActionButton>
-            <ActionButton type="button" size="sm" variant="subtle" disabled={loading || page >= totalPages} onClick={() => { setExpandedId(''); setPage((current) => Math.min(totalPages, current + 1)); }}>
+            <ActionButton type="button" size="sm" variant="subtle" disabled={loading || page >= totalPages} onClick={() => { setExpandedId(''); onPaginationChange({ page: Math.min(totalPages, page + 1), pageSize: perPage }); }}>
               Próxima <ChevronRight size={16} aria-hidden="true" />
             </ActionButton>
           </div>

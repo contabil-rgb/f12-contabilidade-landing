@@ -10042,7 +10042,10 @@ export default function App() {
   const [portalRoute, setPortalRoute] = useState(initialPortalRoute);
   const [reinfSearchContext, setReinfSearchContext] = useState(null);
   const [ecdSearchContext, setEcdSearchContext] = useState(null);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState(() => ({
+    ...DEFAULT_FILTERS,
+    ...initialPortalRoute.clientFilters,
+  }));
   const [quickFilterLabel, setQuickFilterLabel] = useState('');
   const [sort, setSort] = useState({ key: 'nome_identificacao', direction: 'asc' });
   const [selectedClientId, setSelectedClientId] = useState(initialPortalRoute.clientId);
@@ -10084,15 +10087,35 @@ export default function App() {
   const canReuseBootstrapCache = Boolean(initialState.hasBootstrapCache && hasCachedSessionProfile);
   const page = portalRoute.page;
 
+  function applyPortalRoute(route) {
+    const nextRoute = normalizePortalRoute(route);
+    setSelectedClientId(nextRoute.clientId);
+    if (nextRoute.page === 'clientes') {
+      setFilters({ ...DEFAULT_FILTERS, ...nextRoute.clientFilters });
+      setQuickFilterLabel('');
+    }
+    setPortalRoute(nextRoute);
+  }
+
   function navigatePortalRoute(route, options = {}) {
     const nextRoute = normalizePortalRoute(route);
     const navigation = writePortalRoute(window, nextRoute, { replace: options.replace === true });
-    setSelectedClientId(navigation.route.clientId);
-    setPortalRoute(navigation.route);
+    applyPortalRoute(navigation.route);
   }
 
   function setPage(nextPage, options = {}) {
-    navigatePortalRoute({ page: nextPage }, options);
+    navigatePortalRoute({
+      page: nextPage,
+      clientFilters: nextPage === 'clientes' ? filters : {},
+    }, options);
+  }
+
+  function updateClientFilters(nextValue) {
+    const nextFilters = typeof nextValue === 'function' ? nextValue(filters) : nextValue;
+    setFilters(nextFilters);
+    if (page === 'clientes') {
+      navigatePortalRoute({ page: 'clientes', clientFilters: nextFilters }, { replace: true });
+    }
   }
 
   const currentUserFull = useMemo(() => {
@@ -10185,10 +10208,9 @@ export default function App() {
         writePortalRoute(window, nextRoute, { replace: true });
       }
 
-      setSelectedClientId(nextRoute.clientId);
       setEditingClient(null);
       setEditingUser(null);
-      setPortalRoute(nextRoute);
+      applyPortalRoute(nextRoute);
     }
 
     resolveCurrentLocation();
@@ -10898,8 +10920,7 @@ export default function App() {
     if (requestedNavigation.needsNormalization) {
       navigatePortalRoute(requestedRoute, { replace: true });
     } else {
-      setSelectedClientId(requestedRoute.clientId);
-      setPortalRoute(requestedRoute);
+      applyPortalRoute(requestedRoute);
     }
     updateUltimoAcessoUsuario(perfil.id).catch(() => {});
     return { ok: true };
@@ -10969,14 +10990,15 @@ export default function App() {
   }
 
   function clearFilters() {
-    setFilters(DEFAULT_FILTERS);
+    updateClientFilters(DEFAULT_FILTERS);
     setQuickFilterLabel('');
   }
 
   function applyPreset(filter, label) {
-    setFilters({ ...DEFAULT_FILTERS, ...filter });
+    const nextFilters = { ...DEFAULT_FILTERS, ...filter };
+    setFilters(nextFilters);
+    navigatePortalRoute({ page: 'clientes', clientFilters: nextFilters });
     setQuickFilterLabel(label);
-    setPage('clientes');
   }
 
   async function registrarHistoricoPersistente({
@@ -12484,11 +12506,16 @@ export default function App() {
           clients={activeClients}
           onPreset={applyPreset}
           onNavigate={(nextPage, options = {}) => {
+            const nextFilters = options.clearFilters ? DEFAULT_FILTERS : filters;
             if (options.clearFilters) {
               setFilters(DEFAULT_FILTERS);
               setQuickFilterLabel('');
             }
-            setPage(nextPage);
+            if (nextPage === 'clientes') {
+              navigatePortalRoute({ page: 'clientes', clientFilters: nextFilters });
+            } else {
+              setPage(nextPage);
+            }
           }}
         />
       )
@@ -12496,7 +12523,7 @@ export default function App() {
     clientes: (
       <BaseClientesPage
         filters={filters}
-        setFilters={setFilters}
+        setFilters={updateClientFilters}
         listagens={listagens}
         quickFilterLabel={quickFilterLabel}
         onClear={clearFilters}
@@ -12642,7 +12669,25 @@ export default function App() {
           clients={checklistClients}
           responsavelCatalogo={responsavelCatalogo}
           viewMode={portalRoute.checklistView}
-          onViewModeChange={(checklistView) => navigatePortalRoute({ page: 'checklist', checklistView })}
+          onViewModeChange={(checklistView) => navigatePortalRoute({
+            ...portalRoute,
+            page: 'checklist',
+            checklistView,
+          })}
+          competenceYear={portalRoute.checklistYear}
+          competenceMonth={portalRoute.checklistMonth}
+          onCompetenceChange={({ year, month }) => navigatePortalRoute({
+            ...portalRoute,
+            checklistYear: year,
+            checklistMonth: month,
+          }, { replace: true })}
+          historyPage={portalRoute.historyPage}
+          historyPageSize={portalRoute.historyPageSize}
+          onHistoryPaginationChange={({ page: historyPage, pageSize: historyPageSize }) => navigatePortalRoute({
+            ...portalRoute,
+            historyPage: historyPage ?? portalRoute.historyPage,
+            historyPageSize: historyPageSize ?? portalRoute.historyPageSize,
+          }, { replace: true })}
         />
       </Suspense>
     ),

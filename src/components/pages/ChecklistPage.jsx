@@ -1884,11 +1884,17 @@ export default function ChecklistPage({
   responsavelCatalogo = [],
   viewMode = 'checklist',
   onViewModeChange = () => {},
+  competenceYear,
+  competenceMonth,
+  onCompetenceChange = () => {},
+  historyPage = 1,
+  historyPageSize = 25,
+  onHistoryPaginationChange = () => {},
 }) {
   const initialCompetence = useMemo(() => getCurrentCompetence(), []);
   const [currentReminderCompetence, setCurrentReminderCompetence] = useState(initialCompetence);
-  const [mes, setMes] = useState(initialCompetence.mes);
-  const [ano, setAno] = useState(initialCompetence.ano);
+  const mes = toNumber(competenceMonth, initialCompetence.mes);
+  const ano = toNumber(competenceYear, initialCompetence.ano);
   const [search, setSearch] = useState('');
   const [responsavel, setResponsavel] = useState('');
   const [quickFilter, setQuickFilter] = useState('todos');
@@ -2772,19 +2778,36 @@ export default function ChecklistPage({
       {isAutomationMode ? (
         <ChecklistAutomationPanel />
       ) : isHistoryMode ? (
-        <ChecklistHistoryPanel yearOptions={yearOptions} />
+        <ChecklistHistoryPanel
+          yearOptions={yearOptions}
+          page={historyPage}
+          perPage={historyPageSize}
+          onPaginationChange={onHistoryPaginationChange}
+        />
       ) : (
         <>
       <SurfacePanel
         title={isCatalogMode ? 'Central do catálogo' : 'Central de checklist'}
         right={(
           <div className="flex flex-wrap items-center gap-2">
-            {!isCatalogMode ? (
-              <StatusBadge toneClass="border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-200" size="md">
-                <CalendarDays size={14} className="mr-1" aria-hidden="true" />
-                {getMonthLabel(mes)}/{ano}
-              </StatusBadge>
-            ) : null}
+            <div className="grid min-w-[280px] grid-cols-2 gap-2">
+              <ChecklistDropdownSelect
+                label="Mês"
+                value={mes}
+                options={MONTH_OPTIONS}
+                onChange={(value) => onCompetenceChange({ year: ano, month: Number(value) })}
+                includeBlank={false}
+                searchable={false}
+              />
+              <ChecklistDropdownSelect
+                label="Ano"
+                value={ano}
+                options={yearOptions.map((year) => ({ value: year, label: String(year) }))}
+                onChange={(value) => onCompetenceChange({ year: Number(value), month: mes })}
+                includeBlank={false}
+                searchable={false}
+              />
+            </div>
             <ActionButton type="button" variant="secondary" onClick={() => loadResumo()} disabled={loadingResumo}>
               <RefreshCcw size={16} className={loadingResumo ? 'animate-spin' : ''} aria-hidden="true" />
               Atualizar
