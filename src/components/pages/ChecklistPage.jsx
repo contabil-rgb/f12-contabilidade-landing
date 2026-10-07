@@ -1879,7 +1879,12 @@ function ClientChecklistDetails({
   );
 }
 
-export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }) {
+export default function ChecklistPage({
+  clients = [],
+  responsavelCatalogo = [],
+  viewMode = 'checklist',
+  onViewModeChange = () => {},
+}) {
   const initialCompetence = useMemo(() => getCurrentCompetence(), []);
   const [currentReminderCompetence, setCurrentReminderCompetence] = useState(initialCompetence);
   const [mes, setMes] = useState(initialCompetence.mes);
@@ -1914,7 +1919,6 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
   const [applyingDefaultChecklist, setApplyingDefaultChecklist] = useState(false);
   const [showBatchApplyModal, setShowBatchApplyModal] = useState(false);
   const [personalItemBusyKey, setPersonalItemBusyKey] = useState('');
-  const [viewMode, setViewMode] = useState('checklist');
   const isCatalogMode = viewMode === 'catalog';
   const isHistoryMode = viewMode === 'history';
   const isAutomationMode = viewMode === 'automation';
@@ -2734,7 +2738,7 @@ export default function ChecklistPage({ clients = [], responsavelCatalogo = [] }
             <button
               key={option.value}
               type="button"
-              onClick={() => setViewMode(option.value)}
+              onClick={() => onViewModeChange(option.value)}
               className={classNames(
                 'group rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft',
                 active

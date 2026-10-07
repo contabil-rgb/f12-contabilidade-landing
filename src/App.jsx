@@ -171,6 +171,7 @@ import {
 } from './services/usuarios.service';
 import { supabase } from './lib/supabase';
 import {
+  isPortalHistoryEntry,
   normalizePortalRoute,
   readPortalRoute,
   readPortalRouteFromPopState,
@@ -219,19 +220,6 @@ const NAV_GROUPS = [
   { title: 'Relatórios', keys: ['relatorios'] },
   { title: 'Configurações', keys: ['usuarios'] },
 ];
-
-const MAIN_NAVIGATION_PAGES = new Set(NAV_ITEMS.map((item) => item.key));
-
-function getSupportedMainRoute(route) {
-  const normalized = normalizePortalRoute(route);
-  if (!MAIN_NAVIGATION_PAGES.has(normalized.page)) {
-    return normalizePortalRoute({ page: 'clientes' });
-  }
-  if (normalized.page === 'checklist' && normalized.checklistView !== 'checklist') {
-    return normalizePortalRoute({ page: 'checklist', checklistView: 'checklist' });
-  }
-  return normalized;
-}
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -10036,7 +10024,7 @@ export default function App() {
   const initialSecurityState = useMemo(loadSecurityState, []);
   const initialSessionState = useMemo(loadInitialSessionState, []);
   const initialPortalRoute = useMemo(
-    () => getSupportedMainRoute(readPortalRoute(window.location.href).route),
+    () => normalizePortalRoute(readPortalRoute(window.location.href).route),
     [],
   );
   const [clients, setClients] = useState(initialState.clientes);
@@ -10057,7 +10045,7 @@ export default function App() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [quickFilterLabel, setQuickFilterLabel] = useState('');
   const [sort, setSort] = useState({ key: 'nome_identificacao', direction: 'asc' });
-  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [selectedClientId, setSelectedClientId] = useState(initialPortalRoute.clientId);
   const [editingClient, setEditingClient] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
@@ -10096,15 +10084,15 @@ export default function App() {
   const canReuseBootstrapCache = Boolean(initialState.hasBootstrapCache && hasCachedSessionProfile);
   const page = portalRoute.page;
 
-  function setPage(nextPage, options = {}) {
-    if (nextPage === 'detalhe') {
-      setPortalRoute({ page: 'detalhe', checklistView: 'checklist', clientId: null });
-      return;
-    }
-
-    const nextRoute = getSupportedMainRoute({ page: nextPage });
+  function navigatePortalRoute(route, options = {}) {
+    const nextRoute = normalizePortalRoute(route);
     const navigation = writePortalRoute(window, nextRoute, { replace: options.replace === true });
+    setSelectedClientId(navigation.route.clientId);
     setPortalRoute(navigation.route);
+  }
+
+  function setPage(nextPage, options = {}) {
+    navigatePortalRoute({ page: nextPage }, options);
   }
 
   const currentUserFull = useMemo(() => {
@@ -10191,13 +10179,13 @@ export default function App() {
       const resolved = event
         ? readPortalRouteFromPopState(event, window.location.href)
         : readPortalRoute(window.location.href);
-      const nextRoute = getSupportedMainRoute(resolved.route);
+      const nextRoute = normalizePortalRoute(resolved.route);
 
       if (resolved.needsNormalization || !samePortalRoute(resolved.route, nextRoute)) {
         writePortalRoute(window, nextRoute, { replace: true });
       }
 
-      setSelectedClientId(null);
+      setSelectedClientId(nextRoute.clientId);
       setEditingClient(null);
       setEditingUser(null);
       setPortalRoute(nextRoute);
@@ -10207,6 +10195,25 @@ export default function App() {
     window.addEventListener('popstate', resolveCurrentLocation);
     return () => window.removeEventListener('popstate', resolveCurrentLocation);
   }, []);
+
+  useEffect(() => {
+    if (page !== 'detalhe' || !currentUserFull || !initialPortalReady) return;
+
+    const requestedClientId = portalRoute.clientId;
+    const requestedClient = enrichedClients.find((client) => client.id === requestedClientId);
+    if (requestedClient) {
+      setSelectedClientId(requestedClient.id);
+      return;
+    }
+
+    const navigation = writePortalRoute(window, { page: 'clientes' }, { replace: true });
+    setSelectedClientId(null);
+    setPortalRoute(navigation.route);
+    setToast({
+      title: 'Cliente indisponível',
+      message: 'O cliente solicitado não existe ou não está disponível para o seu perfil.',
+    });
+  }, [currentUserFull, enrichedClients, initialPortalReady, page, portalRoute.clientId]);
 
   useEffect(() => {
     if (page !== 'detalhe') return;
@@ -10886,8 +10893,14 @@ export default function App() {
 
     sincronizarPerfilUsuario(perfil);
     startSession(perfil);
-    const requestedRoute = getSupportedMainRoute(readPortalRoute(window.location.href).route);
-    setPage(requestedRoute.page, { replace: true });
+    const requestedNavigation = readPortalRoute(window.location.href);
+    const requestedRoute = normalizePortalRoute(requestedNavigation.route);
+    if (requestedNavigation.needsNormalization) {
+      navigatePortalRoute(requestedRoute, { replace: true });
+    } else {
+      setSelectedClientId(requestedRoute.clientId);
+      setPortalRoute(requestedRoute);
+    }
     updateUltimoAcessoUsuario(perfil.id).catch(() => {});
     return { ok: true };
   }
@@ -10944,8 +10957,15 @@ export default function App() {
   }
 
   function openClient(id) {
-    setSelectedClientId(id);
-    setPage('detalhe');
+    navigatePortalRoute({ page: 'detalhe', clientId: id });
+  }
+
+  function closeClientDetail() {
+    if (isPortalHistoryEntry(window.history.state)) {
+      window.history.back();
+      return;
+    }
+    navigatePortalRoute({ page: 'clientes' }, { replace: true });
   }
 
   function clearFilters() {
@@ -12551,10 +12571,10 @@ export default function App() {
         }}
       />
     ),
-    detalhe: (
+    detalhe: selectedClient ? (
       <DetailPage
         client={selectedClient}
-        onBack={() => setPage('clientes')}
+        onBack={closeClientDetail}
         onEdit={(client) => {
           if (isClientArchived(client)) {
             setToast({ title: 'Cliente arquivado', message: 'Restaure o cliente antes de editar.' });
@@ -12575,7 +12595,7 @@ export default function App() {
         historicoLoading={historicoClienteLoading}
         reinfRelatorios={reinfRelatorios}
       />
-    ),
+    ) : <PageLoadingFallback label="Localizando cliente..." />,
     reinf: (
       <ReinfPage
         clients={activeClients}
@@ -12618,7 +12638,12 @@ export default function App() {
     ),
     checklist: (
       <Suspense fallback={<PageLoadingFallback label="Carregando checklist de documentos..." />}>
-        <LazyChecklistPage clients={checklistClients} responsavelCatalogo={responsavelCatalogo} />
+        <LazyChecklistPage
+          clients={checklistClients}
+          responsavelCatalogo={responsavelCatalogo}
+          viewMode={portalRoute.checklistView}
+          onViewModeChange={(checklistView) => navigatePortalRoute({ page: 'checklist', checklistView })}
+        />
       </Suspense>
     ),
     relatorios: can(currentUserFull, PERMISSIONS.REPORTS_VIEW)
