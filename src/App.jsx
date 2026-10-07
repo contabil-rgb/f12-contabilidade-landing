@@ -170,6 +170,13 @@ import {
   listarUsuariosPortal,
 } from './services/usuarios.service';
 import { supabase } from './lib/supabase';
+import {
+  normalizePortalRoute,
+  readPortalRoute,
+  readPortalRouteFromPopState,
+  samePortalRoute,
+  writePortalRoute,
+} from './lib/portal-navigation.js';
 
 const LazyUsersPage = lazy(() => import('./components/pages/UsersPage.jsx'));
 const LazyHistoryPage = lazy(() => import('./components/pages/HistoryPage.jsx'));
@@ -212,6 +219,19 @@ const NAV_GROUPS = [
   { title: 'Relatórios', keys: ['relatorios'] },
   { title: 'Configurações', keys: ['usuarios'] },
 ];
+
+const MAIN_NAVIGATION_PAGES = new Set(NAV_ITEMS.map((item) => item.key));
+
+function getSupportedMainRoute(route) {
+  const normalized = normalizePortalRoute(route);
+  if (!MAIN_NAVIGATION_PAGES.has(normalized.page)) {
+    return normalizePortalRoute({ page: 'clientes' });
+  }
+  if (normalized.page === 'checklist' && normalized.checklistView !== 'checklist') {
+    return normalizePortalRoute({ page: 'checklist', checklistView: 'checklist' });
+  }
+  return normalized;
+}
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -10015,6 +10035,10 @@ export default function App() {
   const initialState = useMemo(loadInitialState, []);
   const initialSecurityState = useMemo(loadSecurityState, []);
   const initialSessionState = useMemo(loadInitialSessionState, []);
+  const initialPortalRoute = useMemo(
+    () => getSupportedMainRoute(readPortalRoute(window.location.href).route),
+    [],
+  );
   const [clients, setClients] = useState(initialState.clientes);
   const [listagens, setListagens] = useState(initialState.listagens);
   const [officialListagens, setOfficialListagens] = useState(initialState.listagens);
@@ -10027,7 +10051,7 @@ export default function App() {
   const [security, setSecurity] = useState(initialSecurityState);
   const [session, setSession] = useState(initialSessionState.session);
   const [authView, setAuthView] = useState(() => (shouldOpenResetViewFromUrl() ? 'reset' : 'login'));
-  const [page, setPage] = useState('dashboard');
+  const [portalRoute, setPortalRoute] = useState(initialPortalRoute);
   const [reinfSearchContext, setReinfSearchContext] = useState(null);
   const [ecdSearchContext, setEcdSearchContext] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -10070,6 +10094,18 @@ export default function App() {
     && sessionProfile?.auth_user_id === session.auth_user_id,
   );
   const canReuseBootstrapCache = Boolean(initialState.hasBootstrapCache && hasCachedSessionProfile);
+  const page = portalRoute.page;
+
+  function setPage(nextPage, options = {}) {
+    if (nextPage === 'detalhe') {
+      setPortalRoute({ page: 'detalhe', checklistView: 'checklist', clientId: null });
+      return;
+    }
+
+    const nextRoute = getSupportedMainRoute({ page: nextPage });
+    const navigation = writePortalRoute(window, nextRoute, { replace: options.replace === true });
+    setPortalRoute(navigation.route);
+  }
 
   const currentUserFull = useMemo(() => {
     if (!session?.usuario_id) return null;
@@ -10149,6 +10185,28 @@ export default function App() {
     () => enrichedClients.find((client) => client.id === selectedClientId),
     [enrichedClients, selectedClientId],
   );
+
+  useEffect(() => {
+    function resolveCurrentLocation(event = null) {
+      const resolved = event
+        ? readPortalRouteFromPopState(event, window.location.href)
+        : readPortalRoute(window.location.href);
+      const nextRoute = getSupportedMainRoute(resolved.route);
+
+      if (resolved.needsNormalization || !samePortalRoute(resolved.route, nextRoute)) {
+        writePortalRoute(window, nextRoute, { replace: true });
+      }
+
+      setSelectedClientId(null);
+      setEditingClient(null);
+      setEditingUser(null);
+      setPortalRoute(nextRoute);
+    }
+
+    resolveCurrentLocation();
+    window.addEventListener('popstate', resolveCurrentLocation);
+    return () => window.removeEventListener('popstate', resolveCurrentLocation);
+  }, []);
 
   useEffect(() => {
     if (page !== 'detalhe') return;
@@ -10771,7 +10829,7 @@ export default function App() {
     clearSession();
     setSession(null);
     setAuthView('login');
-    setPage('dashboard');
+    setPage('dashboard', { replace: true });
     if (message) setToast({ title: 'Sessão encerrada', message });
   }
 
@@ -10828,7 +10886,8 @@ export default function App() {
 
     sincronizarPerfilUsuario(perfil);
     startSession(perfil);
-    setPage('dashboard');
+    const requestedRoute = getSupportedMainRoute(readPortalRoute(window.location.href).route);
+    setPage(requestedRoute.page, { replace: true });
     updateUltimoAcessoUsuario(perfil.id).catch(() => {});
     return { ok: true };
   }
