@@ -6,7 +6,8 @@ import {
   LIST_HEADER_MAP,
 } from '../data/schema.js';
 import { formatCnpj, normalizeCnpj, normalizeText, onlyDigits, todayBr, uniqueValues } from './formatters.js';
-import { isValidCnpj, validateExcelBuffer, validateWorkbookDimensions } from './excel-import-validation.js';
+import { isValidCnpj } from './cnpj.js';
+import { validateExcelBuffer, validateWorkbookDimensions } from './excel-import-validation.js';
 
 const BASE_SHEET_NAME = 'Base';
 const LIST_SHEET_NAME = 'Listagens';

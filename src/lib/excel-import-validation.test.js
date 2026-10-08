@@ -4,7 +4,6 @@ import * as XLSX from 'xlsx';
 import { mergeClienteRowForImport } from './clientes-sync.js';
 import {
   EXCEL_IMPORT_LIMITS,
-  isValidCnpj,
   validateExcelBuffer,
   validateExcelFileMetadata,
   validateWorkbookDimensions,
@@ -24,13 +23,6 @@ test('valida extensão, tamanho e assinatura do arquivo antes da leitura', () =>
     () => validateExcelBuffer(new Uint8Array([1, 2, 3, 4]).buffer, 'base.xlsx'),
     /não corresponde/,
   );
-});
-
-test('valida os dígitos verificadores do CNPJ', () => {
-  assert.equal(isValidCnpj('98.765.432/0001-98'), true);
-  assert.equal(isValidCnpj('98.765.432/0001-99'), false);
-  assert.equal(isValidCnpj('11.111.111/1111-11'), false);
-  assert.equal(isValidCnpj('123'), false);
 });
 
 test('bloqueia dimensões de planilha acima dos limites', () => {

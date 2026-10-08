@@ -52,6 +52,7 @@ import {
 } from './data/schema.js';
 import { analyzeClient, enrichClients, toBreakdown } from './lib/statusRules.js';
 import { isRegimeEcdEcfAplicavel, sanitizeResponsavelEcdByRegime } from './lib/ecdRules.js';
+import { getCnpjValidationError } from './lib/cnpj.js';
 import {
   formatCnpj,
   formatCnpjInput,
@@ -9263,9 +9264,11 @@ function ClientModal({
       }
     });
 
-    if (normalizeCnpj(form.cnpj).length !== 14) {
-      nextErrors.push('CNPJ deve ter 14 dígitos.');
-    }
+    const cnpjError = getCnpjValidationError(form.cnpj, {
+      originalValue: client?.cnpj,
+      allowUnchangedInvalid: Boolean(client?.id),
+    });
+    if (cnpjError) nextErrors.push(cnpjError);
 
     if (nextErrors.length) {
       setErrors(nextErrors);

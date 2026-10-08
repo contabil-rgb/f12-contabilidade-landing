@@ -1,5 +1,3 @@
-import { onlyDigits } from './formatters.js';
-
 export const EXCEL_IMPORT_LIMITS = Object.freeze({
   maxFileBytes: 10 * 1024 * 1024,
   maxSheets: 10,
@@ -88,24 +86,4 @@ export function validateWorkbookDimensions(workbook, decodeRange) {
       throw new Error(`A aba "${sheetName}" excede o limite de ${EXCEL_IMPORT_LIMITS.maxColumnsPerSheet} colunas.`);
     }
   });
-}
-
-export function isValidCnpj(value) {
-  const digits = onlyDigits(value);
-  if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false;
-
-  const calculateDigit = (length) => {
-    let factor = length - 7;
-    let sum = 0;
-    for (let index = 0; index < length; index += 1) {
-      sum += Number(digits[index]) * factor;
-      factor -= 1;
-      if (factor < 2) factor = 9;
-    }
-    const remainder = sum % 11;
-    return remainder < 2 ? 0 : 11 - remainder;
-  };
-
-  return calculateDigit(12) === Number(digits[12])
-    && calculateDigit(13) === Number(digits[13]);
 }
