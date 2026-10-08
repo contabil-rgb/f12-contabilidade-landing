@@ -9244,7 +9244,6 @@ function ClientModal({
   function updateField(key, value) {
     if (key === 'cnpj') {
       cnpjLookupSequenceRef.current += 1;
-      lastSuccessfulCnpjRef.current = '';
       setCnpjLookup({ status: 'idle', message: '' });
     }
     setForm((current) => {
@@ -9264,6 +9263,10 @@ function ClientModal({
 
     const digits = normalizeCnpj(form.cnpj);
     if (lastSuccessfulCnpjRef.current === digits) return;
+    const replacePreviousCompany = Boolean(
+      lastSuccessfulCnpjRef.current
+      && lastSuccessfulCnpjRef.current !== digits,
+    );
 
     const sequence = cnpjLookupSequenceRef.current + 1;
     cnpjLookupSequenceRef.current = sequence;
@@ -9273,7 +9276,9 @@ function ClientModal({
       const company = await consultarCnpj(digits);
       if (cnpjLookupSequenceRef.current !== sequence) return;
 
-      setForm((current) => applyCnpjAutofill(current, digits, company));
+      setForm((current) => applyCnpjAutofill(current, digits, company, {
+        replaceExisting: replacePreviousCompany,
+      }));
       lastSuccessfulCnpjRef.current = digits;
       setCnpjLookup({
         status: 'success',

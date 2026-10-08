@@ -4,17 +4,21 @@ function asText(value) {
   return String(value ?? '').trim();
 }
 
-export function applyCnpjAutofill(currentForm, expectedCnpj, company) {
+export function applyCnpjAutofill(currentForm, expectedCnpj, company, { replaceExisting = false } = {}) {
   if (normalizeCnpjDigits(currentForm?.cnpj) !== normalizeCnpjDigits(expectedCnpj)) {
     return currentForm;
   }
 
-  const razaoSocial = asText(currentForm?.razao_social)
-    || asText(company?.razaoSocial);
-  const nomeIdentificacao = asText(currentForm?.nome_identificacao)
-    || asText(company?.nomeIdentificacao)
+  const companyLegalName = asText(company?.razaoSocial);
+  const companyDisplayName = asText(company?.nomeIdentificacao)
     || asText(company?.nomeFantasia)
-    || razaoSocial;
+    || companyLegalName;
+  const razaoSocial = replaceExisting
+    ? companyLegalName
+    : asText(currentForm?.razao_social) || companyLegalName;
+  const nomeIdentificacao = replaceExisting
+    ? companyDisplayName
+    : asText(currentForm?.nome_identificacao) || companyDisplayName || razaoSocial;
 
   if (
     razaoSocial === currentForm?.razao_social

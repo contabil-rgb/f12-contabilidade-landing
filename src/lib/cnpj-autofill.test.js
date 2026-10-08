@@ -40,6 +40,21 @@ test('preserva valores que o colaborador ja preencheu', () => {
   assert.strictEqual(applyCnpjAutofill(current, company.cnpj, company), current);
 });
 
+test('substitui os dados da empresa anterior quando um novo CNPJ foi consultado', () => {
+  const current = {
+    cnpj,
+    razao_social: 'Empresa consultada anteriormente Ltda',
+    nome_identificacao: 'Empresa anterior',
+    status: 'Ativo',
+  };
+
+  assert.deepEqual(applyCnpjAutofill(current, company.cnpj, company, { replaceExisting: true }), {
+    ...current,
+    razao_social: 'Empresa F12 Ltda',
+    nome_identificacao: 'F12 Serviços',
+  });
+});
+
 test('usa razao social como fallback do nome', () => {
   const current = { cnpj, razao_social: '', nome_identificacao: '' };
   const withoutFantasyName = {
