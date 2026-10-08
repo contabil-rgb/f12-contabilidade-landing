@@ -53,6 +53,7 @@ import {
 import { analyzeClient, enrichClients, toBreakdown } from './lib/statusRules.js';
 import { isRegimeEcdEcfAplicavel, sanitizeResponsavelEcdByRegime } from './lib/ecdRules.js';
 import { getCnpjValidationError } from './lib/cnpj.js';
+import { applyCnpjAutofill } from './lib/cnpj-autofill.js';
 import {
   formatCnpj,
   formatCnpjInput,
@@ -139,6 +140,7 @@ import {
   listarValoresListagemPorCategoria,
   reativarValorListagem,
 } from './services/listagens.service';
+import { consultarCnpj } from './services/cnpj-consulta.service';
 import {
   excluirHistoricoPorIds as excluirHistoricoPorIdsSupabase,
   listarHistoricoPortal as listarHistoricoPortalSupabase,
@@ -9221,6 +9223,9 @@ function ClientModal({
     cnpj: client?.cnpj ? formatCnpj(client.cnpj) : '',
   }));
   const [errors, setErrors] = useState([]);
+  const [cnpjLookup, setCnpjLookup] = useState({ status: 'idle', message: '' });
+  const cnpjLookupSequenceRef = useRef(0);
+  const lastSuccessfulCnpjRef = useRef('');
   const modalFields = FIELD_DEFINITIONS.filter((field) =>
     !['criado_em', 'atualizado_em'].includes(field.key)
       && !EDIT_MODAL_HIDDEN_FIELDS.has(field.key)
@@ -9230,10 +9235,52 @@ function ClientModal({
   const revisorRequired = isRevisorRequiredByDifficulty(form.dificuldade);
 
   function updateField(key, value) {
+    if (key === 'cnpj') {
+      cnpjLookupSequenceRef.current += 1;
+      lastSuccessfulCnpjRef.current = '';
+      setCnpjLookup({ status: 'idle', message: '' });
+    }
     setForm((current) => {
       const nextPatch = applyResponsavelEcdFallback(current, { [key]: value });
       return { ...current, ...nextPatch };
     });
+  }
+
+  async function lookupNewClientCnpj() {
+    if (client?.id) return;
+
+    const validationError = getCnpjValidationError(form.cnpj);
+    if (validationError) {
+      setCnpjLookup({ status: 'error', message: validationError });
+      return;
+    }
+
+    const digits = normalizeCnpj(form.cnpj);
+    if (lastSuccessfulCnpjRef.current === digits) return;
+
+    const sequence = cnpjLookupSequenceRef.current + 1;
+    cnpjLookupSequenceRef.current = sequence;
+    setCnpjLookup({ status: 'loading', message: 'Consultando os dados cadastrais...' });
+
+    try {
+      const company = await consultarCnpj(digits);
+      if (cnpjLookupSequenceRef.current !== sequence) return;
+
+      setForm((current) => applyCnpjAutofill(current, digits, company));
+      lastSuccessfulCnpjRef.current = digits;
+      setCnpjLookup({
+        status: 'success',
+        message: 'Consulta concluída. Revise a Razão Social e o Nome/Identificação antes de salvar.',
+      });
+    } catch (error) {
+      if (cnpjLookupSequenceRef.current !== sequence) return;
+      setCnpjLookup({
+        status: 'error',
+        message: error instanceof Error
+          ? error.message
+          : 'Não foi possível consultar o CNPJ. Preencha os dados manualmente.',
+      });
+    }
   }
 
   function updateSocios(nextSocios) {
@@ -9309,6 +9356,10 @@ function ClientModal({
         disabled={!canEditFieldForClient(field.key)}
         disabledReason={deniedReasonForField(null, field.key)}
         onChange={(value) => updateField(field.key, value)}
+        onBlur={field.key === 'cnpj' && !client?.id ? lookupNewClientCnpj : undefined}
+        busy={field.key === 'cnpj' && cnpjLookup.status === 'loading'}
+        helperText={field.key === 'cnpj' && !client?.id ? cnpjLookup.message : ''}
+        helperTone={cnpjLookup.status}
         onAttachmentSuccess={(tipoAnexo, anexo) => {
           const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
           if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
@@ -9405,9 +9456,13 @@ function ClientModal({
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700">
             Cancelar
           </button>
-          <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white">
+          <button
+            type="submit"
+            disabled={cnpjLookup.status === 'loading'}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60"
+          >
             <Save size={16} aria-hidden="true" />
-            Salvar cliente
+            {cnpjLookup.status === 'loading' ? 'Consultando CNPJ...' : 'Salvar cliente'}
           </button>
         </div>
       </form>
@@ -9566,6 +9621,10 @@ function FormField({
   listagens,
   officialListagens = listagens,
   onChange,
+  onBlur,
+  busy = false,
+  helperText = '',
+  helperTone = 'idle',
   disabled = false,
   disabledReason = 'Sem permissão para alterar este campo.',
   cliente,
@@ -9866,10 +9925,23 @@ function FormField({
         maxLength={field.type === 'cnpj' ? 18 : undefined}
         placeholder={field.type === 'date' ? 'dd/mm/aaaa' : undefined}
         onChange={(event) => onChange(field.type === 'cnpj' ? formatCnpjInput(event.target.value) : event.target.value)}
+        onBlur={onBlur}
+        aria-busy={busy || undefined}
         disabled={computedDisabled}
         title={computedDisabled ? computedDisabledReason : undefined}
         className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
       />
+      {helperText ? (
+        <span className={`mt-1 block text-[11px] font-semibold normal-case ${
+          helperTone === 'error'
+            ? 'text-red-600 dark:text-red-300'
+            : helperTone === 'success'
+              ? 'text-emerald-600 dark:text-emerald-300'
+              : 'text-brand-blue dark:text-blue-300'
+        }`}>
+          {helperText}
+        </span>
+      ) : null}
       {computedDisabledReason ? (
         <span className="mt-1 block text-[11px] font-semibold normal-case text-slate-400">{computedDisabledReason}</span>
       ) : null}
