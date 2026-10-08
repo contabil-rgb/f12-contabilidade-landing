@@ -54,6 +54,7 @@ import { analyzeClient, enrichClients, toBreakdown } from './lib/statusRules.js'
 import { isRegimeEcdEcfAplicavel, sanitizeResponsavelEcdByRegime } from './lib/ecdRules.js';
 import { getCnpjValidationError } from './lib/cnpj.js';
 import { applyCnpjAutofill } from './lib/cnpj-autofill.js';
+import { shouldConfirmClientFieldOnEnter } from './lib/client-modal-keyboard.js';
 import {
   NEW_CLIENT_ATTACHMENT_FIELD_BY_TYPE,
   uploadNewClientAttachments,
@@ -9360,6 +9361,19 @@ function ClientModal({
     }
   }
 
+  function handleClientFormKeyDown(event) {
+    const target = event.target;
+    if (!shouldConfirmClientFieldOnEnter({
+      key: event.key,
+      defaultPrevented: event.defaultPrevented,
+      tagName: target?.tagName,
+      inputType: target?.type,
+    })) return;
+
+    event.preventDefault();
+    target.blur();
+  }
+
   function renderClientModalField(field) {
     return (
       <FormField
@@ -9413,7 +9427,7 @@ function ClientModal({
 
   return (
     <div className="modal-backdrop z-50 overflow-y-auto">
-      <form onSubmit={submit} className="modal-panel modal-panel-xl mx-auto my-6">
+      <form onSubmit={submit} onKeyDown={handleClientFormKeyDown} className="modal-panel modal-panel-xl mx-auto my-6">
         <div className="modal-header sticky top-0 z-10 flex items-center justify-between gap-3">
           <div>
             <h2 className="modal-title">{client?.id ? 'Editar cliente' : 'Novo cliente'}</h2>
