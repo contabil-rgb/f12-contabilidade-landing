@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test:cnpj": "node --test src/lib/cnpj.test.js",
     "test:cnpj-autofill": "node --test src/lib/cnpj-autofill.test.js",
+    "test:new-client-attachments": "node --test src/lib/new-client-attachments.test.js",
     "test:cnpj-provider": "node --experimental-strip-types --test scripts/cnpj-provider.test.mjs",
     "test:consultar-cnpj-function": "node --experimental-strip-types --test scripts/consultar-cnpj-function.test.mjs",
     "test:cnpj-consulta-service": "node --experimental-strip-types --test scripts/cnpj-consulta-service.test.mjs",

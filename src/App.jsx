@@ -55,6 +55,10 @@ import { isRegimeEcdEcfAplicavel, sanitizeResponsavelEcdByRegime } from './lib/e
 import { getCnpjValidationError } from './lib/cnpj.js';
 import { applyCnpjAutofill } from './lib/cnpj-autofill.js';
 import {
+  NEW_CLIENT_ATTACHMENT_FIELD_BY_TYPE,
+  uploadNewClientAttachments,
+} from './lib/new-client-attachments.js';
+import {
   formatCnpj,
   formatCnpjInput,
   formatCurrency,
@@ -103,7 +107,8 @@ import SurfacePanel from './components/ui/SurfacePanel';
 import ThemeToggle from './components/ui/ThemeToggle.jsx';
 import f12Logo from './assets/logo-f12.png';
 import { TIPOS_ANEXO } from './types/anexo';
-import { listarUltimosAnexosPorClientes } from './services/anexos.service';
+import { listarUltimosAnexosPorClientes, uploadAnexoCliente } from './services/anexos.service';
+import { validarArquivoAnexo } from './utils/validar-arquivo';
 import { listarUltimosContratosSociaisPorClientes } from './services/contratos-sociais.service';
 import {
   buscarClientePorId as buscarClientePorIdSupabase,
@@ -9223,6 +9228,8 @@ function ClientModal({
     cnpj: client?.cnpj ? formatCnpj(client.cnpj) : '',
   }));
   const [errors, setErrors] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState({});
   const [cnpjLookup, setCnpjLookup] = useState({ status: 'idle', message: '' });
   const cnpjLookupSequenceRef = useRef(0);
   const lastSuccessfulCnpjRef = useRef('');
@@ -9291,8 +9298,9 @@ function ClientModal({
     }));
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     const nextErrors = [];
     const canonicalForm = { ...form };
     modalFields.forEach((field) => {
@@ -9330,14 +9338,21 @@ function ClientModal({
         protectedForm[field.key] = client[field.key] ?? '';
       }
     });
-    onSave({
-      ...protectedForm,
-      id: protectedForm.id || stableIdFromCnpj(digits),
-      cnpj: formatCnpj(digits),
-      cnpj_digitos: digits,
-      criado_em: protectedForm.criado_em || new Date().toISOString(),
-      atualizado_em: new Date().toISOString(),
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        ...protectedForm,
+        id: protectedForm.id || stableIdFromCnpj(digits),
+        cnpj: formatCnpj(digits),
+        cnpj_digitos: digits,
+        criado_em: protectedForm.criado_em || new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+      }, {
+        pendingAttachments: client?.id ? {} : pendingAttachments,
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   function renderClientModalField(field) {
@@ -9360,6 +9375,15 @@ function ClientModal({
         busy={field.key === 'cnpj' && cnpjLookup.status === 'loading'}
         helperText={field.key === 'cnpj' && !client?.id ? cnpjLookup.message : ''}
         helperTone={cnpjLookup.status}
+        pendingAttachment={client?.id ? null : pendingAttachments[ATTACHMENT_TYPE_BY_FIELD[field.key]] ?? null}
+        onPendingAttachmentChange={client?.id ? undefined : (tipoAnexo, file) => {
+          setPendingAttachments((current) => {
+            const next = { ...current };
+            if (file) next[tipoAnexo] = file;
+            else delete next[tipoAnexo];
+            return next;
+          });
+        }}
         onAttachmentSuccess={(tipoAnexo, anexo) => {
           const fieldKey = ATTACHMENT_FIELD_BY_TYPE[tipoAnexo];
           if (fieldKey) updateField(fieldKey, anexoToFieldValue(anexo));
@@ -9390,7 +9414,7 @@ function ClientModal({
             <h2 className="modal-title">{client?.id ? 'Editar cliente' : 'Novo cliente'}</h2>
             <p className="modal-subtitle">{form.nome_identificacao || form.razao_social || 'Cadastro contábil'}</p>
           </div>
-          <button type="button" onClick={onClose} className="modal-close-button">
+          <button type="button" onClick={onClose} disabled={saving} className="modal-close-button disabled:cursor-not-allowed disabled:opacity-60">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
@@ -9453,16 +9477,20 @@ function ClientModal({
         </div>
 
         <div className="modal-footer sticky bottom-0 flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700">
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
             Cancelar
           </button>
           <button
             type="submit"
-            disabled={cnpjLookup.status === 'loading'}
+            disabled={cnpjLookup.status === 'loading' || saving}
             className="inline-flex items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60"
           >
             <Save size={16} aria-hidden="true" />
-            {cnpjLookup.status === 'loading' ? 'Consultando CNPJ...' : 'Salvar cliente'}
+            {saving
+              ? 'Salvando cliente...'
+              : cnpjLookup.status === 'loading'
+                ? 'Consultando CNPJ...'
+                : 'Salvar cliente'}
           </button>
         </div>
       </form>
@@ -9625,6 +9653,8 @@ function FormField({
   busy = false,
   helperText = '',
   helperTone = 'idle',
+  pendingAttachment = null,
+  onPendingAttachmentChange,
   disabled = false,
   disabledReason = 'Sem permissão para alterar este campo.',
   cliente,
@@ -9663,9 +9693,16 @@ function FormField({
     const tipoAnexo = ATTACHMENT_TYPE_BY_FIELD[field.key];
     const anexo = tipoAnexo ? fieldValueToAnexo(value, tipoAnexo, cliente) : null;
     const canUpload = Boolean(tipoAnexo && isUuid(cliente?.id));
+    const canStageUpload = Boolean(
+      tipoAnexo
+      && !isUuid(cliente?.id)
+      && NEW_CLIENT_ATTACHMENT_FIELD_BY_TYPE[tipoAnexo]
+      && onPendingAttachmentChange,
+    );
     const attachmentWriteDisabled = isClientArchived(cliente);
     const attachmentWriteDisabledReason = 'Restaure o cliente antes de anexar, substituir ou remover arquivos.';
-    const attachmentName = attachment.structured ? attachment.name : String(value ?? '').trim();
+    const attachmentName = pendingAttachment?.name
+      || (attachment.structured ? attachment.name : String(value ?? '').trim());
 
     return (
       <div className="text-xs font-black uppercase tracking-normal text-slate-500 dark:text-gray-400">
@@ -9677,7 +9714,14 @@ function FormField({
             className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left"
           >
             <span className="block min-w-0">
-              <AttachmentBadge value={value} className="max-w-[8.5rem] sm:max-w-[9.5rem]" />
+              {pendingAttachment ? (
+                <span className="inline-flex max-w-[9.5rem] items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black normal-case text-brand-blue dark:bg-blue-500/10 dark:text-blue-300">
+                  <Paperclip size={12} aria-hidden="true" />
+                  Pronto para enviar
+                </span>
+              ) : (
+                <AttachmentBadge value={value} className="max-w-[8.5rem] sm:max-w-[9.5rem]" />
+              )}
               <span className="mt-1 block max-w-full truncate text-[11px] font-semibold normal-case text-slate-500 dark:text-gray-400">
                 {attachmentName || 'Nenhum arquivo informado'}
               </span>
@@ -9690,7 +9734,42 @@ function FormField({
           {attachmentOptionsOpen ? (
             <div className="border-t border-slate-200 p-3 dark:border-gray-700">
               <div className="flex flex-wrap gap-2">
-                {canUpload ? (
+                {canStageUpload ? (
+                  <>
+                    <label className="inline-flex min-w-[5.85rem] cursor-pointer items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-black normal-case text-slate-700 transition hover:border-brand-blue hover:text-brand-blue dark:border-gray-700 dark:text-gray-200">
+                      <Upload size={14} aria-hidden="true" />
+                      {pendingAttachment ? 'Substituir' : 'Selecionar arquivo'}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={disabled}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (!file || disabled) return;
+                          try {
+                            validarArquivoAnexo(file);
+                            onPendingAttachmentChange(tipoAnexo, file);
+                          } catch (error) {
+                            onAttachmentError?.(error instanceof Error ? error.message : 'Arquivo inválido.');
+                          }
+                        }}
+                      />
+                    </label>
+                    {pendingAttachment ? (
+                      <button
+                        type="button"
+                        onClick={() => onPendingAttachmentChange(tipoAnexo, null)}
+                        disabled={disabled}
+                        className="inline-flex min-w-[5.85rem] items-center justify-center gap-1 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-black normal-case text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        Remover seleção
+                      </button>
+                    ) : null}
+                  </>
+                ) : canUpload ? (
                   <UploadAnexoButton
                     cliente={cliente}
                     tipoAnexo={tipoAnexo}
@@ -9723,15 +9802,21 @@ function FormField({
                   </button>
                 ) : null}
               </div>
-              <input
-                value={attachmentName}
-                onChange={(event) => onChange(event.target.value)}
-                disabled={disabled}
-                readOnly={attachment.structured && Boolean(attachment.path)}
-                title={disabled ? disabledReason : 'Informe o nome, link ou identificador do anexo.'}
-                placeholder="Cole um link ou identificador do anexo"
-                className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
-              />
+              {canStageUpload ? (
+                <p className="mt-2 text-[11px] font-semibold normal-case text-slate-500 dark:text-gray-400">
+                  Opcional. O arquivo será enviado somente depois que o cliente for criado.
+                </p>
+              ) : (
+                <input
+                  value={attachmentName}
+                  onChange={(event) => onChange(event.target.value)}
+                  disabled={disabled}
+                  readOnly={attachment.structured && Boolean(attachment.path)}
+                  title={disabled ? disabledReason : 'Informe o nome, link ou identificador do anexo.'}
+                  placeholder="Cole um link ou identificador do anexo"
+                  className={`${baseClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                />
+              )}
             </div>
           ) : null}
         </div>
@@ -11131,9 +11216,9 @@ export default function App() {
     await carregarHistoricoCliente(clienteId);
   }
 
-  async function saveClient(client) {
-    if (!currentUserFull) return;
-    if (!ensureSupabaseWriteReady(client?.id ? 'salvar o cliente' : 'criar o cliente')) return;
+  async function saveClient(client, { pendingAttachments = {} } = {}) {
+    if (!currentUserFull) return { ok: false };
+    if (!ensureSupabaseWriteReady(client?.id ? 'salvar o cliente' : 'criar o cliente')) return { ok: false };
     const sociosPayload = normalizeSociosClienteInput(client?._socios ?? []);
     const sociosDirty = Boolean(client?._sociosDirty);
     const { _socios, _sociosDirty, ...clientSemSocios } = client;
@@ -11146,13 +11231,14 @@ export default function App() {
     const origemEdicao = page === 'detalhe' ? 'Detalhe do Cliente' : 'Base de Clientes';
     let previousForHistory = previous;
     let syncedWithSupabase = false;
+    let attachmentFailures = [];
     if (previous && !canEditClient(currentUserFull, previous)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode editar este cliente.' });
-      return;
+      return { ok: false };
     }
     if (!previous && !can(currentUserFull, PERMISSIONS.CLIENTS_CREATE)) {
       setToast({ title: 'Acesso negado', message: 'Seu perfil não pode cadastrar clientes.' });
-      return;
+      return { ok: false };
     }
 
     const mutationTimestamp = new Date().toISOString();
@@ -11205,7 +11291,7 @@ export default function App() {
             title: 'Falha ao salvar no Supabase',
             message: `${error.message}. Nenhuma alteração local paralela foi aplicada.`,
           });
-          return;
+          return { ok: false };
         }
       }
       nextClients[index] = clearPersistedObrigacoes(mergedClient);
@@ -11219,6 +11305,14 @@ export default function App() {
           sociosAtualizados = await salvarSociosClienteSupabase(savedId, sociosPayload);
         }
         createdClient = withClientDefaults({ ...createdClient, ...saved, _socios: sociosAtualizados });
+        const attachmentResult = await uploadNewClientAttachments({
+          client: createdClient,
+          pendingAttachments,
+          uploadAttachment: uploadAnexoCliente,
+          serializeAttachment: anexoToFieldValue,
+        });
+        createdClient = withClientDefaults(attachmentResult.client);
+        attachmentFailures = attachmentResult.failures;
         setSupabaseStatus({ connected: true, message: 'Cliente criado no Supabase' });
         syncedWithSupabase = true;
       } catch (error) {
@@ -11227,19 +11321,23 @@ export default function App() {
           title: 'Falha ao criar no Supabase',
           message: `${error.message}. O cliente não foi criado localmente para evitar divergência.`,
         });
-        return;
+        return { ok: false };
       }
       nextClients.unshift(clearPersistedObrigacoes(createdClient));
     }
     persist(nextClients);
     setEditingClient(null);
-    setToast({
+    setToast(attachmentFailures.length ? {
+      title: 'Cliente salvo; revise os anexos',
+      message: `O cliente foi criado, mas ${formatNumber(attachmentFailures.length)} anexo(s) não foi(ram) enviado(s). Abra o cliente para tentar novamente.`,
+    } : {
       title: 'Cliente salvo',
       message: `${client.nome_identificacao || client.razao_social}.`,
     });
     if (syncedWithSupabase) {
       void resyncSupabaseAfterMutation(previous ? 'salvar cliente' : 'criar cliente');
     }
+    return { ok: true, attachmentFailures };
   }
 
   async function quickUpdateClient(id, patch) {
