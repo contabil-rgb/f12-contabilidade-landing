@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:cnpj": "node --test src/lib/cnpj.test.js",
+    "test:cnpj-provider": "node --experimental-strip-types --test scripts/cnpj-provider.test.mjs",
     "test:portal-navigation": "node --test src/lib/portal-navigation.test.js",
     "test:checklist-automation-coordinator": "node --experimental-strip-types scripts/checklist-automation-coordinator.test.mjs",
     "test:checklist-automation-recovery": "node --experimental-strip-types scripts/checklist-automation-recovery.test.mjs",
