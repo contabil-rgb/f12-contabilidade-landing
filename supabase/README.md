@@ -41,6 +41,10 @@ Arquivos SQL ativos do projeto.
 - `supabase/functions/executar-checklist-automacao-teste/index.ts` -> endpoint autenticado do teste manual; prepara a execucao direcionada e aciona o worker sem reativar a automacao global
 - `npm run test:checklist-automation-manual` -> valida autenticacao, perfis, selecao, idempotencia e acionamento direcionado sem acessar o Supabase ou o Resend reais
 - `npm run supabase:configure:checklist-scheduling` -> sincroniza a chave secreta interna entre as Edge Functions e o Vault sem registrar seu valor no repositorio
+- `supabase/functions/consultar-cnpj/index.ts` -> endpoint autenticado para consulta cadastral; permite os mesmos perfis ativos que podem criar clientes e devolve apenas o contrato interno do Portal
+- `supabase/functions/_shared/cnpj-company.ts` -> contrato, validacao e erros independentes do provedor de CNPJ
+- `supabase/functions/_shared/cnpj-ws-provider.ts` -> adaptador isolado da API publica CNPJ.ws
+- `npm run test:consultar-cnpj-function` -> valida autenticacao, permissao, CNPJ, contrato e tratamento de falhas sem acessar o Supabase ou a CNPJ.ws reais
 
 ## Ordem recomendada no SQL Editor
 

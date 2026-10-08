@@ -42,15 +42,35 @@ export function normalizeCnpjForLookup(value: unknown) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+export function isValidCnpjForLookup(value: unknown) {
+  const cnpj = normalizeCnpjForLookup(value);
+  if (!/^\d{14}$/.test(cnpj) || /^(\d)\1{13}$/.test(cnpj)) return false;
+
+  const calculateDigit = (length: number) => {
+    let factor = length - 7;
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) {
+      sum += Number(cnpj[index]) * factor;
+      factor -= 1;
+      if (factor < 2) factor = 9;
+    }
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  return calculateDigit(12) === Number(cnpj[12])
+    && calculateDigit(13) === Number(cnpj[13]);
+}
+
 export async function consultarEmpresaPorCnpj(
   value: unknown,
   provider: CnpjCompanyProvider,
 ) {
   const cnpj = normalizeCnpjForLookup(value);
-  if (!/^\d{14}$/.test(cnpj)) {
+  if (!isValidCnpjForLookup(cnpj)) {
     throw new CnpjLookupError(
       "CNPJ_INVALIDO",
-      "Informe um CNPJ com 14 digitos antes de consultar.",
+      "Informe um CNPJ valido antes de consultar.",
     );
   }
 

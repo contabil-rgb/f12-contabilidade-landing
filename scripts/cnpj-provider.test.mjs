@@ -146,5 +146,10 @@ test('bloqueia entrada fora do contrato antes de chamar o provedor', async () =>
     'CNPJ_INVALIDO',
     false,
   );
+  await expectLookupError(
+    consultarEmpresaPorCnpj('98.765.432/0001-99', provider),
+    'CNPJ_INVALIDO',
+    false,
+  );
   assert.equal(calls, 0);
 });
